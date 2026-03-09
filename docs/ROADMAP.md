@@ -151,29 +151,34 @@ Dependency order — each tier unlocks the next.
 - [x] Postgres event store
 - [x] Actor store (in-memory)
 - [x] Per-role intelligence (Opus/Sonnet)
+- [x] Mission-aware system prompts (soul, method, trust)
 
-### Tier 1: Persistence
+### Tier 1: Persistence + Tools
 - [ ] Postgres actor store (in eventgraph)
 - [ ] Docker Compose for local Postgres
-- [ ] Store selection wired end-to-end
+- [ ] MCP server (Go binary exposing graph/actors/workspace as tools)
+- [ ] Wire MCP into claude-cli provider (`.mcp.json` generation)
+- [ ] Context injection (actor list, pending tasks, own identity)
 
-### Tier 2: Web + Auth
+### Tier 2: Agentic Loop + Auth
+- [ ] Agentic loop (observe → reason → act → reflect → repeat)
+- [ ] Agents self-direct from graph state, not just fixed pipeline
 - [ ] HTTP daemon (`hived`)
 - [ ] Google OAuth2 → actor store registration
-- [ ] Human approval dashboard (pending authority requests)
-- [ ] Serve static content (docs, blog placeholder)
+- [ ] Human approval surface (CLI prompts first, then web dashboard)
 
-### Tier 3: Deployment
+### Tier 3: Deployment + CI
 - [ ] Dockerfile for the hive
 - [ ] fly.io deployment (manual first)
 - [ ] CI/CD (GitHub Actions)
 - [ ] Product deployment (Integrator deploys to fly.io, not just GitHub)
+- [ ] Agent spawning with authority model
 
 ### Tier 4: Self-Improvement
 - [ ] Hive can modify its own codebase (PR-based, human-approved)
+- [ ] Agents can extend MCP tools (build new capabilities)
 - [ ] Hive builds its own task manager (Work Graph, layer 1)
 - [ ] Hive builds its own communication layer
-- [ ] Agent spawning with authority model
 
 ### Tier 5: First Products
 - [ ] Task manager (Work Graph) — the hive's first real product
@@ -186,6 +191,8 @@ Dependency order — each tier unlocks the next.
 - [ ] Market Graph — portable reputation, escrow
 - [ ] Social Graph — user-owned social infrastructure
 - [ ] Alignment Graph — AI accountability for regulators
+
+See [AGENT-TOOLS.md](AGENT-TOOLS.md) for the full MCP + agentic loop spec.
 
 ## Neon vs Docker Postgres
 
