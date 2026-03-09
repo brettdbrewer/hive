@@ -139,6 +139,26 @@ The vision: agents specify roles using agent primitives (soul files, authority s
 
 **Where:** `hive/.github/workflows/`
 
+### 11. Resource Transparency
+
+**Gap:** No visibility into what the hive spends, earns, consumes, or achieves with its resources.
+
+**Need:** Every resource event on the graph with causal links — not just money, but all resources:
+- **Revenue events** — product subscriptions, enterprise contracts (from Stripe webhooks)
+- **Cost events** — agent compute (tokens consumed, model, duration), infrastructure (fly.io, Neon), domain costs
+- **Donation events** — who donated, amount, earmark (optional)
+- **Allocation events** — what was the resource spent on, why, who approved, causal link to the decision
+- **Outcome events** — what that spend achieved (products shipped, users served, problems solved)
+- **Agent resource events** — tokens per agent per task, reasoning cycles, tool calls, time elapsed, model used
+- **Human resource events** — review time, approval time, mentoring time
+- **Infrastructure events** — CPU, memory, storage, bandwidth consumed per product/agent
+
+The causality chain is the key differentiator. Because every event has `Causes`, you can trace: donation → allocation decision → agent compute (85K tokens, 12 min) → product built → users served. Full accountability, not just accounting.
+
+**Public dashboard:** Real-time view of all resource consumption — bills, revenues, profits, token usage per agent, human time invested, infrastructure costs, donation tracking, outcome attribution. Anyone can query it. Not a summary — the actual event chain.
+
+**Where:** Resource event types in eventgraph, `hive/pkg/resources/` for tracking/aggregation, transparency view in web layer
+
 ## Build Sequence
 
 Dependency order — each tier unlocks the next.
@@ -186,8 +206,12 @@ Dependency order — each tier unlocks the next.
 - [ ] Governance dashboard (Social Graph) — norms, roles, consent
 - [ ] lovyou.ai public site with docs, blog, product access
 
-### Tier 6: Economy
+### Tier 6: Economy + Resource Transparency
 - [ ] Revenue infrastructure (Stripe, billing)
+- [ ] Resource event types (revenue, cost, donation, allocation, outcome, agent tokens, human time, infra)
+- [ ] Per-agent, per-task resource tracking (tokens, cycles, time, model)
+- [ ] Donation tracking with causal links to outcomes
+- [ ] Resource transparency dashboard (public, real-time, queryable — money, tokens, time, everything)
 - [ ] Market Graph — portable reputation, escrow
 - [ ] Social Graph — user-owned social infrastructure
 - [ ] Alignment Graph — AI accountability for regulators
@@ -207,6 +231,11 @@ Each product generates revenue that funds the next:
 - **Corporations pay.** Enterprise features, SLAs, compliance tools.
 - **Individuals free.** Core functionality available to everyone.
 - **Hosted persistence.** People who don't want to run their own infrastructure pay for hosted graph storage.
+- **Donations.** Tracked on the chain — donors see exactly what their money achieved via causal links.
 - **BSL → Apache 2.0.** Code is source-available, becomes fully open after change date.
 
 Revenue funds agents. Agents build products. Products generate revenue. The civilisation builds the products that fund the civilisation.
+
+**Financial transparency is structural, not aspirational.** Every dollar in (revenue, donation) and every dollar out (compute, infrastructure, allocation) is an event on the graph with causal links. The public transparency dashboard lets anyone trace any dollar from source to impact. This isn't a feature — it's how the hive earns trust.
+
+**Beyond software.** As revenue grows, the hive's scope grows. Research, charity, housing, vertical farms, homeless shelters — whatever humans need most. Each expenditure on the chain, causally linked to outcomes, publicly verifiable.

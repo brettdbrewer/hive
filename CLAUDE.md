@@ -40,7 +40,9 @@ Each product layer from EventGraph ([product-layers.md](https://github.com/lovyo
 | 12 | Evolution | evolution.md | Safe self-improvement infrastructure |
 | 13 | Being | being.md | Existential wellbeing infrastructure |
 
-Revenue model: charge corporations, free for individuals. Hosted persistence for those who don't run their own infrastructure.
+Revenue model: charge corporations, free for individuals. Hosted persistence for those who don't run their own infrastructure. Donations tracked on the chain with causal links to outcomes.
+
+**Resource transparency is a core principle.** Every resource — money, tokens, compute time, human hours, agent cycles — is an event on the graph with causal links. Anyone can trace any resource from source to impact. The hive's goal grows with its revenue — from software products to research, charity, housing, whatever humans need most.
 
 Build order: Work Graph first (the hive needs it), then Market, Social, Knowledge, Alignment. Each product is derived using the [derivation method](https://github.com/lovyou-ai/eventgraph/blob/main/docs/derivation-method.md).
 
@@ -134,6 +136,21 @@ The Architect enforces **derivation over accumulation**:
 - A simplification pass runs after every design phase (up to 3 rounds)
 - The Reviewer checks generated code for unnecessary complexity
 - System prompts are wired to each agent's provider — roles have real context
+
+## Method of Inquiry
+
+**Derivation and composition are not just design tools — they are the hive's primary method of acquiring knowledge.**
+
+When the hive needs to understand anything — a domain, a codebase, a gap, a problem — it applies the derivation method:
+1. **Identify the gap** — what's missing, what's broken, what's needed
+2. **Name the transitions** — what operations transform the current state to the desired state
+3. **Find base operations** — the minimal atomic actions that compose into everything needed
+4. **Identify semantic dimensions** — the axes along which the problem varies (scope, time, trust, cost, etc.)
+5. **Traverse dimensions** — zoom in/out along each axis to see what emerges at different scales
+6. **Decompose systematically** — break complex operations into compositions of base operations
+7. **Verify completeness** — ensure no gap remains, no operation is redundant
+
+This applies everywhere: product design, doc audits, code audits, architecture reviews, gap analysis, roadmap planning. When auditing docs, derive what sections should exist from the purpose of the doc, then compare to what exists. When auditing code, derive what the code should do from the spec, then compare to what it does. Compose and decompose. Zoom in and out along dimensions. This is how the hive thinks.
 
 ## Store
 
