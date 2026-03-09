@@ -101,16 +101,16 @@ The hive can take a product idea, research it, design a Code Graph spec, generat
 
 **Dependency:** Milestone 2 (MCP tools), Milestone 3 (authority for actions).
 
-| # | Task | Where | Effort |
-|---|------|-------|--------|
-| 4.1 | `AgentRuntime.Loop()` method (outer cycle: observe → kick Claude → check stopping) | `eventgraph/go/pkg/intelligence/` | 1.5d |
-| 4.2 | Observation window (configurable: last N events, events since last check) | `intelligence/loop.go` | 0.5d |
-| 4.3 | Stopping conditions: quiescence, escalation, HALT, budget limit | `intelligence/loop.go` | 0.5d |
-| 4.4 | Budget enforcement per loop iteration (max tokens, max iterations, max cost) | `hive/pkg/resources/budget.go` | 1d |
-| 4.5 | Migrate pipeline from fixed sequence to graph-driven (CTO seeds, agents self-direct) | `hive/pkg/pipeline/` | 2d |
-| 4.6 | Concurrent agent loops (multiple agents running simultaneously, communicating via graph) | `hive/pkg/pipeline/` | 1.5d |
-| 4.7 | Real-time event notification (wire IBus into agent loops — agent notified of relevant events) | `hive/pkg/pipeline/` | 1d |
-| 4.8 | Integration test: two agents collaborate on a task via graph events | `hive/pkg/pipeline/loop_test.go` | 1d |
+| # | Task | Where | Effort | Status |
+|---|------|-------|--------|--------|
+| 4.1 | Agentic loop runner (observe → kick Claude → check stopping) | `hive/pkg/loop/loop.go` | 1.5d | ✅ Done |
+| 4.2 | Observation window (configurable: last N events, events since last check) | `hive/pkg/loop/loop.go` | 0.5d | ✅ Done |
+| 4.3 | Stopping conditions: quiescence, escalation, HALT, budget limit | `hive/pkg/loop/loop.go` | 0.5d | ✅ Done |
+| 4.4 | Budget enforcement per loop iteration (max tokens, max iterations, max cost) | `hive/pkg/resources/budget.go` | 1d | ✅ Done |
+| 4.5 | Migrate pipeline from fixed sequence to graph-driven (CTO seeds, agents self-direct) | `hive/pkg/pipeline/` | 2d | ✅ Done |
+| 4.6 | Concurrent agent loops (multiple agents running simultaneously, communicating via graph) | `hive/pkg/pipeline/` | 1.5d | ✅ Done |
+| 4.7 | Real-time event notification (wire IBus into agent loops — agent notified of relevant events) | `hive/pkg/pipeline/` | 1d | ✅ Done |
+| 4.8 | Integration test: two agents collaborate on a task via graph events | `hive/pkg/loop/loop_test.go` | 1d | ✅ Done |
 
 **Exit criteria:** Multiple agents run concurrent loops, observe graph events, self-direct work, and collaborate without fixed orchestration. Budget limits enforced.
 

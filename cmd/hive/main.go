@@ -40,6 +40,7 @@ func run() error {
 	spec := flag.String("spec", "", "Path to Code Graph spec file")
 	workdir := flag.String("workdir", "products", "Directory for generated products")
 	storeDSN := flag.String("store", "", "Store connection string (postgres://... or empty for in-memory)")
+	loopMode := flag.Bool("loop", false, "Use agentic loop mode (concurrent self-directing agents)")
 	flag.Parse()
 
 	if *idea == "" && *url == "" && *spec == "" {
@@ -137,14 +138,28 @@ func run() error {
 		return fmt.Errorf("pipeline: %w", err)
 	}
 
-	// Run the pipeline — Guardian checks run automatically after each phase
-	if err := p.Run(ctx, pipeline.ProductInput{
+	input := pipeline.ProductInput{
 		Name:        *name,
 		URL:         *url,
 		Description: *idea,
 		SpecFile:    *spec,
-	}); err != nil {
-		return fmt.Errorf("pipeline failed: %w", err)
+	}
+
+	if *loopMode {
+		// Agentic loop mode — concurrent self-directing agents
+		fmt.Println("Mode: agentic loop (concurrent)")
+		results, err := p.RunLoop(ctx, input, pipeline.DefaultLoopConfig())
+		if err != nil {
+			return fmt.Errorf("agentic loop failed: %w", err)
+		}
+		for role, result := range results {
+			fmt.Printf("  %s: %s (%d iterations)\n", role, result.Reason, result.Iterations)
+		}
+	} else {
+		// Sequential pipeline mode — fixed phase sequence
+		if err := p.Run(ctx, input); err != nil {
+			return fmt.Errorf("pipeline failed: %w", err)
+		}
 	}
 
 	// Persist trust state for next run (only if load succeeded — avoids

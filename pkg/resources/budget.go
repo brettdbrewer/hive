@@ -1,0 +1,124 @@
+// Package resources tracks and enforces agent resource budgets.
+//
+// Every agent loop iteration consumes resources — tokens, cost, time.
+// Budget enforcement prevents runaway agents (BUDGET invariant).
+package resources
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+// Budget tracks resource consumption for an agent loop.
+// Safe for concurrent use.
+type Budget struct {
+	mu sync.Mutex
+
+	// Limits (zero means unlimited).
+	maxTokens     int
+	maxCostUSD    float64
+	maxIterations int
+	maxDuration   time.Duration
+
+	// Consumed.
+	tokensUsed int
+	costUSD    float64
+	iterations int
+	startTime  time.Time
+}
+
+// BudgetConfig configures resource limits. Zero values mean unlimited.
+type BudgetConfig struct {
+	MaxTokens     int           // total tokens across all iterations
+	MaxCostUSD    float64       // total cost in USD
+	MaxIterations int           // maximum loop iterations
+	MaxDuration   time.Duration // maximum wall-clock time
+}
+
+// NewBudget creates a budget tracker with the given limits.
+func NewBudget(cfg BudgetConfig) *Budget {
+	return &Budget{
+		maxTokens:     cfg.MaxTokens,
+		maxCostUSD:    cfg.MaxCostUSD,
+		maxIterations: cfg.MaxIterations,
+		maxDuration:   cfg.MaxDuration,
+		startTime:     time.Now(),
+	}
+}
+
+// Record adds resource consumption from one iteration.
+func (b *Budget) Record(tokens int, costUSD float64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.tokensUsed += tokens
+	b.costUSD += costUSD
+	b.iterations++
+}
+
+// Check returns nil if within budget, or an error describing what was exceeded.
+func (b *Budget) Check() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.maxTokens > 0 && b.tokensUsed >= b.maxTokens {
+		return &BudgetExceededError{
+			Resource: "tokens",
+			Used:     fmt.Sprintf("%d", b.tokensUsed),
+			Limit:    fmt.Sprintf("%d", b.maxTokens),
+		}
+	}
+	if b.maxCostUSD > 0 && b.costUSD >= b.maxCostUSD {
+		return &BudgetExceededError{
+			Resource: "cost",
+			Used:     fmt.Sprintf("$%.2f", b.costUSD),
+			Limit:    fmt.Sprintf("$%.2f", b.maxCostUSD),
+		}
+	}
+	if b.maxIterations > 0 && b.iterations >= b.maxIterations {
+		return &BudgetExceededError{
+			Resource: "iterations",
+			Used:     fmt.Sprintf("%d", b.iterations),
+			Limit:    fmt.Sprintf("%d", b.maxIterations),
+		}
+	}
+	if b.maxDuration > 0 && time.Since(b.startTime) >= b.maxDuration {
+		return &BudgetExceededError{
+			Resource: "duration",
+			Used:     time.Since(b.startTime).String(),
+			Limit:    b.maxDuration.String(),
+		}
+	}
+	return nil
+}
+
+// Snapshot returns a point-in-time copy of resource consumption.
+func (b *Budget) Snapshot() BudgetSnapshot {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return BudgetSnapshot{
+		TokensUsed: b.tokensUsed,
+		CostUSD:    b.costUSD,
+		Iterations: b.iterations,
+		Elapsed:    time.Since(b.startTime),
+	}
+}
+
+// BudgetSnapshot is an immutable copy of resource consumption at a point in time.
+type BudgetSnapshot struct {
+	TokensUsed int
+	CostUSD    float64
+	Iterations int
+	Elapsed    time.Duration
+}
+
+// BudgetExceededError is returned when a resource limit is reached.
+type BudgetExceededError struct {
+	Resource string // "tokens", "cost", "iterations", "duration"
+	Used     string
+	Limit    string
+}
+
+func (e *BudgetExceededError) Error() string {
+	return fmt.Sprintf("budget exceeded: %s used %s (limit %s)", e.Resource, e.Used, e.Limit)
+}

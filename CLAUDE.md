@@ -125,8 +125,11 @@ go test ./...
 ## Running
 
 ```bash
-# Local dev (in-memory store)
+# Local dev (in-memory store) — sequential pipeline
 go run ./cmd/hive --human Matt --idea "Build a task management app with kanban boards"
+
+# Agentic loop mode — concurrent self-directing agents
+go run ./cmd/hive --human Matt --loop --idea "Build a task management app with kanban boards"
 
 # With Postgres (Docker locally, Neon in production)
 go run ./cmd/hive --human Matt --store "postgres://hive:hive@localhost:5432/hive" --idea "..."
@@ -145,7 +148,12 @@ go run ./cmd/hive --human Matt --spec path/to/spec.cg
 ## Key Files
 
 - `pkg/roles/` — Agent role definitions and system prompts
-- `pkg/pipeline/` — Product pipeline orchestration
+- `pkg/pipeline/` — Product pipeline orchestration (sequential + agentic loop modes)
+- `pkg/loop/` — Agentic loop runner (observe-reason-act-reflect cycles)
+- `pkg/resources/` — Budget enforcement (tokens, cost, iterations, duration)
+- `pkg/spawn/` — Agent spawning with authority gates and trust checks
+- `pkg/authority/` — Three-tier approval model (Required/Recommended/Notification)
+- `pkg/mcp/` — MCP server for agent tools
 - `pkg/workspace/` — File system and git management for generated code
 - `cmd/hive/` — CLI entry point
 
@@ -168,7 +176,15 @@ Model assignment by role (three tiers):
 - **Sonnet** (`claude-sonnet-4-6`): Builder, Tester, Integrator, Researcher, Spawner — execution tasks
 - **Haiku** (`claude-haiku-4-5-20251001`): SysMon, Allocator — high-volume, simple tasks
 
-## Pipeline
+## Pipeline Modes
+
+### Sequential (default)
+Fixed phase sequence: Research → Design → Simplify → Build → Review → Test → Integrate. Guardian checks after each phase. Human approves agent spawns. Good for stepping through and debugging.
+
+### Agentic Loop (`--loop`)
+CTO seeds work, then agents run concurrent observe-reason-act-reflect loops. They communicate through events on the shared graph. IBus provides real-time event notification. Budget enforcement prevents runaway agents. Agents stop on: quiescence (nothing to do), escalation (needs human), HALT (Guardian), or budget limit.
+
+## Sequential Pipeline Detail
 
 1. **Research** — Researcher reads URLs/ideas, CTO evaluates feasibility
 2. **Design** — Architect creates Code Graph spec, CTO reviews for minimalism

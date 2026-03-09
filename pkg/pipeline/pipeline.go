@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/lovyou-ai/eventgraph/go/pkg/actor"
+	"github.com/lovyou-ai/eventgraph/go/pkg/bus"
 	"github.com/lovyou-ai/eventgraph/go/pkg/event"
 	"github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
 	"github.com/lovyou-ai/eventgraph/go/pkg/store"
@@ -19,6 +20,8 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
 	"github.com/lovyou-ai/hive/pkg/authority"
+	"github.com/lovyou-ai/hive/pkg/loop"
+	"github.com/lovyou-ai/hive/pkg/resources"
 	"github.com/lovyou-ai/hive/pkg/roles"
 	"github.com/lovyou-ai/hive/pkg/spawn"
 	"github.com/lovyou-ai/hive/pkg/workspace"
@@ -354,6 +357,179 @@ func (p *Pipeline) Run(ctx context.Context, input ProductInput) error {
 
 	fmt.Println("═══ Pipeline Complete ═══")
 	return nil
+}
+
+// LoopConfig configures the agentic loop mode of the pipeline.
+type LoopConfig struct {
+	// Budget limits for each agent loop.
+	Budget resources.BudgetConfig
+
+	// OnIteration is called when any agent completes a loop iteration.
+	OnIteration func(role roles.Role, iteration int, response string)
+}
+
+// DefaultLoopConfig returns sensible defaults for loop mode.
+func DefaultLoopConfig() LoopConfig {
+	return LoopConfig{
+		Budget: resources.BudgetConfig{
+			MaxIterations: 20,
+			MaxCostUSD:    10.0,
+		},
+	}
+}
+
+// RunLoop executes the pipeline in graph-driven agentic loop mode.
+//
+// Instead of a fixed phase sequence, the CTO seeds the work and agents
+// self-direct by observing graph events. The Guardian runs its own loop
+// watching everything. Agents communicate through events, not orchestration.
+func (p *Pipeline) RunLoop(ctx context.Context, input ProductInput, cfg LoopConfig) (map[roles.Role]loop.Result, error) {
+	// Create event bus for real-time notification between agents.
+	eventBus := bus.NewEventBus(p.store, 256)
+	defer eventBus.Close()
+
+	// Seed: CTO evaluates the idea and emits initial direction.
+	fmt.Println("═══ Seeding: CTO evaluates idea ═══")
+	seedTask, err := p.seedWork(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("seed work: %w", err)
+	}
+
+	// Bootstrap agents for the product pipeline.
+	agentConfigs, err := p.buildLoopConfigs(ctx, seedTask, eventBus, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("build loop configs: %w", err)
+	}
+
+	// Run all agent loops concurrently.
+	fmt.Printf("═══ Starting %d agent loops ═══\n", len(agentConfigs))
+	for _, c := range agentConfigs {
+		fmt.Printf("  ↳ %s loop starting\n", c.Agent.Role)
+	}
+
+	results := loop.RunConcurrent(ctx, agentConfigs)
+
+	fmt.Println("═══ All loops stopped ═══")
+	for role, result := range results {
+		fmt.Printf("  %s: stopped=%s iterations=%d tokens=%d\n",
+			role, result.Reason, result.Iterations, result.Budget.TokensUsed)
+	}
+
+	return results, nil
+}
+
+// seedWork has the CTO evaluate the input and emit seed events on the graph.
+// Returns a task description that other agents will observe.
+func (p *Pipeline) seedWork(ctx context.Context, input ProductInput) (string, error) {
+	var spec string
+	if input.SpecFile != "" {
+		content, err := p.ws.ReadFile(input.SpecFile)
+		if err != nil {
+			return "", fmt.Errorf("read spec: %w", err)
+		}
+		spec = content
+	} else if input.URL != "" {
+		spec = fmt.Sprintf("Research and build product from: %s", input.URL)
+	} else if input.Description != "" {
+		spec = input.Description
+	}
+
+	// CTO evaluates and seeds direction.
+	_, evaluation, err := p.cto.Runtime.Evaluate(ctx, "seed_direction",
+		fmt.Sprintf(`You are seeding a product build. Evaluate this idea and emit clear direction for the team.
+
+What needs building? What's the architecture? What should the Builder do first?
+Be specific and actionable — other agents will read your events and self-direct.
+
+Product idea:
+%s`, spec))
+	if err != nil {
+		return "", fmt.Errorf("CTO seed: %w", err)
+	}
+
+	// Record the CTO's direction as an action event.
+	_, err = p.cto.Runtime.Act(ctx, "seed_product_build", spec)
+	if err != nil {
+		return "", fmt.Errorf("CTO seed action: %w", err)
+	}
+
+	fmt.Printf("CTO direction:\n%s\n", evaluation)
+	return evaluation, nil
+}
+
+// buildLoopConfigs creates loop configurations for each pipeline agent.
+func (p *Pipeline) buildLoopConfigs(ctx context.Context, seedTask string, eventBus bus.IBus, cfg LoopConfig) ([]loop.Config, error) {
+	var configs []loop.Config
+
+	// Builder — generates code based on CTO direction.
+	builder, err := p.ensureAgent(ctx, roles.RoleBuilder, "builder")
+	if err != nil {
+		return nil, fmt.Errorf("ensure builder: %w", err)
+	}
+	configs = append(configs, loop.Config{
+		Agent:   builder,
+		HumanID: p.humanID,
+		Budget:  cfg.Budget,
+		Task:    fmt.Sprintf("Build the product based on this direction:\n%s", seedTask),
+		Bus:     eventBus,
+		OnIteration: func(i int, resp string) {
+			if cfg.OnIteration != nil {
+				cfg.OnIteration(roles.RoleBuilder, i, resp)
+			}
+		},
+	})
+
+	// Reviewer — watches for build events and reviews code.
+	reviewer, err := p.ensureAgent(ctx, roles.RoleReviewer, "reviewer")
+	if err != nil {
+		return nil, fmt.Errorf("ensure reviewer: %w", err)
+	}
+	configs = append(configs, loop.Config{
+		Agent:   reviewer,
+		HumanID: p.humanID,
+		Budget:  cfg.Budget,
+		Task:    "Watch for code generation events. Review code for quality, security, and spec compliance. Report issues.",
+		Bus:     eventBus,
+		OnIteration: func(i int, resp string) {
+			if cfg.OnIteration != nil {
+				cfg.OnIteration(roles.RoleReviewer, i, resp)
+			}
+		},
+	})
+
+	// Tester — watches for build/review events and runs tests.
+	tester, err := p.ensureAgent(ctx, roles.RoleTester, "tester")
+	if err != nil {
+		return nil, fmt.Errorf("ensure tester: %w", err)
+	}
+	configs = append(configs, loop.Config{
+		Agent:   tester,
+		HumanID: p.humanID,
+		Budget:  cfg.Budget,
+		Task:    "Watch for code changes. Run tests, analyze coverage, and report gaps.",
+		Bus:     eventBus,
+		OnIteration: func(i int, resp string) {
+			if cfg.OnIteration != nil {
+				cfg.OnIteration(roles.RoleTester, i, resp)
+			}
+		},
+	})
+
+	// Guardian — watches everything, can HALT.
+	configs = append(configs, loop.Config{
+		Agent:   p.guardian,
+		HumanID: p.humanID,
+		Budget:  cfg.Budget,
+		Task:    "Monitor all agent activity for policy violations, trust anomalies, and authority overreach. HALT if anything looks wrong.",
+		Bus:     eventBus,
+		OnIteration: func(i int, resp string) {
+			if cfg.OnIteration != nil {
+				cfg.OnIteration(roles.RoleGuardian, i, resp)
+			}
+		},
+	})
+
+	return configs, nil
 }
 
 // deriveName asks the CTO to derive a short, kebab-case product name from the spec.
