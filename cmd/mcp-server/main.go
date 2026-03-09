@@ -33,7 +33,7 @@ func run() error {
 	dsn := flag.String("store", "", "Postgres connection string (required)")
 	agentID := flag.String("agent-id", "", "This agent's ActorID (required)")
 	humanID := flag.String("human-id", "", "The human operator's ActorID (required)")
-	convID := flag.String("conv-id", "conv_mcp_000000000000000000000001", "Conversation ID for emitted events")
+	convID := flag.String("conv-id", "", "Conversation ID for emitted events")
 	flag.Parse()
 
 	// Also check env vars (Claude CLI passes env to subprocesses).
@@ -48,6 +48,9 @@ func run() error {
 	}
 	if *convID == "" {
 		*convID = os.Getenv("HIVE_CONV_ID")
+	}
+	if *convID == "" {
+		*convID = "conv_mcp_000000000000000000000001"
 	}
 
 	if *dsn == "" {
