@@ -61,7 +61,23 @@ go run ./cmd/hive --spec path/to/spec.cg
 - `pkg/workspace/` — File system management for generated code
 - `cmd/hive/` — CLI entry point
 
+## Intelligence
+
+All inference runs through **Claude CLI** (Max plan, flat rate). NOT the Anthropic API — CLI is cheaper and better for our use case. The pipeline creates `claude-cli` providers automatically.
+
+Model assignment by role:
+- **Opus** (`claude-opus-4-6`): CTO, Architect, Reviewer, Guardian — high-judgment tasks
+- **Sonnet** (`claude-sonnet-4-6`): Builder, Tester, Integrator, Researcher — execution tasks
+
+## Design Philosophy
+
+The Architect enforces **derivation over accumulation**:
+- Each view has the minimal elements required
+- Complexity emerges from composing simple atoms, not adding parts
+- A simplification pass runs after every design phase (up to 3 rounds)
+- The Reviewer checks generated code for unnecessary complexity
+
 ## Dependencies
 
 - `github.com/lovyou-ai/eventgraph/go` — event graph, agent runtime, intelligence
-- Claude CLI — intelligence backend (flat rate via Max plan)
+- Claude CLI — intelligence backend (flat rate via Max plan, no API key needed)

@@ -37,10 +37,9 @@ type ProductInput struct {
 
 // Pipeline orchestrates agents through the product build phases.
 type Pipeline struct {
-	store    store.Store
-	provider intelligence.Provider
-	ws       *workspace.Workspace
-	product  *workspace.Product // current product being built
+	store   store.Store
+	ws      *workspace.Workspace
+	product *workspace.Product // current product being built
 
 	cto      *roles.Agent
 	guardian *roles.Agent
@@ -49,9 +48,8 @@ type Pipeline struct {
 
 // Config for creating a new pipeline.
 type Config struct {
-	Store      store.Store
-	Provider   intelligence.Provider
-	WorkDir    string // Root directory for generated products
+	Store   store.Store
+	WorkDir string // Root directory for generated products
 }
 
 // New creates a pipeline and bootstraps the CTO and Guardian.
@@ -62,55 +60,58 @@ func New(ctx context.Context, cfg Config) (*Pipeline, error) {
 	}
 
 	p := &Pipeline{
-		store:    cfg.Store,
-		provider: cfg.Provider,
-		ws:       ws,
-		agents:   make(map[roles.Role]*roles.Agent),
+		store:  cfg.Store,
+		ws:     ws,
+		agents: make(map[roles.Role]*roles.Agent),
 	}
 
-	// Bootstrap CTO first — architectural oversight
-	cto, err := roles.NewAgent(ctx, roles.AgentConfig{
-		Role:     roles.RoleCTO,
-		Name:     "cto",
-		Store:    cfg.Store,
-		Provider: cfg.Provider,
-	})
+	// Bootstrap CTO first — architectural oversight (Opus)
+	cto, err := p.ensureAgent(ctx, roles.RoleCTO, "cto")
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap CTO: %w", err)
 	}
 	p.cto = cto
-	p.agents[roles.RoleCTO] = cto
 
-	// Bootstrap Guardian — independent integrity monitor
-	guardian, err := roles.NewAgent(ctx, roles.AgentConfig{
-		Role:     roles.RoleGuardian,
-		Name:     "guardian",
-		Store:    cfg.Store,
-		Provider: cfg.Provider,
-	})
+	// Bootstrap Guardian — independent integrity monitor (Opus)
+	guardian, err := p.ensureAgent(ctx, roles.RoleGuardian, "guardian")
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap Guardian: %w", err)
 	}
 	p.guardian = guardian
-	p.agents[roles.RoleGuardian] = guardian
 
 	return p, nil
 }
 
+// providerForRole creates an intelligence provider with the model appropriate for the role.
+// Uses Claude CLI (flat rate via Max plan) — no API key needed.
+func (p *Pipeline) providerForRole(role roles.Role) (intelligence.Provider, error) {
+	model := roles.PreferredModel(role)
+	return intelligence.New(intelligence.Config{
+		Provider: "claude-cli",
+		Model:    model,
+	})
+}
+
 // ensureAgent creates an agent of the given role if it doesn't exist yet.
+// Each role gets a provider with the appropriate model (Opus for judgment, Sonnet for execution).
 func (p *Pipeline) ensureAgent(ctx context.Context, role roles.Role, name string) (*roles.Agent, error) {
 	if agent, ok := p.agents[role]; ok {
 		return agent, nil
+	}
+	provider, err := p.providerForRole(role)
+	if err != nil {
+		return nil, fmt.Errorf("provider for %s: %w", role, err)
 	}
 	agent, err := roles.NewAgent(ctx, roles.AgentConfig{
 		Role:     role,
 		Name:     name,
 		Store:    p.store,
-		Provider: p.provider,
+		Provider: provider,
 	})
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("  ↳ %s agent using %s\n", role, roles.PreferredModel(role))
 	p.agents[role] = agent
 	return agent, nil
 }
@@ -139,6 +140,12 @@ func (p *Pipeline) Run(ctx context.Context, input ProductInput) error {
 	design, err := p.design(ctx, spec)
 	if err != nil {
 		return fmt.Errorf("design: %w", err)
+	}
+
+	fmt.Println("═══ Phase 2b: Simplify ═══")
+	design, err = p.simplify(ctx, design)
+	if err != nil {
+		return fmt.Errorf("simplify: %w", err)
 	}
 
 	fmt.Println("═══ Phase 3: Build ═══")
@@ -239,6 +246,51 @@ func (p *Pipeline) design(ctx context.Context, spec string) (string, error) {
 	return design, nil
 }
 
+// simplify reviews the Code Graph spec and reduces it to its minimal form.
+// The Architect re-examines every element: can views be composed from fewer parts?
+// Can entities be split or merged? Can states be derived rather than declared?
+// This runs in a loop until the Architect reports no further simplifications.
+func (p *Pipeline) simplify(ctx context.Context, design string) (string, error) {
+	architect, err := p.ensureAgent(ctx, roles.RoleArchitect, "architect")
+	if err != nil {
+		return "", err
+	}
+
+	const maxRounds = 3
+	current := design
+
+	for round := 1; round <= maxRounds; round++ {
+		_, analysis, err := architect.Runtime.Evaluate(ctx, "simplify",
+			fmt.Sprintf(`Review this Code Graph spec for simplification opportunities.
+
+For each View: can it be composed from fewer elements? Are any elements redundant or derivable from others?
+For each Entity: is it as small as possible? Should it be split or can properties be derived?
+For each State machine: are there too many states? Can transitions be reduced?
+For each Layout: does it have too many children? Can sub-views be composed instead?
+
+If you find simplifications, output the REVISED spec with the changes applied.
+If the spec is already minimal, respond with exactly: MINIMAL
+
+Current spec:
+%s`, current))
+		if err != nil {
+			return "", fmt.Errorf("simplify round %d: %w", round, err)
+		}
+
+		upper := strings.ToUpper(strings.TrimSpace(analysis))
+		if upper == "MINIMAL" || strings.HasPrefix(upper, "MINIMAL") {
+			fmt.Printf("Simplification complete after %d round(s) — spec is minimal.\n", round)
+			return current, nil
+		}
+
+		fmt.Printf("Simplification round %d applied.\n", round)
+		current = analysis
+	}
+
+	fmt.Printf("Simplification capped at %d rounds.\n", maxRounds)
+	return current, nil
+}
+
 // build generates code from the design spec.
 func (p *Pipeline) build(ctx context.Context, design string) (string, error) {
 	builder, err := p.ensureAgent(ctx, roles.RoleBuilder, "builder")
@@ -278,7 +330,7 @@ func (p *Pipeline) review(ctx context.Context, code string, design string) error
 		return fmt.Errorf("code review: %w", err)
 	}
 
-	// Also check spec compliance
+	// Check spec compliance
 	_, specReview, err := reviewer.Runtime.Evaluate(ctx, "spec_compliance",
 		fmt.Sprintf("%s\n\nDoes this code match the design spec?\n\nDesign:\n%s\n\nCode:\n%s",
 			roles.SystemPrompt(roles.RoleReviewer), design, code))
@@ -286,7 +338,21 @@ func (p *Pipeline) review(ctx context.Context, code string, design string) error
 		return fmt.Errorf("spec review: %w", err)
 	}
 
-	fmt.Printf("Code Review:\n%s\n\nSpec Compliance:\n%s\n", review, specReview)
+	// Check for unnecessary complexity in the implementation
+	_, simplicityReview, err := reviewer.Runtime.Evaluate(ctx, "simplicity_check",
+		fmt.Sprintf(`Review this code for unnecessary complexity. Check:
+- Are there components that could be derived from simpler compositions?
+- Are there redundant abstractions or over-engineered patterns?
+- Could any part be simpler while preserving the same behavior?
+- Does the code match the minimal spec, or did the builder add extras?
+
+Code:
+%s`, code))
+	if err != nil {
+		return fmt.Errorf("simplicity review: %w", err)
+	}
+
+	fmt.Printf("Code Review:\n%s\n\nSpec Compliance:\n%s\n\nSimplicity:\n%s\n", review, specReview, simplicityReview)
 	_ = reviewEvt
 	return nil
 }

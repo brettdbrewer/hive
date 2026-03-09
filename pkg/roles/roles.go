@@ -24,6 +24,18 @@ const (
 	RoleIntegrator Role = "integrator"
 )
 
+// PreferredModel returns the recommended model for a role.
+// High-judgment roles (CTO, Architect, Reviewer, Guardian) use Opus.
+// Execution roles (Builder, Tester, Integrator, Researcher) use Sonnet.
+func PreferredModel(role Role) string {
+	switch role {
+	case RoleCTO, RoleArchitect, RoleReviewer, RoleGuardian:
+		return "claude-opus-4-6"
+	default:
+		return "claude-sonnet-4-6"
+	}
+}
+
 // Agent wraps an AgentRuntime with role-specific metadata.
 type Agent struct {
 	Runtime *intelligence.AgentRuntime

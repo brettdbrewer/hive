@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
 	"github.com/lovyou-ai/eventgraph/go/pkg/store"
 
 	"github.com/lovyou-ai/hive/pkg/pipeline"
@@ -18,42 +17,25 @@ func main() {
 	idea := flag.String("idea", "", "Product idea (natural language description)")
 	url := flag.String("url", "", "URL to research for product idea")
 	spec := flag.String("spec", "", "Path to Code Graph spec file")
-	model := flag.String("model", "claude-sonnet-4-6", "Model to use for inference")
 	workdir := flag.String("workdir", "products", "Directory for generated products")
 	flag.Parse()
 
 	if *idea == "" && *url == "" && *spec == "" {
-		fmt.Fprintln(os.Stderr, "Usage: hive --idea 'description' | --url 'https://...' | --spec path/to/spec.cg")
+		fmt.Fprintln(os.Stderr, "Usage: hive --name product-name --idea 'description' | --url 'https://...' | --spec path/to/spec.cg")
 		os.Exit(1)
 	}
 
 	ctx := context.Background()
 
-	// Create intelligence provider
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		fmt.Fprintln(os.Stderr, "ANTHROPIC_API_KEY not set")
-		os.Exit(1)
-	}
-
-	provider, err := intelligence.New(intelligence.Config{
-		Provider: "anthropic",
-		Model:    *model,
-		APIKey:   apiKey,
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "provider: %v\n", err)
-		os.Exit(1)
-	}
-
 	// Create shared event graph
 	s := store.NewInMemoryStore()
 
-	// Create and run pipeline
+	// Create and run pipeline — uses Claude CLI (Max plan, flat rate)
+	// CTO, Architect, Reviewer, Guardian → Opus (high judgment)
+	// Builder, Tester, Integrator, Researcher → Sonnet (execution)
 	p, err := pipeline.New(ctx, pipeline.Config{
-		Store:    s,
-		Provider: provider,
-		WorkDir:  *workdir,
+		Store:   s,
+		WorkDir: *workdir,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "pipeline: %v\n", err)
