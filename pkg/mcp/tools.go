@@ -68,6 +68,9 @@ func registerReadTools(s *Server, deps Deps, audit *AuditLogger) {
 		}`),
 		func(args map[string]any) (ToolCallResult, error) {
 			limit := intArg(args, "limit", 20)
+			if limit <= 0 {
+				limit = 20
+			}
 			if limit > 100 {
 				limit = 100
 			}
@@ -369,6 +372,9 @@ func registerWriteTools(s *Server, deps Deps, audit *AuditLogger, authCheck *Aut
 
 // unmarshalAgentContent deserializes JSON into the correct EventContent type.
 // The agentID is injected since the agent shouldn't need to specify its own ID.
+// Note: fields like Authority and Recipient are format-validated by typed ID
+// unmarshalers but not existence-checked. The graph records what was claimed;
+// the Guardian validates semantics post-hoc.
 func unmarshalAgentContent(eventType string, data []byte, agentID types.ActorID) (event.EventContent, error) {
 	switch eventType {
 	case "agent.observed":

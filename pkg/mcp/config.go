@@ -49,7 +49,7 @@ func WriteConfig(dir string, mcpBinary string, dsn string, agentID types.ActorID
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create config dir: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return "", fmt.Errorf("write MCP config: %w", err)
 	}
 

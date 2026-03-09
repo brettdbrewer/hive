@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/lovyou-ai/eventgraph/go/pkg/event"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
@@ -77,7 +78,9 @@ func (a *AuditLogger) LogToolCall(toolName string, args map[string]any, result T
 		return
 	}
 
-	a.store.Append(ev)
+	if _, err := a.store.Append(ev); err != nil {
+		fmt.Fprintf(os.Stderr, "mcp: audit append failed: %v\n", err)
+	}
 }
 
 // WrapHandler wraps a tool handler with audit logging.

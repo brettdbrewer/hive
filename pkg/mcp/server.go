@@ -84,6 +84,9 @@ func (s *Server) handleRequest(req Request) *Response {
 	case "ping":
 		return s.success(req.ID, json.RawMessage(`{}`))
 	default:
+		if req.ID == nil {
+			return nil // notification — no response per JSON-RPC 2.0
+		}
 		return s.errorResp(req.ID, -32601, fmt.Sprintf("method not found: %s", req.Method))
 	}
 }
