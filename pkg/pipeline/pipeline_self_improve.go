@@ -68,6 +68,16 @@ func (p *Pipeline) runSelfImproveIteration(parentCtx context.Context, iteration 
 	ctx, cancel := context.WithTimeout(parentCtx, selfImproveIterationTimeout)
 	defer cancel()
 
+	// Step 0: Clean up from any previous failed iteration — discard uncommitted
+	// changes, delete stale hive/* branches, and sync main with remote.
+	product, err := workspace.OpenRepo(input.RepoPath)
+	if err != nil {
+		return fmt.Errorf("open repo for cleanup: %w", err)
+	}
+	if err := product.CleanupForIteration(); err != nil {
+		fmt.Printf("Warning: cleanup failed: %v (continuing anyway)\n", err)
+	}
+
 	// Step 1: Read telemetry
 	telemetryResults, err := ReadTelemetry(input.RepoPath)
 	if err != nil {
@@ -76,10 +86,6 @@ func (p *Pipeline) runSelfImproveIteration(parentCtx context.Context, iteration 
 	fmt.Printf("Telemetry: %d past run(s) found.\n", len(telemetryResults))
 
 	// Step 2: Load codebase context (reuse targeted mode Phase 1)
-	product, err := workspace.OpenRepo(input.RepoPath)
-	if err != nil {
-		return fmt.Errorf("open repo: %w", err)
-	}
 	existingFiles, err := product.ReadSourceFiles()
 	if err != nil {
 		return fmt.Errorf("read source files: %w", err)

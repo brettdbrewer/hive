@@ -333,6 +333,39 @@ func (p *Product) SyncMain() error {
 	return nil
 }
 
+// CleanupForIteration resets the repo to a clean main branch, discarding
+// any uncommitted changes and deleting local hive/* branches left over from
+// failed self-improve iterations. Safe to call at the start of each iteration.
+func (p *Product) CleanupForIteration() error {
+	// Discard any uncommitted changes.
+	_ = p.git("checkout", "--", ".")
+	_ = p.git("clean", "-fd")
+
+	// Switch to main (may already be there).
+	if err := p.git("checkout", "main"); err != nil {
+		return fmt.Errorf("checkout main: %w", err)
+	}
+
+	// Delete local hive/* branches (stale feature branches from failed runs).
+	cmd := exec.Command("git", "branch", "--list", "hive/*")
+	cmd.Dir = p.Dir
+	out, err := cmd.Output()
+	if err == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			branch := strings.TrimSpace(line)
+			if branch != "" {
+				_ = p.git("branch", "-D", branch)
+			}
+		}
+	}
+
+	// Pull latest main.
+	if err := p.git("pull", "origin", "main"); err != nil {
+		return fmt.Errorf("pull main: %w", err)
+	}
+	return nil
+}
+
 // PushBranch pushes the current branch to the remote.
 func (p *Product) PushBranch() error {
 	branch, err := p.CurrentBranch()
