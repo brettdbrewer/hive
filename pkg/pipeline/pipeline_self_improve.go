@@ -13,7 +13,7 @@ import (
 )
 
 // maxSelfImproveIterations is the maximum number of improvements per session.
-const maxSelfImproveIterations = 5
+const maxSelfImproveIterations = 10
 
 // selfImproveIterationTimeout caps how long a single self-improve iteration
 // (CTO analysis + targeted pipeline run) can take before being killed.
