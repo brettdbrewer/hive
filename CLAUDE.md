@@ -149,8 +149,19 @@ go run ./cmd/hive --human Matt --store "postgres://hive:hive@localhost:5432/hive
 # Targeted mode — modify existing code (creates branch + PR)
 go run ./cmd/hive --human Matt --yes --store "postgres://hive:hive@localhost:5432/hive" --repo /path/to/repo --idea "add a has command"
 
-# Self-improvement — analyze telemetry + codebase, apply fixes (up to 3 iterations)
+# Self-improvement — analyze telemetry + codebase, apply fixes (up to 10 iterations)
 go run ./cmd/hive --human Matt --yes --self-improve --store "postgres://hive:hive@localhost:5432/hive"
+
+# Evolution — build new capabilities and features (up to 5 iterations)
+go run ./cmd/hive --human Matt --yes --evolve --store "postgres://hive:hive@localhost:5432/hive"
+
+# Evolution with human direction
+go run ./cmd/hive --human Matt --yes --evolve --store "postgres://hive:hive@localhost:5432/hive" --idea "add agent communication channels"
+
+# Query pipeline events from the event graph
+go run ./cmd/hive --store "postgres://hive:hive@localhost:5432/hive" -q
+go run ./cmd/hive --store "postgres://hive:hive@localhost:5432/hive" --query phase
+go run ./cmd/hive --store "postgres://hive:hive@localhost:5432/hive" --query telemetry
 ```
 
 ## Key Files
@@ -203,6 +214,12 @@ Fixed phase sequence: Research → Design → Simplify → Build → Review → 
 
 ### Sequential — Targeted Mode (`--repo`)
 For modifying existing code: Context Load → Understand → Modify → Review → Test → PR. Skips research/design/simplify. Builder and reviewer receive existing codebase as context. Creates branch and PR, not direct commits. Used for self-improvement and feature additions.
+
+### Self-Improve (`--self-improve`)
+CTO analyzes telemetry + full codebase, identifies bugs and correctness issues, runs targeted pipeline to fix them. Up to 10 iterations per session, stops when CTO finds nothing worth fixing.
+
+### Evolve (`--evolve`)
+CTO reads full codebase + architecture roadmap, proposes new capabilities and features to build. Unlike self-improve (which fixes bugs), evolve builds what's missing. Up to 5 iterations per session. Accepts `--idea` for human direction ("build agent communication channels"). Guardian stays active for integrity checks on new features.
 
 ### Agentic Loop (`--loop`)
 CTO seeds work, then agents run concurrent observe-reason-act-reflect loops. They communicate through events on the shared graph. IBus provides real-time event notification. Budget enforcement prevents runaway agents. Agents stop on: quiescence (nothing to do), escalation (needs human), HALT (Guardian), or budget limit.

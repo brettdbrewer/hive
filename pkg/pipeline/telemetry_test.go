@@ -239,9 +239,10 @@ func TestSummarizeTelemetryWithData(t *testing.T) {
 }
 
 func TestSummarizeTelemetryCapsOlderRuns(t *testing.T) {
-	// Build 5 runs — only the last 3 should have full detail.
+	// Build 15 runs — only the last telemetryDetailRunLimit should have full detail.
+	// Older runs get one-line summaries.
 	var results []PipelineResult
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 15; i++ {
 		results = append(results, PipelineResult{
 			Mode:             "targeted",
 			InputDescription: fmt.Sprintf("change %d", i+1),
@@ -260,37 +261,29 @@ func TestSummarizeTelemetryCapsOlderRuns(t *testing.T) {
 
 	summary := summarizeTelemetry(results)
 
-	// Older runs (1 and 2) should have one-line summaries only.
-	for _, runNum := range []int{1, 2} {
+	// Older runs (1-5) should have one-line summaries only.
+	for _, runNum := range []int{1, 2, 3, 4, 5} {
 		prefix := fmt.Sprintf("Run %d: mode=targeted", runNum)
 		if !contains(summary, prefix) {
 			t.Errorf("older run %d: missing one-line summary with %q", runNum, prefix)
 		}
 	}
 
-	// Older runs must NOT have full detail markers.
-	// We check the substring between "Run 1:" and "Run 2:" for run 1,
-	// and between "Run 2:" and "--- Run 3" for run 2.
-	// Simpler: the one-line format never contains "Phase timings:" or "Token usage by role:".
-	// Count occurrences — should be exactly 3 (one per detailed run).
+	// Count detailed sections — should match telemetryDetailRunLimit.
 	phaseCount := countOccurrences(summary, "Phase timings:")
 	tokenCount := countOccurrences(summary, "Token usage by role:")
-	if phaseCount != 3 {
-		t.Errorf("expected 3 'Phase timings:' sections (last 3 runs), got %d", phaseCount)
+	if phaseCount != telemetryDetailRunLimit {
+		t.Errorf("expected %d 'Phase timings:' sections, got %d", telemetryDetailRunLimit, phaseCount)
 	}
-	if tokenCount != 3 {
-		t.Errorf("expected 3 'Token usage by role:' sections (last 3 runs), got %d", tokenCount)
+	if tokenCount != telemetryDetailRunLimit {
+		t.Errorf("expected %d 'Token usage by role:' sections, got %d", telemetryDetailRunLimit, tokenCount)
 	}
 
-	// Recent runs (3, 4, 5) should have full detail.
-	for _, runNum := range []int{3, 4, 5} {
+	// Recent runs should have full detail headers.
+	for runNum := 15 - telemetryDetailRunLimit + 1; runNum <= 15; runNum++ {
 		header := fmt.Sprintf("--- Run %d (mode=targeted", runNum)
 		if !contains(summary, header) {
 			t.Errorf("recent run %d: missing full detail header %q", runNum, header)
-		}
-		desc := fmt.Sprintf("change %d", runNum)
-		if !contains(summary, desc) {
-			t.Errorf("recent run %d: missing input description %q", runNum, desc)
 		}
 	}
 

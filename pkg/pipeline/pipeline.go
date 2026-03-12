@@ -36,6 +36,7 @@ const (
 	PhaseIntegrate   Phase = "integrate"
 	PhaseMerge       Phase = "merge"
 	PhaseSelfImprove Phase = "self-improve"
+	PhaseEvolve      Phase = "evolve"
 )
 
 // Action constants for pipeline events — no magic strings.

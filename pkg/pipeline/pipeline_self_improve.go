@@ -22,13 +22,13 @@ const selfImproveIterationTimeout = 15 * time.Minute
 
 // telemetryDetailRunLimit is the number of most-recent runs that get full detail
 // in summarizeTelemetry(). Older runs get a one-line summary to cap CTO input tokens.
-const telemetryDetailRunLimit = 3
+const telemetryDetailRunLimit = 10
 
 // maxTelemetryRuns caps the total number of run summaries sent to the CTO.
 // Older runs beyond this limit are dropped entirely — the one-liner format
 // already strips most signal from older runs, so dropping them has negligible
 // impact on recommendation quality while cutting CTO input tokens significantly.
-const maxTelemetryRuns = 20
+const maxTelemetryRuns = 50
 
 // maxConsecutiveFailures is the number of back-to-back transient iteration
 // failures (failed tests, network glitches, gh CLI errors) allowed before the
@@ -296,7 +296,9 @@ func (p *Pipeline) selfImproveCTOModel() string {
 // full codebase so it can recommend improvements across all packages — not
 // just pipeline efficiency tweaks.
 // Each file is truncated to maxSelfImproveFileLines to keep total input bounded.
-const maxSelfImproveFileLines = 200
+// With 20x Max plan this can be generous — full file visibility matters more
+// than token savings for finding non-trivial improvements.
+const maxSelfImproveFileLines = 500
 
 func filterSelfImproveFiles(files map[string]string) map[string]string {
 	out := make(map[string]string, len(files))

@@ -53,6 +53,7 @@ func run() error {
 	guardianModel := flag.String("guardian-model", "", "Override model for Guardian integrity checks (default: claude-sonnet-4-6)")
 	architectModel := flag.String("architect-model", "", "Override model for architect design and simplify calls (default: claude-sonnet-4-6)")
 	selfImprove := flag.Bool("self-improve", false, "Self-improvement mode: analyze telemetry + codebase and apply fixes")
+	evolve := flag.Bool("evolve", false, "Evolution mode: build new capabilities and features")
 	query := flag.String("query", "", "Query pipeline events from the graph (optional filter: phase, progress, output, warning, telemetry)")
 	queryMode := flag.Bool("q", false, "Shorthand for --query (show all pipeline events)")
 	flag.Parse()
@@ -82,8 +83,8 @@ func run() error {
 		return queryPipelineEvents(s, *query)
 	}
 
-	if *idea == "" && *url == "" && *spec == "" && !*selfImprove {
-		return fmt.Errorf("usage: hive --human name [--store postgres://...] [--name product-name] --idea 'description' | --url 'https://...' | --spec path/to/spec.cg | --repo path --idea 'change' | --self-improve")
+	if *idea == "" && *url == "" && *spec == "" && !*selfImprove && !*evolve {
+		return fmt.Errorf("usage: hive --human name [--store postgres://...] [--name product-name] --idea 'description' | --url 'https://...' | --spec path/to/spec.cg | --repo path --idea 'change' | --self-improve | --evolve")
 	}
 	if *human == "" {
 		return fmt.Errorf("--human is required (the name of the human operator)")
@@ -205,7 +206,16 @@ func run() error {
 		RepoPath:    *repo,
 	}
 
-	if *selfImprove {
+	if *evolve {
+		// Evolution mode — build new capabilities
+		fmt.Fprintln(os.Stderr, "Mode: evolve (build new capabilities)")
+		if input.RepoPath == "" {
+			input.RepoPath = "."
+		}
+		if err := p.RunEvolve(ctx, input); err != nil {
+			return fmt.Errorf("evolve failed: %w", err)
+		}
+	} else if *selfImprove {
 		// Self-improvement mode — analyze telemetry and apply fixes
 		fmt.Fprintln(os.Stderr, "Mode: self-improve")
 		if input.RepoPath == "" {
