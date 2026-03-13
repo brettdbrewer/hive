@@ -107,8 +107,9 @@ func (p *Pipeline) RunEvolve(ctx context.Context, input ProductInput) error {
 	}
 
 	consecutiveFailures := 0
-	for iteration := startIteration; iteration <= maxEvolveIterations; iteration++ {
-		fmt.Fprintf(os.Stderr, "\n═══ Evolve: Iteration %d/%d ═══\n", iteration, maxEvolveIterations)
+	iterationLimit := maxEvolveIterations
+	for iteration := startIteration; iteration <= iterationLimit; iteration++ {
+		fmt.Fprintf(os.Stderr, "\n═══ Evolve: Iteration %d/%d ═══\n", iteration, iterationLimit)
 		iterationStart := time.Now()
 		p.emitPhaseStarted(PhaseEvolve, iteration)
 
@@ -119,6 +120,29 @@ func (p *Pipeline) RunEvolve(ctx context.Context, input ProductInput) error {
 			if err == errEvolveStop {
 				p.emitPhaseCompleted(PhaseEvolve, time.Since(iterationStart), iteration)
 				break
+			}
+
+			// No-change iterations: the builder ran but made no commits.
+			// Don't count toward failures, don't mark as completed, and give
+			// back the iteration slot so the CTO can retry with a different
+			// recommendation or the same one with fresh context.
+			if err == errEvolveNoChanges {
+				fmt.Fprintf(os.Stderr, "Evolve iteration %d: builder made no changes — retrying (does not count as failure)\n", iteration)
+				p.emitWarning(PhaseEvolve, "iteration %d: builder made no changes — retrying", iteration)
+				p.emitPhaseCompleted(PhaseEvolve, time.Since(iterationStart), iteration)
+				// Track as failed so CTO avoids repeating it, but don't
+				// increment consecutiveFailures or consume the iteration slot.
+				if rec != nil {
+					state.Failed = append(state.Failed, *rec)
+				}
+				state.TotalCost = totalCost
+				if saveErr := saveEvolveState(input.RepoPath, state); saveErr != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not save evolve state: %v\n", saveErr)
+				}
+				if iterationLimit < maxEvolveIterations+3 {
+					iterationLimit++ // give back the slot (cap at 3 extra to prevent infinite loops)
+				}
+				continue
 			}
 
 			// Track failed recommendation in state.
@@ -173,6 +197,7 @@ func (p *Pipeline) RunEvolve(ctx context.Context, input ProductInput) error {
 }
 
 var errEvolveStop = fmt.Errorf("CTO says nothing worth building")
+var errEvolveNoChanges = fmt.Errorf("builder made no changes")
 
 func (p *Pipeline) runEvolveIteration(parentCtx context.Context, iteration int, input ProductInput, state *EvolveState) (float64, *EvolveRecommendation, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, evolveIterationTimeout)
@@ -331,6 +356,18 @@ func (p *Pipeline) runEvolveIteration(parentCtx context.Context, iteration int, 
 			iterCost += t.Snapshot().CostUSD
 		}
 		return iterCost, &rec, fmt.Errorf("targeted pipeline: %w", err)
+	}
+
+	// Detect when the builder ran but made no changes. This is different from
+	// a real failure — the builder judged the work was already done (often
+	// incorrectly). Return a specific error so the evolve loop can handle it
+	// without counting it as a success or a real failure.
+	if p.telemetry != nil && p.telemetry.NoChanges {
+		iterCost := ctoCost
+		for _, t := range p.trackers {
+			iterCost += t.Snapshot().CostUSD
+		}
+		return iterCost, &rec, errEvolveNoChanges
 	}
 
 	// Mark work task complete on success — best-effort.

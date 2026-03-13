@@ -367,9 +367,13 @@ func (p *Product) CleanupForIteration() error {
 	_ = p.git("checkout", "--", ".")
 	_ = p.git("clean", "-fd")
 
-	// Try to switch to main. In a worktree, main is locked by the primary
-	// checkout — that's fine, we'll reset whatever branch we're on.
-	_ = p.git("checkout", "main")
+	// Switch to main (or detach if in a worktree where main is locked).
+	// We must get off any hive/* branch before we can delete it.
+	if err := p.git("checkout", "main"); err != nil {
+		// Worktree: main is locked — detach HEAD so we're not on any branch.
+		// This allows the branch -D below to succeed.
+		_ = p.git("checkout", "--detach")
+	}
 
 	// Delete local hive/* branches (stale feature branches from failed runs).
 	cmd := exec.Command("git", "branch", "--list", "hive/*")
