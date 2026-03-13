@@ -481,24 +481,26 @@ func (p *Pipeline) runPMAnalysis(ctx context.Context, input ProductInput) string
 
 Your job: analyze the current codebase and produce a PRIORITIZED PRODUCT BACKLOG — what should we build next, from a PRODUCT perspective (not engineering).
 
+CRITICAL INSIGHT: The hive is its OWN first customer. Every product it builds should be dogfooded — the hive should use what it builds. The Work Graph should track the hive's own work. The hive's products improve the hive, which builds better products. This virtuous cycle is the whole point.
+
 The hive builds thirteen products (see CLAUDE.md). The first product is the Work Graph (task management with agent collaboration). Revenue model: charge corporations, free for individuals.
 
 %s
 
 Analyze the codebase and answer:
-1. What can a user DO with this system right now? (current product capabilities)
-2. What's the smallest thing we could ship that would matter to a real user? (next MVP)
-3. What product gaps exist between what's built and what users need?
+1. What can the hive DO with its own products right now? (dogfooding status)
+2. What can an external user DO with this system right now? (external product capabilities)
+3. What's the smallest thing we could ship that matters? (next MVP — for the hive AND external users)
 4. What order should we build things in?
 
 Produce a prioritized list of 3-5 product recommendations. For each:
 - WHAT: what to build (user-facing description, not internal engineering)
-- WHO: which users benefit
+- WHO: which users benefit (the hive itself, external developers, teams, etc.)
 - WHY NOW: why this is more important than alternatives
 - SUCCESS: how we know it works (user-visible criteria)
 - SCOPE: what's in, what's explicitly out
 
-Focus on user value. Tests, refactoring, and internal improvements are the CTO's domain — you focus on what users see and need. Be specific and actionable.
+Focus on user value — and remember the hive IS a user. Tests, refactoring, and internal improvements are the CTO's domain — you focus on what users see and need. Be specific and actionable.
 
 IMPORTANT: Keep your response under 1500 characters. Be concise — bullet points, not paragraphs. The CTO needs priorities, not a thesis.`, codeContext.String())
 
