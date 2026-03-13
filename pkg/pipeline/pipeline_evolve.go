@@ -218,18 +218,24 @@ func (p *Pipeline) runEvolveIteration(parentCtx context.Context, iteration int, 
 		p.emitWarning(PhaseEvolve, "cleanup failed: %v (continuing anyway)", err)
 	}
 
-	// Read full codebase — no truncation limits for evolve mode.
+	// Read source files for structural overview. CTO gets file tree +
+	// key docs, not full source — it picks WHAT to build, the builder
+	// reads the actual files.
 	existingFiles, err := product.ReadSourceFiles()
 	if err != nil {
 		return 0, nil, fmt.Errorf("read source files: %w", err)
 	}
-	goFiles := filterEvolveFiles(existingFiles)
 
-	// Build full codebase context — evolve CTO sees everything.
 	var codeContext strings.Builder
-	codeContext.WriteString("FULL CODEBASE:\n\n")
-	for path, content := range goFiles {
-		codeContext.WriteString(fmt.Sprintf("--- %s ---\n%s\n\n", path, content))
+	codeContext.WriteString("PROJECT FILES:\n")
+	for path := range existingFiles {
+		codeContext.WriteString(fmt.Sprintf("  %s\n", path))
+	}
+	// Include key docs so CTO has architectural context.
+	for _, key := range []string{"CLAUDE.md", "go.mod", "README.md"} {
+		if content, ok := existingFiles[key]; ok {
+			codeContext.WriteString(fmt.Sprintf("\n--- %s ---\n%s\n", key, content))
+		}
 	}
 
 	// Read telemetry for operational context.
@@ -447,8 +453,8 @@ func (p *Pipeline) evolveCTOModel() string {
 	return "claude-sonnet-4-6"
 }
 
-// filterEvolveFiles returns all Go source files (including tests) and key
-// config files. Evolve mode sees everything — no truncation.
+// filterEvolveFiles returns non-test Go source files and key config files.
+// Test files are excluded (PM/CTO don't need them for product decisions).
 // runPMAnalysis runs the Product Manager's analysis once per evolve session.
 // Returns product priorities that feed into every CTO iteration. If the PM
 // fails (provider unavailable, timeout, etc.) the CTO runs without PM input.
@@ -466,12 +472,19 @@ func (p *Pipeline) runPMAnalysis(ctx context.Context, input ProductInput) string
 		fmt.Fprintf(os.Stderr, "Warning: PM could not read source files: %v (continuing without PM)\n", err)
 		return ""
 	}
-	goFiles := filterEvolveFiles(existingFiles)
 
-	var codeContext strings.Builder
-	codeContext.WriteString("CODEBASE:\n\n")
-	for path, content := range goFiles {
-		codeContext.WriteString(fmt.Sprintf("--- %s ---\n%s\n\n", path, content))
+	// PM gets a lightweight view: file tree + key docs (CLAUDE.md, go.mod).
+	// No need to read full source — PM makes product decisions from structure.
+	var pmContext strings.Builder
+	pmContext.WriteString("PROJECT STRUCTURE:\n")
+	for path := range existingFiles {
+		pmContext.WriteString(fmt.Sprintf("  %s\n", path))
+	}
+	// Include key docs the PM needs for product context.
+	for _, key := range []string{"CLAUDE.md", "go.mod", "README.md"} {
+		if content, ok := existingFiles[key]; ok {
+			pmContext.WriteString(fmt.Sprintf("\n--- %s ---\n%s\n", key, content))
+		}
 	}
 
 	model := p.evolveCTOModel() // PM uses same model tier as CTO
@@ -485,7 +498,7 @@ func (p *Pipeline) runPMAnalysis(ctx context.Context, input ProductInput) string
 
 	pmPrompt := fmt.Sprintf(`You are the Product Manager for a self-improving AI agent civilisation called "the hive."
 
-Your job: analyze the current codebase and produce a PRIORITIZED PRODUCT BACKLOG — what should we build next, from a PRODUCT perspective (not engineering).
+Your job: analyze the project and produce a PRIORITIZED PRODUCT BACKLOG — what should we build next, from a PRODUCT perspective (not engineering).
 
 CRITICAL INSIGHT: The hive is its OWN first customer. Every product it builds should be dogfooded — the hive should use what it builds. The Work Graph should track the hive's own work. The hive's products improve the hive, which builds better products. This virtuous cycle is the whole point.
 
@@ -495,28 +508,25 @@ Products are NOT feature lists. Use the derivation method:
 2. Identify DIMENSIONS — the axes along which the domain varies
 3. TRAVERSE dimensions — explore meaningful combinations
 4. ZOOM — decompose into atoms, compose into products
-Features emerge from traversing dimensions, not from wishlists. When you recommend a product capability, ground it in which dimension of the domain it opens up. A good product recommendation opens a new dimension; a bad one adds a point feature.
+Features emerge from traversing dimensions, not from wishlists. A good product recommendation opens a new dimension; a bad one adds a point feature.
 
-The hive builds thirteen products (see CLAUDE.md). The first product is the Work Graph (task management with agent collaboration). Revenue model: charge corporations, free for individuals.
+The hive builds thirteen products (see CLAUDE.md). Build order: Work Graph first, then Mind (persistent memory/judgment), then Market, Social, Knowledge, Alignment. Revenue model: charge corporations, free for individuals.
 
 %s
 
-Analyze the codebase and answer:
+Analyze the project structure and docs. Answer:
 1. What can the hive DO with its own products right now? (dogfooding status)
-2. What can an external user DO with this system right now? (external product capabilities)
-3. What's the smallest thing we could ship that matters? (next MVP — for the hive AND external users)
-4. What order should we build things in?
+2. What can an external user DO with this system right now?
+3. What's the smallest thing we could ship that matters?
 
 Produce a prioritized list of 3-5 product recommendations. For each:
-- WHAT: what to build (user-facing description, not internal engineering)
-- WHO: which users benefit (the hive itself, external developers, teams, etc.)
+- WHAT: what to build (user-facing, not internal engineering)
 - WHY NOW: why this is more important than alternatives
-- SUCCESS: how we know it works (user-visible criteria)
-- SCOPE: what's in, what's explicitly out
+- SUCCESS: how we know it works
 
-Focus on user value — and remember the hive IS a user. Tests, refactoring, and internal improvements are the CTO's domain — you focus on what users see and need. Be specific and actionable.
+Focus on user value — the hive IS a user. Tests and refactoring are the CTO's domain.
 
-IMPORTANT: Keep your response under 1500 characters. Be concise — bullet points, not paragraphs. The CTO needs priorities, not a thesis.`, codeContext.String())
+IMPORTANT: Keep your response under 1500 characters. Bullet points, not paragraphs.`, pmContext.String())
 
 	pmCtx, pmCancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer pmCancel()
@@ -531,19 +541,29 @@ IMPORTANT: Keep your response under 1500 characters. Be concise — bullet point
 	pmOutput := resp.Content()
 	fmt.Fprintf(os.Stderr, "PM priorities: %s\n", truncate(pmOutput, 200))
 	p.emitOutput("pm", "priorities", pmOutput)
-	// Truncate for CTO injection — the full codebase already fills most of
-	// the context window, so PM priorities must be concise.
 	if len(pmOutput) > 2000 {
 		pmOutput = pmOutput[:2000] + "\n[PM output truncated for CTO context]"
 	}
 	return pmOutput
 }
 
+// maxEvolveFileSize caps individual files to prevent context overflow.
+// Files larger than this are truncated with a note.
+const maxEvolveFileSize = 8000 // ~2k tokens
+
 func filterEvolveFiles(files map[string]string) map[string]string {
 	out := make(map[string]string, len(files))
 	for p, content := range files {
+		// Skip test files — PM and CTO don't need test code to make
+		// product and architecture decisions. Tests add ~200KB to context.
+		if strings.HasSuffix(p, "_test.go") {
+			continue
+		}
 		switch {
 		case strings.HasSuffix(p, ".go"):
+			if len(content) > maxEvolveFileSize {
+				content = content[:maxEvolveFileSize] + "\n// [truncated — full file is larger]\n"
+			}
 			out[p] = content
 		case p == "CLAUDE.md", p == "go.mod", p == "SPEC.md", p == "README.md":
 			out[p] = content
@@ -604,14 +624,11 @@ ARCHITECTURE VISION:
 
 THE THIRTEEN PRODUCTS (build order):
 1. Work Graph — task management with agent collaboration (BUILD FIRST — the hive needs it)
-2. Market Graph — portable reputation, no platform rent
-3. Social Graph — user-owned social, community self-governance
-4. Justice Graph — dispute resolution, precedent, due process
-5. Build Graph — accountable software development
-6. Knowledge Graph — claim provenance, open access research
-7. Alignment Graph — AI accountability for regulators
-8. Identity Graph — user-owned identity, trust accumulation
-9-13: Bond, Belonging, Meaning, Evolution, Being
+2. Mind — persistent memory, self-model, narrative, judgment, continuity across sessions
+3. Market Graph — portable reputation, no platform rent
+4. Social Graph — user-owned social, community self-governance
+5-13: Justice, Build, Knowledge, Alignment, Identity, Bond, Belonging, Evolution, Being
+Mind comes before Market/Social because reputation and relationships require judgment that only accumulated experience provides.
 
 CURRENT PIPELINE MODES:
 - Full (greenfield): Research → Design → Simplify → Build → Review → Test → Integrate

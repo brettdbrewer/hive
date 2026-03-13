@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -184,20 +185,23 @@ func TestParseEvolveProse(t *testing.T) {
 	}
 }
 
-// TestFilterEvolveFiles verifies that filterEvolveFiles keeps .go files and
-// key config files, and drops everything else.
+// TestFilterEvolveFiles verifies that filterEvolveFiles keeps non-test .go
+// files and key config files, drops test files and everything else, and
+// truncates large files.
 func TestFilterEvolveFiles(t *testing.T) {
+	bigFile := strings.Repeat("x", maxEvolveFileSize+1000)
 	input := map[string]string{
 		"pkg/pipeline/pipeline.go":      "package pipeline",
 		"pkg/pipeline/pipeline_test.go": "package pipeline",
 		"cmd/hive/main.go":              "package main",
+		"pkg/big/big.go":                bigFile,
 		"CLAUDE.md":                     "# Hive",
 		"go.mod":                        "module github.com/lovyou-ai/hive",
 		"SPEC.md":                       "# Spec",
 		"README.md":                     "# README",
 		"Dockerfile":                    "FROM golang",
 		"scripts/build.sh":              "#!/bin/bash",
-		"docs/design.md":                "## Design",  // not a key config file
+		"docs/design.md":                "## Design", // not a key config file
 		".github/workflows/ci.yml":      "on: push",
 		"assets/logo.png":               "binary",
 	}
@@ -206,14 +210,15 @@ func TestFilterEvolveFiles(t *testing.T) {
 
 	mustInclude := []string{
 		"pkg/pipeline/pipeline.go",
-		"pkg/pipeline/pipeline_test.go",
 		"cmd/hive/main.go",
+		"pkg/big/big.go",
 		"CLAUDE.md",
 		"go.mod",
 		"SPEC.md",
 		"README.md",
 	}
 	mustExclude := []string{
+		"pkg/pipeline/pipeline_test.go", // test files excluded
 		"Dockerfile",
 		"scripts/build.sh",
 		"docs/design.md",
@@ -230,6 +235,14 @@ func TestFilterEvolveFiles(t *testing.T) {
 		if _, ok := got[path]; ok {
 			t.Errorf("filterEvolveFiles should not include %q", path)
 		}
+	}
+
+	// Large files should be truncated.
+	if len(got["pkg/big/big.go"]) > maxEvolveFileSize+200 {
+		t.Errorf("big file not truncated: got %d bytes", len(got["pkg/big/big.go"]))
+	}
+	if !strings.Contains(got["pkg/big/big.go"], "[truncated") {
+		t.Error("truncated file missing truncation marker")
 	}
 }
 
