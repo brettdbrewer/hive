@@ -338,12 +338,15 @@ func (p *Product) CurrentBranch() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// SyncMain checks out the main branch and pulls the latest from the remote.
-// This ensures the local main is up-to-date after a PR merge, so the next
-// iteration branches from the correct base.
+// SyncMain syncs the working directory with the latest remote main.
+// In a primary checkout, checks out main and pulls. In a worktree (where
+// main is locked by the primary checkout), fetches and resets to origin/main.
 func (p *Product) SyncMain() error {
+	// Try checkout main — works in primary checkout, fails in worktree.
 	if err := p.git("checkout", "main"); err != nil {
-		return fmt.Errorf("checkout main: %w", err)
+		// Worktree: can't checkout main, so fetch and reset instead.
+		_ = p.git("fetch", "origin", "main")
+		return p.git("reset", "--hard", "origin/main")
 	}
 	if err := p.git("pull", "origin", "main"); err != nil {
 		return fmt.Errorf("pull main: %w", err)
