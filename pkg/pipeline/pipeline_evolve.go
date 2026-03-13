@@ -62,6 +62,31 @@ func (p *Pipeline) RunEvolve(ctx context.Context, input ProductInput) error {
 			"", false, "", "", totalCost)
 	}()
 
+	// Create a worktree so we don't clobber the main checkout.
+	// CleanupForIteration does git reset --hard, which is safe in a
+	// disposable worktree but destructive in the developer's checkout.
+	sourceRepo, err := workspace.OpenRepo(input.RepoPath)
+	if err != nil {
+		return fmt.Errorf("open source repo: %w", err)
+	}
+	worktree, err := sourceRepo.CreateWorktree("evolve")
+	if err != nil {
+		return fmt.Errorf("create worktree: %w", err)
+	}
+	defer func() {
+		if rmErr := worktree.RemoveWorktree(); rmErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: worktree cleanup failed: %v\n", rmErr)
+		}
+		_ = sourceRepo.PruneWorktrees()
+	}()
+	fmt.Fprintf(os.Stderr, "Evolve worktree: %s\n", worktree.Dir)
+	p.emitProgress(PhaseEvolve, "worktree created at %s", worktree.Dir)
+
+	// Rewrite input to point at the worktree. Evolve state is still
+	// stored in the original repo's .hive/ so it survives worktree removal.
+	worktreeInput := input
+	worktreeInput.RepoPath = worktree.Dir
+
 	// Load or create evolve state for resume support.
 	state, err := loadEvolveState(input.RepoPath)
 	if err != nil {
@@ -87,7 +112,7 @@ func (p *Pipeline) RunEvolve(ctx context.Context, input ProductInput) error {
 		iterationStart := time.Now()
 		p.emitPhaseStarted(PhaseEvolve, iteration)
 
-		iterCost, rec, err := p.runEvolveIteration(ctx, iteration, input, state)
+		iterCost, rec, err := p.runEvolveIteration(ctx, iteration, worktreeInput, state)
 		totalCost += iterCost
 
 		if err != nil {
@@ -107,7 +132,7 @@ func (p *Pipeline) RunEvolve(ctx context.Context, input ProductInput) error {
 			// Self-heal: run one self-improve iteration before giving up.
 			fmt.Fprintf(os.Stderr, "Evolve iteration %d failed: %v — attempting self-heal...\n", iteration, err)
 			p.emitProgress(PhaseEvolve, "iteration %d failed — attempting self-heal", iteration)
-			healCost := p.runEvolveSelfHeal(ctx, input)
+			healCost := p.runEvolveSelfHeal(ctx, worktreeInput)
 			totalCost += healCost
 
 			state.LastIteration = iteration

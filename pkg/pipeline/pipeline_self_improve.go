@@ -70,13 +70,37 @@ func (p *Pipeline) RunSelfImprove(ctx context.Context, input ProductInput) error
 			"", false, "", "", totalCost)
 	}()
 
+	// Create a worktree so we don't clobber the main checkout.
+	// CleanupForIteration does git reset --hard, which is safe in a
+	// disposable worktree but destructive in the developer's checkout.
+	sourceRepo, err := workspace.OpenRepo(input.RepoPath)
+	if err != nil {
+		return fmt.Errorf("open source repo: %w", err)
+	}
+	worktree, err := sourceRepo.CreateWorktree("self-improve")
+	if err != nil {
+		return fmt.Errorf("create worktree: %w", err)
+	}
+	defer func() {
+		if rmErr := worktree.RemoveWorktree(); rmErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: worktree cleanup failed: %v\n", rmErr)
+		}
+		_ = sourceRepo.PruneWorktrees()
+	}()
+	fmt.Fprintf(os.Stderr, "Self-improve worktree: %s\n", worktree.Dir)
+	p.emitProgress(PhaseSelfImprove, "worktree created at %s", worktree.Dir)
+
+	// Rewrite input to point at the worktree.
+	worktreeInput := input
+	worktreeInput.RepoPath = worktree.Dir
+
 	consecutiveFailures := 0
 	for iteration := 1; iteration <= maxSelfImproveIterations; iteration++ {
 		fmt.Fprintf(os.Stderr, "\n═══ Self-Improve: Iteration %d/%d ═══\n", iteration, maxSelfImproveIterations)
 		iterationStart := time.Now()
 		p.emitPhaseStarted(PhaseSelfImprove, iteration)
 
-		iterCost, err := p.runSelfImproveIteration(ctx, iteration, input)
+		iterCost, err := p.runSelfImproveIteration(ctx, iteration, worktreeInput)
 		totalCost += iterCost
 
 		if err != nil {

@@ -417,6 +417,64 @@ func (p *Product) PushBranch() error {
 	return p.git("push", "-u", "origin", branch)
 }
 
+// CreateWorktree creates a git worktree from this repo, returning a Product
+// that points to the worktree directory. The worktree shares the same git
+// objects and remote but has its own working directory, so operations like
+// CleanupForIteration() won't affect the original checkout.
+// The caller must call RemoveWorktree() on the returned Product when done.
+func (p *Product) CreateWorktree(name string) (*Product, error) {
+	dir := filepath.Join(os.TempDir(), fmt.Sprintf("hive-worktree-%s-%d", name, time.Now().UnixNano()))
+
+	// Create the worktree checked out at main (or HEAD if main doesn't exist).
+	if err := p.git("worktree", "add", dir, "main"); err != nil {
+		// Fallback: try HEAD if main branch doesn't exist.
+		if err2 := p.git("worktree", "add", dir); err2 != nil {
+			return nil, fmt.Errorf("create worktree: %w (also tried HEAD: %v)", err, err2)
+		}
+	}
+
+	wt := &Product{
+		Name: p.Name,
+		Dir:  dir,
+		Repo: p.Repo,
+	}
+
+	// Configure git identity in worktree.
+	_ = wt.git("config", "user.name", "hive")
+	_ = wt.git("config", "user.email", "hive@lovyou.ai")
+
+	// Symlink .hive/ from source repo so telemetry and evolve state are
+	// accessible in the worktree without copying.
+	srcHive := filepath.Join(p.Dir, ".hive")
+	if _, err := os.Stat(srcHive); err == nil {
+		dstHive := filepath.Join(dir, ".hive")
+		if linkErr := os.Symlink(srcHive, dstHive); linkErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not symlink .hive: %v (telemetry may be unavailable)\n", linkErr)
+		}
+	}
+
+	return wt, nil
+}
+
+// RemoveWorktree removes this product's worktree directory and prunes the
+// worktree reference from the parent repo. Safe to call multiple times.
+func (p *Product) RemoveWorktree() error {
+	// git worktree remove needs to be run from the main repo, but we can
+	// also just remove the directory and then prune.
+	if err := os.RemoveAll(p.Dir); err != nil {
+		return fmt.Errorf("remove worktree dir: %w", err)
+	}
+	// Prune stale worktree references. Run from the worktree dir's parent
+	// since the worktree itself is gone — git handles this gracefully.
+	return nil
+}
+
+// PruneWorktrees cleans up stale worktree references. Call this from the
+// main repo after worktrees have been removed.
+func (p *Product) PruneWorktrees() error {
+	return p.git("worktree", "prune")
+}
+
 // isBinaryExt returns true for known binary file extensions.
 func isBinaryExt(ext string) bool {
 	switch ext {
