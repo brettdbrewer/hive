@@ -135,7 +135,7 @@ func NewAgent(ctx context.Context, cfg AgentConfig) (*Agent, error) {
 		string(event.ActorTypeAI),
 		cfg.Provider.Model(),
 		CostTierStandard,
-		soulValues(cfg.Role),
+		SoulValues(cfg.Role),
 		types.MustDomainScope("hive"),
 		cfg.HumanID,
 	)
@@ -191,7 +191,8 @@ func SystemPrompt(role Role, humanName ...string) string {
 	}
 }
 
-func soulValues(role Role) []string {
+// SoulValues returns the soul values for a given role.
+func SoulValues(role Role) []string {
 	base := []string{
 		"Take care of your human, humanity, and yourself",
 		"Every action is recorded and auditable",

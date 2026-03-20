@@ -26,7 +26,7 @@ func (p *Pipeline) guardianCheck(ctx context.Context, phase string) bool {
 	if p.skipGuardian {
 		return false
 	}
-	events, err := p.guardian.Runtime.Memory(200)
+	events, err := p.guardian.Memory(200)
 	if err != nil || len(events) == 0 {
 		return false
 	}
@@ -70,8 +70,8 @@ Events:
 		// NOTE: Emit is context-unaware (eventgraph Runtime.Emit doesn't take ctx).
 		// This is acceptable — the HALT event is best-effort observability, not
 		// control flow. The pipeline stops regardless of whether the event persists.
-		if _, err := p.guardian.Runtime.Emit(event.AgentEscalatedContent{
-			AgentID:   p.guardian.Runtime.ID(),
+		if _, err := p.guardian.Runtime().Emit(event.AgentEscalatedContent{
+			AgentID:   p.guardian.ID(),
 			Authority: p.humanID,
 			Reason:    fmt.Sprintf("[HALT after %s] %s", phase, eval),
 		}); err != nil {
@@ -86,8 +86,8 @@ Events:
 		if p.telemetry != nil {
 			p.telemetry.addGuardianAlert(fmt.Sprintf("[%s phase] %s", phase, eval))
 		}
-		if _, err := p.guardian.Runtime.Emit(event.AgentEscalatedContent{
-			AgentID:   p.guardian.Runtime.ID(),
+		if _, err := p.guardian.Runtime().Emit(event.AgentEscalatedContent{
+			AgentID:   p.guardian.ID(),
 			Authority: p.humanID,
 			Reason:    fmt.Sprintf("[%s phase] %s", phase, eval),
 		}); err != nil {

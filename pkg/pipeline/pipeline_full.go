@@ -306,8 +306,8 @@ func (p *Pipeline) RunLoop(ctx context.Context, input ProductInput, cfg LoopConf
 	fmt.Fprintf(os.Stderr, "═══ Starting %d agent loops ═══\n", len(agentConfigs))
 	p.emitProgress(Phase(""), "starting %d agent loops", len(agentConfigs))
 	for _, c := range agentConfigs {
-		fmt.Fprintf(os.Stderr, "  ↳ %s loop starting\n", c.Agent.Role)
-		p.emitProgress(Phase(""), "%s loop starting", c.Agent.Role)
+		fmt.Fprintf(os.Stderr, "  ↳ %s loop starting\n", c.Agent.Role())
+		p.emitProgress(Phase(""), "%s loop starting", c.Agent.Role())
 	}
 
 	results := loop.RunConcurrent(ctx, agentConfigs)
@@ -364,7 +364,7 @@ Product idea:
 	evaluation := ctoResp.Content()
 
 	// Record the CTO's direction as an action event.
-	_, err = p.cto.Runtime.Act(ctx, ActionSeedBuild, spec)
+	_, err = p.cto.Runtime().Act(ctx, ActionSeedBuild, spec)
 	if err != nil {
 		return "", fmt.Errorf("CTO seed action: %w", err)
 	}
@@ -502,7 +502,7 @@ func (p *Pipeline) research(ctx context.Context, input ProductInput) (spec strin
 		if err != nil {
 			return "", "", err
 		}
-		_, evaluation, err := researcher.Runtime.Research(ctx, input.URL,
+		_, evaluation, err := researcher.Runtime().Research(ctx, input.URL,
 			"extract the product idea, key entities, features, and requirements. Output in Code Graph vocabulary where possible.")
 		if err != nil {
 			return "", "", fmt.Errorf("research URL: %w", err)
@@ -694,7 +694,7 @@ Specification:
 	code := buildResp.Content()
 
 	// Record the build action
-	if _, err := builder.Runtime.Act(ctx, writeCodeAction(lang), "multi-file generation from spec"); err != nil {
+	if _, err := builder.Runtime().Act(ctx, writeCodeAction(lang), "multi-file generation from spec"); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: write_code action event failed: %v\n", err)
 		p.emitWarning(PhaseBuild, "write_code action event failed: %v", err)
 	}
@@ -934,7 +934,7 @@ Preserve existing code style and conventions.`, lang, testResult)
 				fmt.Fprintf(os.Stderr, "Builder (agentic fix): %s\n", truncate(result.Summary, 200))
 				p.emitOutput("builder", "analysis", truncate(result.Summary, 200))
 
-				if _, actErr := builder.Runtime.Act(ctx, writeCodeAction(lang), "agentic test fix"); actErr != nil {
+				if _, actErr := builder.Runtime().Act(ctx, writeCodeAction(lang), "agentic test fix"); actErr != nil {
 					fmt.Fprintf(os.Stderr, "warning: write_code action event failed: %v\n", actErr)
 					p.emitWarning(PhaseTest, "write_code action event failed: %v", actErr)
 				}
@@ -1053,11 +1053,11 @@ func (p *Pipeline) installDeps(lang string) {
 // Best-effort: logs a warning to stderr and returns nil on any error so the
 // pipeline continues uninterrupted even if the Work Graph is unavailable.
 func (p *Pipeline) createPhaseTask(ts *work.TaskStore, phase Phase, title, description string) *work.Task {
-	head, err := p.store.Head()
-	if err != nil || head.IsNone() {
+	causeID := p.ctoCause()
+	if causeID.IsZero() {
 		return nil
 	}
-	causes := []types.EventID{head.Unwrap().ID()}
+	causes := []types.EventID{causeID}
 	task, err := ts.Create(p.humanID, title, description, causes, p.convID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: work task create failed: %v (continuing)\n", err)
@@ -1085,7 +1085,7 @@ func (p *Pipeline) integrate(ctx context.Context) error {
 		return err
 	}
 
-	_, err = integrator.Runtime.Act(ctx, ActionIntegrate, "staging")
+	_, err = integrator.Runtime().Act(ctx, ActionIntegrate, "staging")
 	if err != nil {
 		return fmt.Errorf("integration: %w", err)
 	}
@@ -1101,7 +1101,7 @@ func (p *Pipeline) integrate(ctx context.Context) error {
 
 	// Escalate to human for production approval
 	humanID := p.humanID
-	_, err = integrator.Runtime.Escalate(ctx, humanID, "Product ready for human review before production deploy")
+	_, err = integrator.Runtime().Escalate(ctx, humanID, "Product ready for human review before production deploy")
 	if err != nil {
 		return fmt.Errorf("escalate: %w", err)
 	}

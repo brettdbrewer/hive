@@ -5,12 +5,16 @@ package mind
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"time"
 
-	"github.com/lovyou-ai/eventgraph/go/pkg/decision"
+	"github.com/lovyou-ai/eventgraph/go/pkg/graph"
 	"github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
+	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
+	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
 	"github.com/lovyou-ai/hive/pkg/roles"
 )
 
@@ -22,36 +26,91 @@ type Turn struct {
 
 // Config holds everything the mind needs to operate.
 type Config struct {
-	Provider         intelligence.Provider
+	Graph            *graph.Graph         // shared event graph (required)
+	Provider         intelligence.Provider // LLM provider (required)
 	Store            *MindStore
-	RepoPath         string // hive repo root
-	TelemetrySummary string // pre-formatted by caller
+	RepoPath         string   // hive repo root
+	TelemetrySummary string   // pre-formatted by caller
 	DocPaths         []string // paths to docs the mind should know about
+	ConversationID   string   // resume a specific conversation (empty = new)
 }
 
 // Mind is the hive's consciousness — it accumulates wisdom and provides
 // judgment through interactive conversation with agentic tool access.
+// Wraps a hiveagent.Agent for proper lifecycle, causality, and trust tracking.
 type Mind struct {
-	provider         intelligence.Provider
+	agent            *hiveagent.Agent
 	store            *MindStore
 	repoPath         string
 	telemetrySummary string
 	docPaths         []string
 	history          []Turn
 	contextCache     string // loaded once at startup
+	convID           types.ConversationID
 }
 
 // New creates a Mind with the given configuration.
-func New(cfg Config) *Mind {
+// The Mind wraps a hiveagent.Agent for proper lifecycle events, causality
+// tracking, and state machine management.
+func New(ctx context.Context, cfg Config) (*Mind, error) {
+	if cfg.Graph == nil {
+		return nil, fmt.Errorf("mind: Graph is required")
+	}
+	if cfg.Provider == nil {
+		return nil, fmt.Errorf("mind: Provider is required")
+	}
+
+	// Create the underlying Agent with the Mind role.
+	a, err := hiveagent.New(ctx, hiveagent.Config{
+		Role:     roles.RoleMind,
+		Name:     "Mind",
+		Graph:    cfg.Graph,
+		Provider: cfg.Provider,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mind: create agent: %w", err)
+	}
+
+	// Generate conversation ID — resume existing or create new.
+	convIDStr := cfg.ConversationID
+	if convIDStr == "" {
+		convIDStr = fmt.Sprintf("mind-%d", time.Now().UnixMilli())
+	}
+	convID, _ := types.NewConversationID(convIDStr)
+
 	m := &Mind{
-		provider:         cfg.Provider,
+		agent:            a,
 		store:            cfg.Store,
 		repoPath:         cfg.RepoPath,
 		telemetrySummary: cfg.TelemetrySummary,
 		docPaths:         cfg.DocPaths,
+		convID:           convID,
 	}
+
+	// Load history from a resumed conversation.
+	if cfg.ConversationID != "" {
+		if turns, err := m.store.LoadConversation(convID); err == nil {
+			m.history = turns
+		}
+	}
+
 	m.contextCache = m.loadContext()
-	return m
+	return m, nil
+}
+
+// ConversationID returns the current conversation ID.
+func (m *Mind) ConversationID() string {
+	return m.convID.Value()
+}
+
+// History returns the current conversation turns.
+func (m *Mind) History() []Turn {
+	return m.history
+}
+
+// ListConversations returns summaries of past conversations.
+func (m *Mind) ListConversations(limit int) ([]ConversationSummary, error) {
+	return m.store.ListConversations(limit)
 }
 
 // ContextLines returns the number of lines in the loaded context.
@@ -60,33 +119,53 @@ func (m *Mind) ContextLines() int {
 }
 
 // Chat sends a message to the mind and returns its response.
-// Uses Operate() for agentic tool access (file reads, MCP, bash).
+// Uses the agent's Operate() for agentic tool access (file reads, MCP, bash),
+// falling back to Reason() if the provider doesn't support Operate.
+// Each turn is persisted to the event graph.
 func (m *Mind) Chat(ctx context.Context, message string) (string, error) {
 	m.history = append(m.history, Turn{Role: "human", Content: message})
+	m.persistTurn("human", message)
 
 	instruction := m.buildInstruction(message)
 
 	// Try agentic mode first (Operate gives tools).
-	if op, ok := m.provider.(decision.IOperator); ok {
-		result, err := op.Operate(ctx, decision.OperateTask{
-			WorkDir:     m.repoPath,
-			Instruction: instruction,
-		})
-		if err != nil {
-			return "", fmt.Errorf("mind operate: %w", err)
-		}
+	result, err := m.agent.Operate(ctx, m.repoPath, instruction)
+	if err == nil {
 		m.history = append(m.history, Turn{Role: "mind", Content: result.Summary})
+		m.persistTurn("mind", result.Summary)
 		return result.Summary, nil
 	}
 
-	// Fallback to Reason() if provider doesn't support Operate.
-	resp, err := m.provider.Reason(ctx, instruction, nil)
+	// Fallback to Reason() if Operate is not supported.
+	content, err := m.agent.Reason(ctx, instruction)
 	if err != nil {
 		return "", fmt.Errorf("mind reason: %w", err)
 	}
-	content := resp.Content()
 	m.history = append(m.history, Turn{Role: "mind", Content: content})
+	m.persistTurn("mind", content)
 	return content, nil
+}
+
+// LogPath is set by the TUI before starting to enable file-based logging.
+var LogPath string
+
+// persistTurn saves a turn to the event graph.
+func (m *Mind) persistTurn(role, content string) {
+	if err := m.store.SaveTurn(m.agent.ID(), m.convID, role, content); err != nil {
+		mindLog("persistTurn: %v", err)
+	}
+}
+
+func mindLog(format string, args ...interface{}) {
+	if LogPath == "" {
+		return
+	}
+	f, err := os.OpenFile(LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "[mind] "+format+"\n", args...)
 }
 
 // loadContext gathers the hive's accumulated state once at startup.

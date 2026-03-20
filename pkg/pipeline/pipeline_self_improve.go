@@ -312,7 +312,7 @@ Respond with ONLY a JSON object: {"description": "what to change, 1-2 sentences"
 		}
 		completer := p.humanID
 		if builder, ok := p.agents[roles.RoleBuilder]; ok {
-			completer = builder.Runtime.ID()
+			completer = builder.ID()
 		}
 		summary := rec.Description
 		if retErr != nil {
@@ -323,8 +323,8 @@ Respond with ONLY a JSON object: {"description": "what to change, 1-2 sentences"
 			p.emitWarning(PhaseSelfImprove, "work task complete failed: %v", completeErr)
 		}
 	}()
-	if head, headErr := p.store.Head(); headErr == nil && head.IsSome() {
-		causes := []types.EventID{head.Unwrap().ID()}
+	if taskCauseID := p.ctoCause(); !taskCauseID.IsZero() {
+		causes := []types.EventID{taskCauseID}
 		task, createErr := ts.Create(p.humanID, rec.Description, rec.ExpectedImpact, causes, p.convID)
 		if createErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: work task create failed: %v (continuing)\n", createErr)
@@ -333,16 +333,13 @@ Respond with ONLY a JSON object: {"description": "what to change, 1-2 sentences"
 			workTask = &task
 			assignee := p.humanID
 			if builder, ok := p.agents[roles.RoleBuilder]; ok {
-				assignee = builder.Runtime.ID()
+				assignee = builder.ID()
 			}
 			if assignErr := ts.Assign(p.humanID, task.ID, assignee, []types.EventID{task.ID}, p.convID); assignErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: work task assign failed: %v (continuing)\n", assignErr)
 				p.emitWarning(PhaseSelfImprove, "work task assign failed: %v", assignErr)
 			}
 		}
-	} else if headErr != nil {
-		fmt.Fprintf(os.Stderr, "Warning: work task store head failed: %v (continuing)\n", headErr)
-		p.emitWarning(PhaseSelfImprove, "work task store head failed: %v", headErr)
 	}
 
 	fmt.Fprintf(os.Stderr, "\n═══ Self-Improve: Running targeted pipeline ═══\n")

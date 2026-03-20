@@ -161,52 +161,52 @@ func TestSystemPromptIncludesHumanName(t *testing.T) {
 }
 
 func TestSoulValues(t *testing.T) {
-	base := soulValues(Role("unknown"))
+	base := SoulValues(Role("unknown"))
 	if len(base) != 3 {
 		t.Errorf("base soul values = %d, want 3", len(base))
 	}
 
-	mindVals := soulValues(RoleMind)
+	mindVals := SoulValues(RoleMind)
 	if len(mindVals) != 6 {
 		t.Errorf("Mind soul values = %d, want 6", len(mindVals))
 	}
 
-	pm := soulValues(RolePM)
+	pm := SoulValues(RolePM)
 	if len(pm) != 5 {
 		t.Errorf("PM soul values = %d, want 5", len(pm))
 	}
 
-	cto := soulValues(RoleCTO)
+	cto := SoulValues(RoleCTO)
 	if len(cto) != 5 {
 		t.Errorf("CTO soul values = %d, want 5", len(cto))
 	}
 
-	guardian := soulValues(RoleGuardian)
+	guardian := SoulValues(RoleGuardian)
 	if len(guardian) != 6 {
 		t.Errorf("Guardian soul values = %d, want 6", len(guardian))
 	}
 
-	builder := soulValues(RoleBuilder)
+	builder := SoulValues(RoleBuilder)
 	if len(builder) != 5 {
 		t.Errorf("Builder soul values = %d, want 5", len(builder))
 	}
 
-	reviewer := soulValues(RoleReviewer)
+	reviewer := SoulValues(RoleReviewer)
 	if len(reviewer) != 5 {
 		t.Errorf("Reviewer soul values = %d, want 5", len(reviewer))
 	}
 
-	sysmon := soulValues(RoleSysMon)
+	sysmon := SoulValues(RoleSysMon)
 	if len(sysmon) != 5 {
 		t.Errorf("SysMon soul values = %d, want 5", len(sysmon))
 	}
 
-	spawner := soulValues(RoleSpawner)
+	spawner := SoulValues(RoleSpawner)
 	if len(spawner) != 5 {
 		t.Errorf("Spawner soul values = %d, want 5", len(spawner))
 	}
 
-	allocator := soulValues(RoleAllocator)
+	allocator := SoulValues(RoleAllocator)
 	if len(allocator) != 5 {
 		t.Errorf("Allocator soul values = %d, want 5", len(allocator))
 	}

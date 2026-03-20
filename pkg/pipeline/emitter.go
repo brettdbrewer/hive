@@ -10,12 +10,20 @@ import (
 
 // emit appends a pipeline event to the graph. Best-effort — errors are
 // swallowed because output events are observability, not control flow.
+// Causality: links to CTO's last event (pipeline is CTO-orchestrated).
+// Falls back to store.Head() if CTO hasn't emitted yet.
 func (p *Pipeline) emit(eventType types.EventType, content event.EventContent) {
-	head, err := p.store.Head()
-	if err != nil || !head.IsSome() {
-		return
+	var causeID types.EventID
+	if p.cto != nil {
+		causeID = p.cto.LastEvent()
 	}
-	causeID := head.Unwrap().ID()
+	if causeID.IsZero() {
+		head, err := p.store.Head()
+		if err != nil || !head.IsSome() {
+			return
+		}
+		causeID = head.Unwrap().ID()
+	}
 	ev, err := p.factory.Create(eventType, p.humanID, content, []types.EventID{causeID}, p.convID, p.store, p.signer)
 	if err != nil {
 		return

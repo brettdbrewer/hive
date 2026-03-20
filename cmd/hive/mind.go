@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
@@ -15,12 +14,15 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/lovyou-ai/eventgraph/go/pkg/actor/pgactor"
 	"github.com/lovyou-ai/eventgraph/go/pkg/event"
+	"github.com/lovyou-ai/eventgraph/go/pkg/graph"
 	"github.com/lovyou-ai/eventgraph/go/pkg/store/pgstore"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
 	"github.com/lovyou-ai/hive/pkg/mind"
 	"github.com/lovyou-ai/hive/pkg/pipeline"
+	"github.com/lovyou-ai/hive/pkg/tui"
 )
 
 // runMind starts an interactive chat session with the hive's mind.
@@ -41,11 +43,18 @@ func runMind(ctx context.Context, dsn, repoPath, model string) error {
 	}
 	defer s.Close()
 
+	// Actor store — needed for agent.New() registration.
+	actors, err := pgactor.NewPostgresActorStoreFromPool(ctx, pool)
+	if err != nil {
+		return fmt.Errorf("actor store: %w", err)
+	}
+
 	// Register event types so the store can deserialize mind events.
-	mind.RegisterEventTypes()
+	registry := event.DefaultRegistry()
+	mind.RegisterWithRegistry(registry)
 	pipeline.RegisterEventTypes()
 
-	factory := event.NewEventFactory(event.DefaultRegistry())
+	factory := event.NewEventFactory(registry)
 
 	// Derive signer from "mind" identity.
 	// TODO: replace with Google auth when available.
@@ -61,6 +70,23 @@ func runMind(ctx context.Context, dsn, repoPath, model string) error {
 	if err != nil {
 		return fmt.Errorf("resolve human ID: %w", err)
 	}
+
+	// Bootstrap the event graph if needed (mind needs it for turn persistence).
+	humanActorID, err := types.NewActorID(humanID)
+	if err != nil {
+		return fmt.Errorf("actor ID: %w", err)
+	}
+	if err := bootstrapGraph(s, humanActorID); err != nil {
+		return fmt.Errorf("bootstrap graph: %w", err)
+	}
+
+	// Create the shared Graph facade — wraps the event store and actor store.
+	// The Mind's agent uses this for event recording with proper causality.
+	g := graph.New(s, actors)
+	if err := g.Start(); err != nil {
+		return fmt.Errorf("graph start: %w", err)
+	}
+	defer g.Close()
 
 	// Generate MCP config so the mind can query the event graph.
 	mcpConfigPath, cleanup, err := writeMCPConfig(dsn, humanID, repoPath)
@@ -83,44 +109,39 @@ func runMind(ctx context.Context, dsn, repoPath, model string) error {
 		return fmt.Errorf("mind provider: %w", err)
 	}
 
-	m := mind.New(mind.Config{
+	// Resume the most recent conversation if one exists.
+	var resumeConvID string
+	if convs, err := mindStore.ListConversations(1); err == nil && len(convs) > 0 {
+		resumeConvID = convs[0].ID
+	}
+
+	m, err := mind.New(ctx, mind.Config{
+		Graph:            g,
 		Provider:         provider,
 		Store:            mindStore,
 		RepoPath:         absRepo,
 		TelemetrySummary: telemetrySummary,
 		DocPaths:         docPaths,
+		ConversationID:   resumeConvID,
 	})
-
-	fmt.Fprintf(os.Stderr, "Mind loaded: %d lines of context\n", m.ContextLines())
-	if mcpConfigPath != "" {
-		fmt.Fprintf(os.Stderr, "MCP: event graph connected\n")
+	if err != nil {
+		return fmt.Errorf("mind: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "Docs: %d sources available\n", len(docPaths))
-	fmt.Fprintf(os.Stderr, "Type your message. Empty line or Ctrl+C to exit.\n\n")
 
-	scanner := bufio.NewScanner(os.Stdin)
-	// Increase scanner buffer for long inputs.
-	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
-
-	for {
-		fmt.Fprint(os.Stderr, "Matt> ")
-		if !scanner.Scan() {
-			break
-		}
-		input := strings.TrimSpace(scanner.Text())
-		if input == "" {
-			break
-		}
-
-		fmt.Fprintf(os.Stderr, "  ⏳ thinking...\n")
-		resp, err := m.Chat(ctx, input)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n\n", err)
-			continue
-		}
-		fmt.Fprintf(os.Stdout, "\n%s\n\n", resp)
+	// Determine model name for display.
+	modelName := model
+	if modelName == "" {
+		modelName = "Opus"
 	}
-	return nil
+
+	// Launch TUI.
+	if home, err := os.UserHomeDir(); err == nil {
+		logPath := filepath.Join(home, "hive-tui.log")
+		tui.TUILogPath = logPath
+		mind.LogPath = logPath
+	}
+	backend := tui.NewDirectBackend(m, mcpConfigPath != "", modelName)
+	return tui.Run(ctx, backend)
 }
 
 // writeMCPConfig creates a temporary MCP config file that points at the

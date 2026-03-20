@@ -7,13 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lovyou-ai/eventgraph/go/pkg/actor"
 	"github.com/lovyou-ai/eventgraph/go/pkg/bus"
 	"github.com/lovyou-ai/eventgraph/go/pkg/decision"
 	"github.com/lovyou-ai/eventgraph/go/pkg/event"
+	"github.com/lovyou-ai/eventgraph/go/pkg/graph"
 	"github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
 	"github.com/lovyou-ai/eventgraph/go/pkg/store"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
+	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
 	"github.com/lovyou-ai/hive/pkg/roles"
 )
@@ -49,9 +52,41 @@ var _ intelligence.Provider = (*mockProvider)(nil)
 // Test helpers
 // ════════════════════════════════════════════════════════════════════════
 
-func testAgent(t *testing.T, provider intelligence.Provider) *roles.Agent {
+// agentCounter generates unique names for test agents.
+var agentCounter uint32
+
+func testGraph(t *testing.T) *graph.Graph {
 	t.Helper()
-	return testAgentWithRole(t, provider, roles.RoleBuilder, "test-builder")
+	s := store.NewInMemoryStore()
+	as := actor.NewInMemoryActorStore()
+	g := graph.New(s, as)
+	if err := g.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { g.Close() })
+	return g
+}
+
+func testHiveAgent(t *testing.T, provider intelligence.Provider, role roles.Role, name string) *hiveagent.Agent {
+	t.Helper()
+	n := atomic.AddUint32(&agentCounter, 1)
+	uniqueName := fmt.Sprintf("%s-%d", name, n)
+	g := testGraph(t)
+	a, err := hiveagent.New(context.Background(), hiveagent.Config{
+		Role:     role,
+		Name:     uniqueName,
+		Graph:    g,
+		Provider: provider,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
+}
+
+func testAgent(t *testing.T, provider intelligence.Provider) *hiveagent.Agent {
+	t.Helper()
+	return testHiveAgent(t, provider, roles.RoleBuilder, "test-builder")
 }
 
 func humanID() types.ActorID {
@@ -239,9 +274,6 @@ func TestLoopBudgetTracking(t *testing.T) {
 	}
 
 	result := l.Run(context.Background())
-	if result.Budget.TokensUsed == 0 {
-		t.Error("expected non-zero token usage")
-	}
 	if result.Budget.Iterations != 2 {
 		t.Errorf("budget iterations = %d, want 2", result.Budget.Iterations)
 	}
@@ -307,8 +339,8 @@ func TestRunConcurrent(t *testing.T) {
 	provider1 := newMockProvider("/signal {\"signal\": \"TASK_DONE\"}")
 	provider2 := newMockProvider("/signal {\"signal\": \"TASK_DONE\"}")
 
-	agent1 := testAgentWithRole(t, provider1, roles.RoleBuilder, "builder")
-	agent2 := testAgentWithRole(t, provider2, roles.RoleTester, "tester")
+	agent1 := testHiveAgent(t, provider1, roles.RoleBuilder, "builder")
+	agent2 := testHiveAgent(t, provider2, roles.RoleTester, "tester")
 
 	results := RunConcurrent(context.Background(), []Config{
 		{Agent: agent1, HumanID: humanID(), Budget: resources.BudgetConfig{MaxIterations: 5}},
@@ -336,34 +368,6 @@ func TestNewLoopRequiresAgent(t *testing.T) {
 // ════════════════════════════════════════════════════════════════════════
 // Additional helpers
 // ════════════════════════════════════════════════════════════════════════
-
-// agentCounter generates unique actor IDs for test agents.
-var agentCounter uint32
-
-func testAgentWithRole(t *testing.T, provider intelligence.Provider, role roles.Role, name string) *roles.Agent {
-	t.Helper()
-	n := atomic.AddUint32(&agentCounter, 1)
-	agentID := types.MustActorID(fmt.Sprintf("actor_%032d", n))
-	humanID := types.MustActorID("actor_00000000000000000000000000000099")
-
-	rt, err := intelligence.NewRuntime(context.Background(), intelligence.RuntimeConfig{
-		AgentID:  agentID,
-		Provider: provider,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = rt.Boot(rt.PublicKey(), "ai", "mock-model", "standard", []string{"test"}, types.MustDomainScope("test"), humanID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return &roles.Agent{
-		Runtime: rt,
-		Role:    role,
-		Name:    name,
-	}
-}
 
 // createMockEvent creates a minimal event for bus testing.
 func createMockEvent(t *testing.T, _ store.Store, source types.ActorID) event.Event {

@@ -313,9 +313,10 @@ func (p *Pipeline) runEvolveIteration(parentCtx context.Context, iteration int, 
 	p.emitOutput("cto", "analysis", fmt.Sprintf("expected impact: %s", rec.ExpectedImpact))
 
 	// Persist this decision to the mind store for future sessions.
-	if head, headErr := p.store.Head(); headErr == nil && head.IsSome() {
+	causeID := p.ctoCause()
+	if !causeID.IsZero() {
 		obs := mind.Observation{Proposed: rec.Description, Why: rec.ExpectedImpact, Mode: "evolve"}
-		if saveErr := mindStore.Save(p.humanID, obs, []types.EventID{head.Unwrap().ID()}, p.convID); saveErr != nil {
+		if saveErr := mindStore.Save(p.humanID, obs, []types.EventID{causeID}, p.convID); saveErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: mind observation save failed: %v (continuing)\n", saveErr)
 			p.emitWarning(PhaseEvolve, "mind observation save failed: %v", saveErr)
 		}
@@ -369,7 +370,7 @@ func (p *Pipeline) runEvolveIteration(parentCtx context.Context, iteration int, 
 		}
 		completer := p.humanID
 		if builder, ok := p.agents[roles.RoleBuilder]; ok {
-			completer = builder.Runtime.ID()
+			completer = builder.ID()
 		}
 		summary := ""
 		if recOut != nil {
@@ -383,8 +384,8 @@ func (p *Pipeline) runEvolveIteration(parentCtx context.Context, iteration int, 
 			p.emitWarning(PhaseEvolve, "work task complete failed: %v", completeErr)
 		}
 	}()
-	if head, headErr := p.store.Head(); headErr == nil && head.IsSome() {
-		causes := []types.EventID{head.Unwrap().ID()}
+	if taskCauseID := p.ctoCause(); !taskCauseID.IsZero() {
+		causes := []types.EventID{taskCauseID}
 		task, createErr := ts.Create(p.humanID, rec.Description, rec.ExpectedImpact, causes, p.convID)
 		if createErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: work task create failed: %v (continuing)\n", createErr)
@@ -393,16 +394,13 @@ func (p *Pipeline) runEvolveIteration(parentCtx context.Context, iteration int, 
 			workTask = &task
 			assignee := p.humanID
 			if builder, ok := p.agents[roles.RoleBuilder]; ok {
-				assignee = builder.Runtime.ID()
+				assignee = builder.ID()
 			}
 			if assignErr := ts.Assign(p.humanID, task.ID, assignee, []types.EventID{task.ID}, p.convID); assignErr != nil {
 				fmt.Fprintf(os.Stderr, "Warning: work task assign failed: %v (continuing)\n", assignErr)
 				p.emitWarning(PhaseEvolve, "work task assign failed: %v", assignErr)
 			}
 		}
-	} else if headErr != nil {
-		fmt.Fprintf(os.Stderr, "Warning: work task store head failed: %v (continuing)\n", headErr)
-		p.emitWarning(PhaseEvolve, "work task store head failed: %v", headErr)
 	}
 
 	fmt.Fprintf(os.Stderr, "\n═══ Evolve: Running targeted pipeline ═══\n")

@@ -12,11 +12,13 @@ import (
 
 	"github.com/lovyou-ai/eventgraph/go/pkg/actor"
 	"github.com/lovyou-ai/eventgraph/go/pkg/event"
+	"github.com/lovyou-ai/eventgraph/go/pkg/graph"
 	"github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
 	"github.com/lovyou-ai/eventgraph/go/pkg/store"
 	"github.com/lovyou-ai/eventgraph/go/pkg/trust"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
+	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
 	"github.com/lovyou-ai/hive/pkg/authority"
 	"github.com/lovyou-ai/hive/pkg/mind"
 	"github.com/lovyou-ai/hive/pkg/resources"
@@ -73,15 +75,16 @@ type ProductInput struct {
 type Pipeline struct {
 	store     store.Store
 	actors    actor.IActorStore
+	graph     *graph.Graph       // shared graph facade (bus-integrated, mutex-safe)
 	humanID   types.ActorID
 	humanName string
 	ws        *workspace.Workspace
 	product   *workspace.Product // current product being built
 	spawner   *spawn.Spawner     // nil = direct creation (no approval)
 
-	cto           *roles.Agent
-	guardian      *roles.Agent
-	agents        map[roles.Role]*roles.Agent
+	cto           *hiveagent.Agent
+	guardian      *hiveagent.Agent
+	agents        map[roles.Role]*hiveagent.Agent
 	trackers      map[roles.Role]*resources.TrackingProvider // per-agent token tracking
 	skipGuardian  bool
 	skipReviewer  bool
@@ -175,13 +178,21 @@ func New(ctx context.Context, cfg Config) (*Pipeline, error) {
 		return nil, fmt.Errorf("workspace: %w", err)
 	}
 
+	// Create the shared graph facade — used by hiveagent.New() for bus-integrated,
+	// mutex-safe event recording with proper causality tracking.
+	g := graph.New(cfg.Store, cfg.Actors, graph.WithSigner(deriveSignerFromID(cfg.HumanID)))
+	if err := g.Start(); err != nil {
+		return nil, fmt.Errorf("start graph: %w", err)
+	}
+
 	p := &Pipeline{
 		store:         cfg.Store,
 		actors:        cfg.Actors,
+		graph:         g,
 		humanID:       cfg.HumanID,
 		humanName:     human.DisplayName(),
 		ws:            ws,
-		agents:        make(map[roles.Role]*roles.Agent),
+		agents:        make(map[roles.Role]*hiveagent.Agent),
 		trackers:      make(map[roles.Role]*resources.TrackingProvider),
 		skipGuardian:  cfg.SkipGuardian,
 		skipSimplify:  cfg.SkipSimplify,
@@ -286,13 +297,10 @@ The --yes flag is active (auto-approve mode). Missing authority.requested/author
 // (human approval). Without a spawner, agents are created directly.
 // Always uses the role's preferred model — callers needing a different model
 // should create a temporary provider via providerForRoleWithModel instead.
-func (p *Pipeline) ensureAgent(ctx context.Context, role roles.Role, name string) (*roles.Agent, error) {
-	if agent, ok := p.agents[role]; ok {
-		return agent, nil
+func (p *Pipeline) ensureAgent(ctx context.Context, role roles.Role, name string) (*hiveagent.Agent, error) {
+	if a, ok := p.agents[role]; ok {
+		return a, nil
 	}
-
-	var actorID types.ActorID
-	var agentPK types.PublicKey
 
 	if p.spawner != nil {
 		// Spawn through authority gate — human must approve.
@@ -308,27 +316,11 @@ func (p *Pipeline) ensureAgent(ctx context.Context, role roles.Role, name string
 		if !result.Approved {
 			return nil, fmt.Errorf("spawn %s denied: %s", name, result.Reason)
 		}
-		actorID = result.ActorID
-		// Derive the same public key the Spawner registered.
-		pk, err := types.NewPublicKey([]byte(spawn.DerivePublicKey("agent:" + name)))
-		if err != nil {
-			return nil, fmt.Errorf("agent public key: %w", err)
-		}
-		agentPK = pk
+		// Spawner registered the actor and emitted lifecycle events.
+		// Fall through to create the hiveagent.Agent below.
+		_ = result.ActorID
 	} else {
 		// Direct creation — no approval gate (bootstrap or testing).
-		agentPub := spawn.DerivePublicKey("agent:" + name)
-		pk, err := types.NewPublicKey([]byte(agentPub))
-		if err != nil {
-			return nil, fmt.Errorf("agent public key: %w", err)
-		}
-		agentPK = pk
-		agentActor, err := p.actors.Register(agentPK, name, event.ActorTypeAI)
-		if err != nil {
-			return nil, fmt.Errorf("create agent %s: %w", name, err)
-		}
-		actorID = agentActor.ID()
-
 		// Emit authority events for OBSERVABLE invariant — all spawns are auditable,
 		// even in dev/bootstrap mode without an authority gate.
 		action := fmt.Sprintf("spawn agent %q as %s", name, role)
@@ -352,22 +344,22 @@ func (p *Pipeline) ensureAgent(ctx context.Context, role roles.Role, name string
 	}
 	tracker := resources.NewTrackingProvider(rawProvider)
 	p.trackers[role] = tracker
-	agent, err := roles.NewAgent(ctx, roles.AgentConfig{
-		Role:      role,
-		Name:      name,
-		ActorID:   actorID,
-		PublicKey: agentPK,
-		Store:     p.store,
-		Provider:  tracker,
-		HumanID:   p.humanID,
+
+	// Create the unified hiveagent.Agent — handles actor registration, boot
+	// events, state machine, and causality tracking internally.
+	a, err := hiveagent.New(ctx, hiveagent.Config{
+		Role:     role,
+		Name:     name,
+		Graph:    p.graph,
+		Provider: tracker,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create agent %s: %w", name, err)
 	}
-	fmt.Fprintf(os.Stderr, "  ↳ %s agent %s using %s\n", role, actorID.Value(), model)
-	p.emitAgentSpawned(string(role), actorID.Value(), model)
-	p.agents[role] = agent
-	return agent, nil
+	fmt.Fprintf(os.Stderr, "  ↳ %s agent %s using %s\n", role, a.ID().Value(), model)
+	p.emitAgentSpawned(string(role), a.ID().Value(), model)
+	p.agents[role] = a
+	return a, nil
 }
 
 // ed25519Signer implements event.Signer for pipeline-emitted events.
@@ -398,15 +390,22 @@ func newConversationID() (types.ConversationID, error) {
 }
 
 // emitAuthorityRequested records an authority.requested event on the graph.
+// Uses CTO causality when available; falls back to store.Head().
 func (p *Pipeline) emitAuthorityRequested(action string, justification string) (types.EventID, error) {
-	head, err := p.store.Head()
-	if err != nil {
-		return types.EventID{}, fmt.Errorf("store head: %w", err)
+	var causeID types.EventID
+	if p.cto != nil {
+		causeID = p.cto.LastEvent()
 	}
-	if !head.IsSome() {
-		return types.EventID{}, fmt.Errorf("graph not bootstrapped")
+	if causeID.IsZero() {
+		head, err := p.store.Head()
+		if err != nil {
+			return types.EventID{}, fmt.Errorf("store head: %w", err)
+		}
+		if !head.IsSome() {
+			return types.EventID{}, fmt.Errorf("graph not bootstrapped")
+		}
+		causeID = head.Unwrap().ID()
 	}
-	causeID := head.Unwrap().ID()
 
 	content := event.AuthorityRequestContent{
 		Action:        action,
@@ -454,12 +453,27 @@ func (p *Pipeline) emitAuthorityResolved(reqEventID types.EventID, res authority
 	return appended.ID(), nil
 }
 
+// ctoCause returns the CTO agent's last event ID for causality linking.
+// Falls back to store.Head() if CTO hasn't emitted yet.
+func (p *Pipeline) ctoCause() types.EventID {
+	if p.cto != nil {
+		if id := p.cto.LastEvent(); !id.IsZero() {
+			return id
+		}
+	}
+	head, err := p.store.Head()
+	if err != nil || !head.IsSome() {
+		return types.EventID{}
+	}
+	return head.Unwrap().ID()
+}
+
 // Store returns the shared event graph.
 func (p *Pipeline) Store() store.Store {
 	return p.store
 }
 
 // Agents returns all active agents.
-func (p *Pipeline) Agents() map[roles.Role]*roles.Agent {
+func (p *Pipeline) Agents() map[roles.Role]*hiveagent.Agent {
 	return p.agents
 }

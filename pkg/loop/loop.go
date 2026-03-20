@@ -23,6 +23,7 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/event"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
+	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
 	"github.com/lovyou-ai/hive/pkg/roles"
 )
@@ -50,8 +51,9 @@ type Result struct {
 
 // Config configures an agentic loop.
 type Config struct {
-	// Agent is the agent to run. Required.
-	Agent *roles.Agent
+	// Agent is the unified hive agent to run. Required.
+	// Provides state machine, causality tracking, and trust hooks.
+	Agent *hiveagent.Agent
 
 	// HumanID is the human operator's ID (for escalation attribution).
 	HumanID types.ActorID
@@ -83,7 +85,7 @@ type Config struct {
 
 // Loop runs an agent's observe-reason-act-reflect cycle.
 type Loop struct {
-	agent   *roles.Agent
+	agent   *hiveagent.Agent
 	humanID types.ActorID
 	budget  *resources.Budget
 	config  Config
@@ -188,16 +190,14 @@ func (l *Loop) Run(ctx context.Context) Result {
 
 // observe gathers recent events from the graph as context.
 func (l *Loop) observe(ctx context.Context) (string, error) {
-	rt := l.agent.Runtime
-
-	// Record observation.
-	_, err := rt.Observe(ctx, l.config.ObservationWindow)
+	// Record observation via hiveagent (drives state machine + causality).
+	_, err := l.agent.Observe(ctx, l.config.ObservationWindow)
 	if err != nil {
 		return "", err
 	}
 
 	// Get recent events for context.
-	events, err := rt.Memory(l.config.ObservationWindow)
+	events, err := l.agent.Memory(l.config.ObservationWindow)
 	if err != nil {
 		return "", err
 	}
@@ -231,7 +231,7 @@ func (l *Loop) buildPrompt(observation string, iteration int) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("You are %s (%s), iteration %d of your agentic loop.\n\n",
-		l.agent.Name, l.agent.Role, iteration))
+		l.agent.Name(), l.agent.Role(), iteration))
 
 	if l.config.Task != "" && iteration == 1 {
 		sb.WriteString(fmt.Sprintf("## Your Task\n%s\n\n", l.config.Task))
@@ -268,14 +268,15 @@ Every response MUST end with exactly one /signal line.
 }
 
 // reason calls the agent's LLM and returns the response text and token usage.
+// Uses the unified Agent.Reason() which drives state machine transitions.
 func (l *Loop) reason(ctx context.Context, prompt string) (string, decision.TokenUsage, error) {
-	rt := l.agent.Runtime
-	memory, _ := rt.Memory(10)
-	resp, err := rt.Provider().Reason(ctx, prompt, memory)
+	content, err := l.agent.Reason(ctx, prompt)
 	if err != nil {
 		return "", decision.TokenUsage{}, err
 	}
-	return resp.Content(), resp.Usage(), nil
+	// Token usage is tracked by the provider wrapper (TrackingProvider).
+	// Return zero usage here — the budget uses iteration counts.
+	return content, decision.TokenUsage{}, nil
 }
 
 // Signal is the structured JSON signal emitted by agents at the end of each response.
@@ -350,14 +351,14 @@ func (l *Loop) checkResponse(ctx context.Context, response string, iteration int
 		r := l.result(StopHalt, iteration, sig.Reason)
 		return &r
 	case SignalEscalate:
-		if _, err := l.agent.Runtime.Escalate(ctx, l.humanID,
+		if err := l.agent.Escalate(ctx,
 			fmt.Sprintf("loop iteration %d: %s", iteration, sig.Reason)); err != nil {
 			fmt.Printf("warning: escalation event failed: %v\n", err)
 		}
 		r := l.result(StopEscalation, iteration, sig.Reason)
 		return &r
 	case SignalTaskDone:
-		if _, err := l.agent.Runtime.Learn(ctx,
+		if err := l.agent.Learn(ctx,
 			"task completed after loop iteration "+fmt.Sprint(iteration), "loop"); err != nil {
 			fmt.Printf("warning: completion event failed: %v\n", err)
 		}
@@ -367,7 +368,7 @@ func (l *Loop) checkResponse(ctx context.Context, response string, iteration int
 		// Not a stop — handled by isQuiescent.
 		return nil
 	default:
-		fmt.Printf("warning: unknown signal %q from %s\n", sig.Signal, l.agent.Name)
+		fmt.Printf("warning: unknown signal %q from %s\n", sig.Signal, l.agent.Name())
 		return nil
 	}
 }
@@ -379,7 +380,7 @@ func (l *Loop) checkResponseText(ctx context.Context, response string, iteration
 		return &r
 	}
 	if ContainsSignal(response, "ESCALATE") {
-		if _, err := l.agent.Runtime.Escalate(ctx, l.humanID,
+		if err := l.agent.Escalate(ctx,
 			fmt.Sprintf("loop iteration %d: %s", iteration, response)); err != nil {
 			fmt.Printf("warning: escalation event failed: %v\n", err)
 		}
@@ -387,7 +388,7 @@ func (l *Loop) checkResponseText(ctx context.Context, response string, iteration
 		return &r
 	}
 	if ContainsSignal(response, "TASK_DONE") {
-		if _, err := l.agent.Runtime.Learn(ctx,
+		if err := l.agent.Learn(ctx,
 			"task completed after loop iteration "+fmt.Sprint(iteration), "loop"); err != nil {
 			fmt.Printf("warning: completion event failed: %v\n", err)
 		}
@@ -409,7 +410,7 @@ func (l *Loop) isQuiescent(response string) bool {
 // onEvent is called by the bus when a new event arrives.
 func (l *Loop) onEvent(ev event.Event) {
 	// Skip our own events to avoid infinite loops.
-	if ev.Source() == l.agent.Runtime.ID() {
+	if ev.Source() == l.agent.ID() {
 		return
 	}
 
@@ -472,16 +473,16 @@ func RunConcurrent(ctx context.Context, configs []Config) []AgentResult {
 			l, err := New(c)
 			if err != nil {
 				results[idx] = AgentResult{
-					Role:   c.Agent.Role,
-					Name:   c.Agent.Name,
+					Role:   c.Agent.Role(),
+					Name:   c.Agent.Name(),
 					Result: Result{Reason: StopError, Detail: err.Error()},
 				}
 				return
 			}
 
 			results[idx] = AgentResult{
-				Role:   c.Agent.Role,
-				Name:   c.Agent.Name,
+				Role:   c.Agent.Role(),
+				Name:   c.Agent.Name(),
 				Result: l.Run(ctx),
 			}
 		}(i, cfg)

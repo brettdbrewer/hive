@@ -13,6 +13,7 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/store"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
+	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
 	"github.com/lovyou-ai/hive/pkg/roles"
 	"github.com/lovyou-ai/hive/pkg/spawn"
@@ -295,7 +296,7 @@ func TestEnsureAgentNoSpawnerEmitsAuthorityEvents(t *testing.T) {
 		signer:   signer,
 		factory:  factory,
 		convID:   convID,
-		agents:   make(map[roles.Role]*roles.Agent),
+		agents:   make(map[roles.Role]*hiveagent.Agent),
 		trackers: make(map[roles.Role]*resources.TrackingProvider),
 		// spawner is nil — dev/bootstrap mode.
 	}
