@@ -23,9 +23,8 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/event"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
-	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
+	hiveagent "github.com/lovyou-ai/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
-	"github.com/lovyou-ai/hive/pkg/roles"
 )
 
 // StopReason describes why a loop stopped.
@@ -454,7 +453,7 @@ func (l *Loop) result(reason StopReason, iterations int, detail string) Result {
 // AgentResult pairs a loop result with the agent's role and name,
 // avoiding silent data loss when multiple agents share a role.
 type AgentResult struct {
-	Role   roles.Role
+	Role   string
 	Name   string
 	Result Result
 }
@@ -473,7 +472,7 @@ func RunConcurrent(ctx context.Context, configs []Config) []AgentResult {
 			l, err := New(c)
 			if err != nil {
 				results[idx] = AgentResult{
-					Role:   c.Agent.Role(),
+					Role:   string(c.Agent.Role()),
 					Name:   c.Agent.Name(),
 					Result: Result{Reason: StopError, Detail: err.Error()},
 				}
@@ -481,7 +480,7 @@ func RunConcurrent(ctx context.Context, configs []Config) []AgentResult {
 			}
 
 			results[idx] = AgentResult{
-				Role:   c.Agent.Role(),
+				Role:   string(c.Agent.Role()),
 				Name:   c.Agent.Name(),
 				Result: l.Run(ctx),
 			}

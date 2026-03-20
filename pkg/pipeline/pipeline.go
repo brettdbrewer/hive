@@ -18,7 +18,7 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/trust"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
-	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
+	hiveagent "github.com/lovyou-ai/agent"
 	"github.com/lovyou-ai/hive/pkg/authority"
 	"github.com/lovyou-ai/hive/pkg/mind"
 	"github.com/lovyou-ai/hive/pkg/resources"
@@ -351,10 +351,13 @@ func (p *Pipeline) ensureAgent(ctx context.Context, role roles.Role, name string
 	// events, state machine, and causality tracking internally.
 	// All agents share the pipeline's conversation ID for unified threading.
 	a, err := hiveagent.New(ctx, hiveagent.Config{
-		Role:           role,
+		Role:           hiveagent.Role(role),
 		Name:           name,
 		Graph:          p.graph,
 		Provider:       tracker,
+		Model:          model,
+		CostTier:       "opus",
+		SoulValues:     roles.SoulValues(role),
 		ConversationID: p.convID,
 	})
 	if err != nil {

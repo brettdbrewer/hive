@@ -14,7 +14,7 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
-	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
+	hiveagent "github.com/lovyou-ai/agent"
 	"github.com/lovyou-ai/hive/pkg/roles"
 )
 
@@ -62,10 +62,13 @@ func New(ctx context.Context, cfg Config) (*Mind, error) {
 
 	// Create the underlying Agent with the Mind role.
 	a, err := hiveagent.New(ctx, hiveagent.Config{
-		Role:     roles.RoleMind,
-		Name:     "Mind",
-		Graph:    cfg.Graph,
-		Provider: cfg.Provider,
+		Role:       hiveagent.Role(roles.RoleMind),
+		Name:       "Mind",
+		Graph:      cfg.Graph,
+		Provider:   cfg.Provider,
+		Model:      roles.PreferredModel(roles.RoleMind),
+		CostTier:   "opus",
+		SoulValues: roles.SoulValues(roles.RoleMind),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("mind: create agent: %w", err)

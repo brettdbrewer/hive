@@ -16,7 +16,7 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/store"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
-	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
+	hiveagent "github.com/lovyou-ai/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
 	"github.com/lovyou-ai/hive/pkg/roles"
 )
@@ -73,10 +73,13 @@ func testHiveAgent(t *testing.T, provider intelligence.Provider, role roles.Role
 	uniqueName := fmt.Sprintf("%s-%d", name, n)
 	g := testGraph(t)
 	a, err := hiveagent.New(context.Background(), hiveagent.Config{
-		Role:     role,
-		Name:     uniqueName,
-		Graph:    g,
-		Provider: provider,
+		Role:       hiveagent.Role(role),
+		Name:       uniqueName,
+		Graph:      g,
+		Provider:   provider,
+		Model:      roles.PreferredModel(role),
+		CostTier:   "opus",
+		SoulValues: roles.SoulValues(role),
 	})
 	if err != nil {
 		t.Fatal(err)

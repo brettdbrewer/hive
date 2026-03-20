@@ -22,7 +22,6 @@ import (
 
 	"github.com/lovyou-ai/hive/pkg/mind"
 	"github.com/lovyou-ai/hive/pkg/pipeline"
-	"github.com/lovyou-ai/hive/pkg/tui"
 )
 
 // runMind starts an interactive chat session with the hive's mind.
@@ -128,20 +127,9 @@ func runMind(ctx context.Context, dsn, repoPath, model string) error {
 		return fmt.Errorf("mind: %w", err)
 	}
 
-	// Determine model name for display.
-	modelName := model
-	if modelName == "" {
-		modelName = "Opus"
-	}
-
-	// Launch TUI.
-	if home, err := os.UserHomeDir(); err == nil {
-		logPath := filepath.Join(home, "hive-tui.log")
-		tui.TUILogPath = logPath
-		mind.LogPath = logPath
-	}
-	backend := tui.NewDirectBackend(m, mcpConfigPath != "", modelName)
-	return tui.Run(ctx, backend)
+	// TODO: replace TUI with new interface.
+	_ = m
+	return fmt.Errorf("mind: TUI removed — new interface coming soon")
 }
 
 // writeMCPConfig creates a temporary MCP config file that points at the

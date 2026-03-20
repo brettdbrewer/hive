@@ -13,7 +13,7 @@ import (
 	"github.com/lovyou-ai/eventgraph/go/pkg/store"
 	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 
-	hiveagent "github.com/lovyou-ai/hive/pkg/agent"
+	hiveagent "github.com/lovyou-ai/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
 	"github.com/lovyou-ai/hive/pkg/roles"
 	"github.com/lovyou-ai/hive/pkg/spawn"
