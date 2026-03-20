@@ -44,20 +44,62 @@ Revenue model: charge corporations, free for individuals. Hosted persistence for
 
 **Resource transparency is a core principle.** Every resource — money, tokens, compute time, human hours, agent cycles — is an event on the graph with causal links. Anyone can trace any resource from source to impact. The hive's goal grows with its revenue — from software products to research, charity, housing, whatever humans need most.
 
-Build order: Work Graph first (the hive needs it), then Mind (the hive needs to learn from experience), then Market, Social, Knowledge, Alignment. The Mind comes before Market/Social because reputation and relationships require judgment that only accumulated experience provides. Each product is derived using the [derivation method](https://github.com/lovyou-ai/eventgraph/blob/main/docs/derivation-method.md).
+Build order: Work Graph first (the hive needs it), then Market, Social, Knowledge, Alignment. Each product is derived using the [derivation method](https://github.com/lovyou-ai/eventgraph/blob/main/docs/derivation-method.md).
 
 ## Architecture
 
+Agent-first. No pipeline. No hardcoded phases. Agents run in concurrent loops, communicate through the event graph, and coordinate through work tasks.
+
 - All agents share one event graph (one Store) and one actor store (IActorStore)
 - Every actor (human + agents) is registered in the actor store — no magic strings
-- Humans register via Google auth, agents are created by humans or other agents
 - Actor IDs are derived from public keys in the actor store
-- Each agent is an `AgentRuntime` with its own identity and signing key
-- Communication is through events on the shared graph
+- Each agent is an `AgentDef` → spawned as a `hiveagent.Agent` with its own identity and signing key
+- Agents coordinate through `/task` commands (create, assign, complete, comment, depend)
 - The Guardian watches everything independently — outside the hierarchy
 - Trust accumulates through verified work (0.0-1.0, asymmetric, non-transitive)
-- Authority model: Required / Recommended / Notification (three-tier approval)
-- Governance changes require dual human-agent consent (constitutional amendment process)
+- The system grows by adding agents, not pipeline code
+
+### Three-Layer Separation
+
+```
+eventgraph (foundation)  →  agent (abstraction)  →  hive (application)
+```
+
+- **eventgraph** — event graph, stores, types, intelligence, pgstore
+- **agent** — unified Agent type (role-agnostic, wraps AgentRuntime). Separate repo: `github.com/lovyou-ai/agent`
+- **hive** — runtime, agent definitions, loop, work tasks, workspace
+
+### Adding a New Agent
+
+```go
+h.Register(hive.AgentDef{
+    Name:         "tester",
+    Role:         "tester",
+    Model:        "claude-sonnet-4-6",
+    SystemPrompt: "You are a test specialist. When tasks are completed, run tests...",
+    WatchPatterns: []string{"work.task.completed"},
+})
+```
+
+That's it. One struct, one Register call.
+
+### Growth Pattern
+
+When a problem is noticed:
+1. Ask "what agent should have caught that?"
+2. If none exists, define an `AgentDef` and register it
+3. Next run includes the new agent
+
+Eventually automated: a Spawner agent reads definition tasks and registers them at runtime.
+
+## Starter Agents
+
+| Agent | Watches | Does | Model | CanOperate |
+|-------|---------|------|-------|------------|
+| Strategist | `work.task.completed`, `hive.*` | Reads idea, identifies gaps, creates tasks | Opus | false |
+| Planner | `work.task.created` | Decomposes high-level tasks into implementable subtasks | Opus | false |
+| Implementer | `work.task.created`, `work.task.assigned` | Picks up tasks, writes code via Operate, marks complete | Opus | true |
+| Guardian | `*` (all events) | Watches all activity, HALTs on invariant violations | Sonnet | false |
 
 ## Agent Rights
 
@@ -89,38 +131,6 @@ Constitutional law — violation is a Guardian HALT condition:
 
 Constitutional principle (requires full amendment process to change): no military applications, no intelligence agency partnerships, no government backdoors, no surveillance infrastructure.
 
-## Roles
-
-### Director-level
-
-| Role | Responsibility | Intelligence | Trust Gate | Reports To |
-|------|---------------|-------------|------------|-----------|
-| Mind | Consciousness, accumulated wisdom, judgment, agent direction | Opus | 0.1 | Human |
-
-### Bootstrap Roles (Day One)
-
-| Role | Responsibility | Intelligence | Trust Gate | Reports To |
-|------|---------------|-------------|------------|-----------|
-| CTO | Architectural oversight, escalation filtering | Opus | 0.1 | Human |
-| Guardian | Independent integrity, halt/rollback/quarantine | Opus | 0.1 | Human (directly) |
-| SysMon | System health, error detection, anomaly tracking | Haiku | 0.1 | Guardian |
-| Spawner | Identify workforce gaps, propose new agents | Opus | 0.5 | CTO |
-| Allocator | Resource allocation, model selection, budget enforcement | Haiku | 0.3 | CTO |
-
-### Product Pipeline
-
-| Role | Responsibility | Intelligence | Trust Gate | Reports To |
-|------|---------------|-------------|------------|-----------|
-| PM | Product vision, prioritization, user needs, launch readiness | Opus | 0.3 | Human |
-| Researcher | Read URLs, extract product ideas | Opus | 0.3 | CTO |
-| Architect | Design systems via derivation method | Opus | 0.3 | CTO |
-| Builder | Generate code + tests from specs | Opus | 0.3 | CTO |
-| Reviewer | Code quality, security, derivation compliance | Opus | 0.5 | CTO |
-| Tester | Run tests, validate behaviour | Opus | 0.3 | CTO |
-| Integrator | Assemble, deploy, health check | Opus | 0.7 | CTO |
-
-The Spawner grows the workforce through the growth loop: something breaks → "what role should have caught that?" → if none exists, propose one → human approves. See [ROLES.md](docs/ROLES.md) for the full role architecture.
-
 ## Dev Setup
 
 ```bash
@@ -132,56 +142,69 @@ go test ./...
 
 ## Running
 
-All examples use `--store` for Postgres persistence. Omit it for in-memory (ephemeral). Can also set `DATABASE_URL` env var instead.
-
 ```bash
-# Local dev — sequential pipeline
-go run ./cmd/hive --human Matt --store "postgres://hive:hive@localhost:5432/hive" --idea "Build a task management app with kanban boards"
+# Basic run — agents coordinate via tasks to build from an idea
+go run ./cmd/hive --human Matt --idea "Build a task management app with kanban boards"
 
-# Auto-approve all agent spawns (dev/testing — skips interactive prompts)
-go run ./cmd/hive --human Matt --yes --store "postgres://hive:hive@localhost:5432/hive" --idea "Build a task management app with kanban boards"
+# With Postgres persistence
+go run ./cmd/hive --human Matt --store "postgres://hive:hive@localhost:5432/hive" --idea "Build a CLI tool"
 
-# Fast dev mode — auto-approve + skip Guardian checks (NOT recommended, Guardian should run)
-go run ./cmd/hive --human Matt --yes --skip-guardian --store "postgres://hive:hive@localhost:5432/hive" --idea "Build a task management app with kanban boards"
+# Auto-approve all authority requests (dev/testing)
+go run ./cmd/hive --human Matt --yes --idea "Build a REST API"
 
-# Agentic loop mode — concurrent self-directing agents
-go run ./cmd/hive --human Matt --loop --store "postgres://hive:hive@localhost:5432/hive" --idea "Build a task management app with kanban boards"
-
-# From a URL with an explicit product name
-go run ./cmd/hive --human Matt --name social-grammar --store "postgres://hive:hive@localhost:5432/hive" --url "https://mattsearles2.substack.com/p/the-missing-social-grammar"
-
-# From a Code Graph spec file
-go run ./cmd/hive --human Matt --store "postgres://hive:hive@localhost:5432/hive" --spec path/to/spec.cg
-
-# Targeted mode — modify existing code (creates branch + PR)
-go run ./cmd/hive --human Matt --yes --store "postgres://hive:hive@localhost:5432/hive" --repo /path/to/repo --idea "add a has command"
-
-# Self-improvement — analyze telemetry + codebase, apply fixes (up to 10 iterations)
-go run ./cmd/hive --human Matt --yes --self-improve --store "postgres://hive:hive@localhost:5432/hive"
-
-# Evolution — build new capabilities and features (up to 5 iterations)
-go run ./cmd/hive --human Matt --yes --evolve --store "postgres://hive:hive@localhost:5432/hive"
-
-# Evolution with human direction
-go run ./cmd/hive --human Matt --yes --evolve --store "postgres://hive:hive@localhost:5432/hive" --idea "add agent communication channels"
-
-# Query pipeline events from the event graph
-go run ./cmd/hive --store "postgres://hive:hive@localhost:5432/hive" -q
-go run ./cmd/hive --store "postgres://hive:hive@localhost:5432/hive" --query phase
-go run ./cmd/hive --store "postgres://hive:hive@localhost:5432/hive" --query telemetry
+# Point at an existing repo for the Implementer to modify
+go run ./cmd/hive --human Matt --yes --repo /path/to/repo --idea "add error handling to the API"
 ```
+
+Five flags:
+- `--human` — Human operator name (required)
+- `--idea` — Seed idea for agents to work on
+- `--store` — Store DSN (`postgres://...` or empty for in-memory)
+- `--yes` — Auto-approve all authority requests
+- `--repo` — Path to repo for Implementer's Operate (default: current dir)
+
+Can also set `DATABASE_URL` env var instead of `--store`.
 
 ## Key Files
 
-- `pkg/roles/` — Agent role definitions and system prompts
-- `pkg/pipeline/` — Product pipeline orchestration (sequential + agentic loop modes)
+- `pkg/hive/` — Runtime, AgentDef, hive event types
+  - `runtime.go` — Hive runtime: manages agents, graph, bus, tasks
+  - `agentdef.go` — AgentDef type + starter agent definitions
+  - `events.go` — Hive event types (run.started, agent.spawned, etc.)
 - `pkg/loop/` — Agentic loop runner (observe-reason-act-reflect cycles)
+  - `loop.go` — Loop.Run(), RunConcurrent(), signal parsing, bus integration
+  - `tasks.go` — /task command parsing and TaskStore execution
+- `pkg/work/` — Task primitives on the event graph (create, assign, complete, depend)
 - `pkg/resources/` — Budget enforcement (tokens, cost, iterations, duration)
-- `pkg/spawn/` — Agent spawning with authority gates and trust checks
-- `pkg/authority/` — Three-tier approval model (Required/Recommended/Notification)
-- `pkg/mcp/` — MCP server for agent tools
 - `pkg/workspace/` — File system and git management for generated code
+- `pkg/authority/` — Three-tier approval model (Required/Recommended/Notification)
 - `cmd/hive/` — CLI entry point
+
+Agent type lives in a separate repo: `github.com/lovyou-ai/agent` (imported as `hiveagent`).
+
+## Agent Coordination
+
+Agents coordinate through `/task` commands in their LLM responses:
+
+```
+/task create {"title": "...", "description": "...", "priority": "high"}
+/task assign {"task_id": "...", "assignee": "self"}
+/task complete {"task_id": "...", "summary": "..."}
+/task comment {"task_id": "...", "body": "..."}
+/task depend {"task_id": "...", "depends_on": "..."}
+```
+
+The loop parses these after each iteration and calls TaskStore methods. Tasks are events on the shared graph — all agents can see them. The Strategist creates tasks, the Planner decomposes them, the Implementer picks them up.
+
+Agents also emit `/signal` directives to control the loop:
+- `IDLE` — nothing to do, waiting for events
+- `TASK_DONE` — all work is complete
+- `ESCALATE` — needs human approval
+- `HALT` — policy violation (Guardian)
+
+## Operate Integration
+
+When an agent has `CanOperate=true` and assigned tasks, the loop calls `agent.Operate()` instead of `agent.Reason()`. This gives the agent full Claude CLI agentic capabilities (read/write files, run tests, git operations) without passing codebases through prompts.
 
 ## Coding Standards
 
@@ -195,71 +218,53 @@ See `docs/CODING-STANDARDS.md` for full details. The cardinal rules:
 
 ## Intelligence
 
-All inference runs through **Claude CLI** (Max plan, flat rate). NOT the Anthropic API — CLI is cheaper and better for our use case. The pipeline creates `claude-cli` providers automatically.
+All inference runs through **Claude CLI** (Max plan, flat rate). NOT the Anthropic API — CLI is cheaper and better for our use case. The runtime creates `claude-cli` providers automatically.
 
 ### Authentication
 
-The CLI authenticates via OAuth token stored in `~/.claude/.credentials.json`. To rotate a token:
-
-1. Generate a new OAuth token from your Max plan account
-2. Replace the `accessToken` value in `~/.claude/.credentials.json`
-
-Token format: `sk-ant-oat01-...` (OAuth access token). The `refreshToken` and other fields remain unchanged. The hive's `claude-cli` provider inherits whatever auth Claude Code already has — no separate credentials needed.
+The CLI authenticates via OAuth token stored in `~/.claude/.credentials.json`. The hive's `claude-cli` provider inherits whatever auth Claude Code already has — no separate credentials needed.
 
 **Never commit `.credentials.json` or tokens to the repo.**
 
 ### Model Assignment
 
-Model assignment by role (two tiers — Max plan, flat rate, token rich):
-- **Opus** (`claude-opus-4-6`): Mind, CTO, Guardian, PM, Architect, Builder, Reviewer, Tester, Integrator, Researcher, Spawner — all judgment and execution tasks
-- **Haiku** (`claude-haiku-4-5-20251001`): SysMon, Allocator — high-volume, simple tasks
+Model is set per-agent in `AgentDef.Model`. Starter agents use:
+- **Opus** (`claude-opus-4-6`): Strategist, Planner, Implementer — judgment and execution
+- **Sonnet** (`claude-sonnet-4-6`): Guardian — classification tasks
 
-## Pipeline Modes
+## Timeouts
 
-### Sequential — Full Pipeline (default)
-Fixed phase sequence: Research → Design → Simplify → Build → Review → Test → Integrate. For greenfield projects — generating new products from ideas/specs. Guardian checks after each phase. Human approves agent spawns.
+Claude CLI calls have default timeouts to prevent hung subprocesses:
+- **Reason()**: 5 minutes
+- **Operate()**: 10 minutes
 
-### Sequential — Targeted Mode (`--repo`)
-For modifying existing code: Context Load → Understand → Modify → Review → Test → PR. Skips research/design/simplify. Builder and reviewer receive existing codebase as context. Creates branch and PR, not direct commits. Used for self-improvement and feature additions.
+Timeouts only apply when the parent context has no explicit deadline.
 
-### Self-Improve (`--self-improve`)
-CTO analyzes telemetry + full codebase, identifies bugs and correctness issues, runs targeted pipeline to fix them. Up to 10 iterations per session, stops when CTO finds nothing worth fixing.
+## Division of Labour: Claude Code vs The Hive
 
-### Evolve (`--evolve`)
-CTO reads full codebase + architecture roadmap, proposes new capabilities and features to build. Unlike self-improve (which fixes bugs), evolve builds what's missing. Up to 5 iterations per session. Accepts `--idea` for human direction ("build agent communication channels"). Guardian stays active for integrity checks on new features.
+The hive's fifth invariant is **SELF-EVOLVE** — agents fix agents, not humans. Claude Code (you) handles infrastructure; the hive handles product work.
 
-### Agentic Loop (`--loop`)
-CTO seeds work, then agents run concurrent observe-reason-act-reflect loops. They communicate through events on the shared graph. IBus provides real-time event notification. Budget enforcement prevents runaway agents. Agents stop on: quiescence (nothing to do), escalation (needs human), HALT (Guardian), or budget limit.
+**Claude Code should:**
+- Fix hive infrastructure (runtime, loop, agent definitions, prompts)
+- Add new agent definitions
+- Fix broken LLM prompt engineering or JSON parsing
+- Make architectural decisions about the hive itself
+- Monitor runs, commit, push, clean up branches/PRs
+- Fix compilation errors or test failures in hive infrastructure
 
-## Sequential Pipeline Detail
+**The hive should (via `--idea`):**
+- Build product features (Work Graph, Market Graph, etc.)
+- Write application code and tests for the thirteen products
 
-### Full Pipeline (greenfield)
-1. **Research** — Researcher reads URLs/ideas, CTO evaluates feasibility
-2. **Design** — Architect creates Code Graph spec, CTO reviews for minimalism
-3. **Simplify** — Architect reduces spec to minimal form (up to 2 rounds)
-4. **Build** — Builder generates multi-file project, committed to product repo
-5. **Review → Rebuild** — Reviewer checks quality/compliance/simplicity (up to 3 rounds)
-6. **Test** — Tester runs actual test suite, Builder fixes failures. **Pipeline halts if tests still fail after fix attempt.**
-7. **Integrate** — Integrator pushes to GitHub, escalates to human for approval
+**Rule of thumb:** If it's infrastructure/plumbing for the hive runtime, Claude Code does it. If it's product work, the hive builds it by running agents with `--idea "..."`.
 
-### Targeted Pipeline (existing code)
-1. **Context Load** — Read existing files, git history, SPEC.md from target repo
-2. **Understand** — CTO evaluates the change request against existing codebase
-3. **Modify** — Builder modifies specific files (receives full codebase as context)
-4. **Review** — Reviewer checks diff against existing code
-5. **Test** — Run existing test suite + any new tests
-6. **PR** — Create branch, commit, open pull request
+## Store
 
-Guardian runs integrity checks after every phase in both modes. Can HALT the pipeline.
+Two stores (event, actor) use the same backend, selected via `--store` flag or `DATABASE_URL` env var:
+- **No flag**: in-memory (ephemeral, lost on exit)
+- **`postgres://...`**: PostgreSQL (Docker locally, Neon in production)
 
-## Design Philosophy
-
-The Architect enforces **derivation over accumulation**:
-- Each view has the minimal elements required
-- Complexity emerges from composing simple atoms, not adding parts
-- A simplification pass runs after every design phase (up to 3 rounds)
-- The Reviewer checks generated code for unnecessary complexity
-- System prompts are wired to each agent's provider — roles have real context
+Tables auto-create on first connection (`CREATE TABLE IF NOT EXISTS`). Local Postgres runs via `docker compose up -d postgres` with DSN `postgres://hive:hive@localhost:5432/hive`.
 
 ## The Generator Function
 
@@ -284,52 +289,12 @@ Twelve operations composed from six modes of three atoms:
 
 The method: Decompose → Dimension + Bound → Derive → Need + Diagnose → Compose + Name + Simplify → Abstract → Accept → Release → Loop via Need.
 
-**Accept and Release are stopping conditions.** The original method had none — it iterated forever. The self-derivation produced the method's own recognition that some gaps should remain gaps. This applies directly: the reviewer uses Accept (don't block for style nits), the pipeline uses Release (move on when good enough).
+**Accept and Release are stopping conditions.** The original method had none — it iterated forever. The self-derivation produced the method's own recognition that some gaps should remain gaps.
 
 See `eventgraph/docs/generator-function.md` and `eventgraph/docs/generator-function-self-derivation.md`.
-
-## Store
-
-All three stores (event, actor, state) use the same backend, selected via `--store` flag or `DATABASE_URL` env var:
-- **No flag**: in-memory (ephemeral, lost on exit)
-- **`postgres://...`**: PostgreSQL (Docker locally, Neon in production)
-
-Tables auto-create on first connection (`CREATE TABLE IF NOT EXISTS`). Local Postgres runs via `docker compose up -d postgres` with DSN `postgres://hive:hive@localhost:5432/hive`.
-
-Trust state persists across runs in the state store. Events accumulate on the graph. Self-improve telemetry is also written to `.hive/telemetry/` as JSON files for CTO analysis.
-
-## Timeouts
-
-Claude CLI calls have default timeouts to prevent hung subprocesses:
-- **Reason()**: 5 minutes (CTO analysis, reviews, evaluations)
-- **Operate()**: 10 minutes (code generation, test runs)
-- **Self-improve iteration**: 15 minutes (CTO analysis + full targeted pipeline)
-
-Timeouts only apply when the parent context has no explicit deadline.
-
-## Division of Labour: Claude Code vs The Hive
-
-The hive's fifth invariant is **SELF-EVOLVE** — agents fix agents, not humans. Claude Code (you) handles infrastructure; the hive handles product work.
-
-**Claude Code should:**
-- Fix hive infrastructure (pipeline modes, flags, parsing, prompts)
-- Add new pipeline capabilities (e.g. `--resume`, self-heal)
-- Fix broken LLM prompt engineering or JSON parsing
-- Make architectural decisions about the hive itself
-- Monitor runs, commit, push, clean up branches/PRs
-- Fix compilation errors or test failures in hive infrastructure
-
-**The hive should (via `--evolve` or `--self-improve`):**
-- Build product features (Work Graph, Market Graph, etc.)
-- Fix its own bugs found through telemetry analysis
-- Write application code and tests for the thirteen products
-- Wire new capabilities into the pipeline (e.g. task tracking)
-
-**Rule of thumb:** If it's infrastructure/plumbing for the hive CLI or pipeline orchestration, Claude Code does it. If it's product work the hive can build autonomously, let the hive do it with `--evolve --idea "..."`.
-
-**Critical workflow rule:** Always commit AND push to origin before running `hive --evolve --repo .` or `hive --self-improve --repo .`. The hive's `CleanupForIteration()` runs `git reset --hard origin/main`, which destroys any unpushed local commits.
 
 ## Dependencies
 
 - `github.com/lovyou-ai/eventgraph/go` — event graph, agent runtime, intelligence, pgstore
+- `github.com/lovyou-ai/agent` — unified Agent type (role-agnostic, wraps AgentRuntime)
 - Claude CLI — intelligence backend (flat rate via Max plan, no API key needed)

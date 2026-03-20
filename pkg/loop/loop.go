@@ -25,6 +25,7 @@ import (
 
 	hiveagent "github.com/lovyou-ai/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
+	"github.com/lovyou-ai/hive/pkg/work"
 )
 
 // StopReason describes why a loop stopped.
@@ -80,6 +81,22 @@ type Config struct {
 	// OnIteration is called after each loop iteration (for monitoring).
 	// Optional.
 	OnIteration func(iteration int, response string)
+
+	// TaskStore enables /task command processing. When set, agents can
+	// create, assign, complete, and comment on tasks through the work graph.
+	TaskStore *work.TaskStore
+
+	// ConvID is the conversation ID for task operations.
+	ConvID types.ConversationID
+
+	// CanOperate indicates this agent has filesystem access.
+	// When true and the agent has assigned tasks, the loop calls
+	// Operate() instead of Reason() for implementation work.
+	CanOperate bool
+
+	// RepoPath is the working directory for Operate() calls.
+	// Required when CanOperate is true.
+	RepoPath string
 }
 
 // Loop runs an agent's observe-reason-act-reflect cycle.
@@ -149,11 +166,31 @@ func (l *Loop) Run(ctx context.Context) Result {
 			return l.result(StopError, iteration, fmt.Sprintf("observe: %v", err))
 		}
 
-		// 2. REASON + ACT — kick the agent with context and task.
-		prompt := l.buildPrompt(observation, iteration)
-		response, usage, err := l.reason(ctx, prompt)
-		if err != nil {
-			return l.result(StopError, iteration, fmt.Sprintf("reason: %v", err))
+		// 2. REASON or OPERATE — choose based on agent capabilities.
+		var response string
+		var usage decision.TokenUsage
+
+		if l.config.CanOperate && l.config.RepoPath != "" && l.hasAssignedTask() {
+			// Operate path: agent has filesystem access and assigned work.
+			task := l.nextAssignedTask()
+			instruction := fmt.Sprintf("Task: %s\n\n%s", task.Title, task.Description)
+			result, opErr := l.agent.Operate(ctx, l.config.RepoPath, instruction)
+			if opErr != nil {
+				return l.result(StopError, iteration, fmt.Sprintf("operate: %v", opErr))
+			}
+			response = result.Summary
+			usage = result.Usage
+
+			// Auto-complete the task after successful Operate.
+			l.completeTask(task, result.Summary)
+		} else {
+			// Reason path: standard observe-reason loop.
+			prompt := l.buildPrompt(observation, iteration)
+			var reasonErr error
+			response, usage, reasonErr = l.reason(ctx, prompt)
+			if reasonErr != nil {
+				return l.result(StopError, iteration, fmt.Sprintf("reason: %v", reasonErr))
+			}
 		}
 
 		// Record resource consumption.
@@ -162,6 +199,9 @@ func (l *Loop) Run(ctx context.Context) Result {
 		if l.config.OnIteration != nil {
 			l.config.OnIteration(iteration, response)
 		}
+
+		// 2.5. PROCESS task commands from the response.
+		l.processTaskCommands(response)
 
 		// 3. CHECK stopping conditions in the response.
 		if stop := l.checkResponse(ctx, response, iteration); stop != nil {
@@ -236,12 +276,20 @@ func (l *Loop) buildPrompt(observation string, iteration int) string {
 		sb.WriteString(fmt.Sprintf("## Your Task\n%s\n\n", l.config.Task))
 	}
 
+	// Include task context if TaskStore is available.
+	if l.config.TaskStore != nil {
+		if taskCtx := l.buildTaskContext(); taskCtx != "" {
+			sb.WriteString(taskCtx)
+			sb.WriteString("\n")
+		}
+	}
+
 	sb.WriteString(observation)
 
 	sb.WriteString(`
 
 ## Instructions
-Based on the events above, decide what to do next.
+Based on the events and tasks above, decide what to do next.
 
 End your response with exactly one signal on its own line, in this exact JSON format:
 /signal {"signal": "IDLE"}
@@ -447,6 +495,110 @@ func (l *Loop) result(reason StopReason, iterations int, detail string) Result {
 		Iterations: iterations,
 		Budget:     l.budget.Snapshot(),
 		Detail:     detail,
+	}
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Task integration helpers
+// ────────────────────────────────────────────────────────────────────
+
+// buildTaskContext builds a task summary section for the prompt.
+func (l *Loop) buildTaskContext() string {
+	summaries, err := l.config.TaskStore.ListSummaries(50)
+	if err != nil || len(summaries) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("## Work Tasks\n")
+
+	for _, t := range summaries {
+		status := string(t.Status)
+		if t.Blocked {
+			status = "blocked"
+		}
+		assignee := ""
+		if t.Assignee != (types.ActorID{}) {
+			if t.Assignee == l.agent.ID() {
+				assignee = " [assigned to you]"
+			} else {
+				assignee = fmt.Sprintf(" [assigned to %s]", t.Assignee.Value())
+			}
+		}
+		sb.WriteString(fmt.Sprintf("- [%s] %s: %s%s\n",
+			status, t.ID.Value(), t.Title, assignee))
+	}
+
+	return sb.String()
+}
+
+// processTaskCommands extracts and executes /task commands from the response.
+func (l *Loop) processTaskCommands(response string) {
+	if l.config.TaskStore == nil {
+		return
+	}
+
+	commands := parseTaskCommands(response)
+	if len(commands) == 0 {
+		return
+	}
+
+	// Use agent's last event as cause for task operations.
+	var causes []types.EventID
+	if lastEv := l.agent.LastEvent(); !lastEv.IsZero() {
+		causes = []types.EventID{lastEv}
+	}
+
+	executed := executeTaskCommands(commands, l.config.TaskStore, l.agent.ID(), causes, l.config.ConvID)
+	if executed > 0 {
+		fmt.Printf("[%s] executed %d/%d task commands\n", l.agent.Name(), executed, len(commands))
+	}
+}
+
+// hasAssignedTask returns true if the agent has any assigned (non-completed) tasks.
+func (l *Loop) hasAssignedTask() bool {
+	if l.config.TaskStore == nil {
+		return false
+	}
+	tasks, err := l.config.TaskStore.GetByAssignee(l.agent.ID())
+	if err != nil || len(tasks) == 0 {
+		return false
+	}
+	// Check if any assigned task is not yet completed.
+	for _, t := range tasks {
+		status, _ := l.config.TaskStore.GetStatus(t.ID)
+		if status != work.StatusCompleted {
+			return true
+		}
+	}
+	return false
+}
+
+// nextAssignedTask returns the next non-completed task assigned to this agent.
+func (l *Loop) nextAssignedTask() work.Task {
+	tasks, _ := l.config.TaskStore.GetByAssignee(l.agent.ID())
+	for _, t := range tasks {
+		status, _ := l.config.TaskStore.GetStatus(t.ID)
+		if status != work.StatusCompleted {
+			return t
+		}
+	}
+	return work.Task{}
+}
+
+// completeTask marks a task as completed in the task store. Best-effort.
+func (l *Loop) completeTask(task work.Task, summary string) {
+	if l.config.TaskStore == nil {
+		return
+	}
+	var causes []types.EventID
+	if lastEv := l.agent.LastEvent(); !lastEv.IsZero() {
+		causes = []types.EventID{lastEv}
+	}
+	if err := l.config.TaskStore.Complete(l.agent.ID(), task.ID, summary, causes, l.config.ConvID); err != nil {
+		fmt.Printf("warning: task complete failed: %v\n", err)
+	} else {
+		fmt.Printf("  → task completed: %s — %s\n", task.ID.Value(), task.Title)
 	}
 }
 

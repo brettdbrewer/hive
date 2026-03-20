@@ -18,7 +18,6 @@ import (
 
 	hiveagent "github.com/lovyou-ai/agent"
 	"github.com/lovyou-ai/hive/pkg/resources"
-	"github.com/lovyou-ai/hive/pkg/roles"
 )
 
 // ════════════════════════════════════════════════════════════════════════
@@ -67,19 +66,16 @@ func testGraph(t *testing.T) *graph.Graph {
 	return g
 }
 
-func testHiveAgent(t *testing.T, provider intelligence.Provider, role roles.Role, name string) *hiveagent.Agent {
+func testHiveAgent(t *testing.T, provider intelligence.Provider, role string, name string) *hiveagent.Agent {
 	t.Helper()
 	n := atomic.AddUint32(&agentCounter, 1)
 	uniqueName := fmt.Sprintf("%s-%d", name, n)
 	g := testGraph(t)
 	a, err := hiveagent.New(context.Background(), hiveagent.Config{
-		Role:       hiveagent.Role(role),
-		Name:       uniqueName,
-		Graph:      g,
-		Provider:   provider,
-		Model:      roles.PreferredModel(role),
-		CostTier:   "opus",
-		SoulValues: roles.SoulValues(role),
+		Role:     hiveagent.Role(role),
+		Name:     uniqueName,
+		Graph:    g,
+		Provider: provider,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +85,7 @@ func testHiveAgent(t *testing.T, provider intelligence.Provider, role roles.Role
 
 func testAgent(t *testing.T, provider intelligence.Provider) *hiveagent.Agent {
 	t.Helper()
-	return testHiveAgent(t, provider, roles.RoleBuilder, "test-builder")
+	return testHiveAgent(t, provider, "builder", "test-builder")
 }
 
 func humanID() types.ActorID {
@@ -342,8 +338,8 @@ func TestRunConcurrent(t *testing.T) {
 	provider1 := newMockProvider("/signal {\"signal\": \"TASK_DONE\"}")
 	provider2 := newMockProvider("/signal {\"signal\": \"TASK_DONE\"}")
 
-	agent1 := testHiveAgent(t, provider1, roles.RoleBuilder, "builder")
-	agent2 := testHiveAgent(t, provider2, roles.RoleTester, "tester")
+	agent1 := testHiveAgent(t, provider1, "builder", "builder")
+	agent2 := testHiveAgent(t, provider2, "tester", "tester")
 
 	results := RunConcurrent(context.Background(), []Config{
 		{Agent: agent1, HumanID: humanID(), Budget: resources.BudgetConfig{MaxIterations: 5}},
