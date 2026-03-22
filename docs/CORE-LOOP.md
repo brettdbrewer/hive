@@ -125,6 +125,17 @@ chain). Also analyze backward — find the failure, then trace WHY it
 exists (root cause analysis). Validate and root cause analysis are
 duals: same operations, opposite starting points.
 
+INVARIANTS: Check each change against the constitutional invariants
+(CLAUDE.md § The Invariants). The invariants are derived from the
+three cognitive atoms — Distinguish, Relate, Select:
+- Distinguish → IDENTITY (11), TRANSPARENT (7): entities and roles
+  must be distinguishable by immutable properties
+- Relate → CAUSALITY (2), INTEGRITY (3), EXPLICIT (14): connections
+  between entities must be declared and traceable
+- Select → BUDGET (1), BOUNDED (13), RESERVE (10): operations must
+  have defined limits and scope
+If a change violates any invariant, REVISE.
+
 EXHAUSTIVE: Check every changed file. Run every test. Trace every
 code path. Don't sample.
 

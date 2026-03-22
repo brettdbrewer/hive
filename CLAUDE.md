@@ -128,6 +128,8 @@ Constitutional law — violation is a Guardian HALT condition:
 10. **RESERVE** — Maintain 7-day runway minimum
 11. **IDENTITY** — Entities are referenced by immutable IDs, never mutable display values. Names are for humans; IDs are for systems. Any code that stores, matches, JOINs, or compares on a display name where an ID should be used violates this invariant.
 12. **VERIFIED** — No code ships without tests. Every derivation has verification. If the Critic can't point to a test that covers the change, REVISE.
+13. **BOUNDED** — Every operation has defined scope. No unbounded queries, loops, or context. If a function can process N items, N has a limit. Derived from Select (choose what matters → exclude what doesn't).
+14. **EXPLICIT** — Dependencies are declared, not inferred. If A requires B, the requirement is in the code (imports, foreign keys, type signatures), not in the developer's head. Derived from Relate (perceive connection → make connections visible).
 
 ## Neutrality Clause
 
