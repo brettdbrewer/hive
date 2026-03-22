@@ -475,6 +475,24 @@ Iteration 20 completes the animation cluster and closes the aesthetic arc that b
 
 ---
 
+## Iteration 28 — 2026-03-22
+
+**Cluster:** Space Previews (28)
+
+**Built:** Node count + last activity on discover cards. `ListPublicSpaces` enhanced with `LEFT JOIN LATERAL` for per-space stats. `relativeTime()` helper for human-friendly timestamps. Spaces sorted by most recent activity. 4 files changed, deployed.
+
+**COVER:** Scout correctly identified that discover cards were bare. The fix is surgical: one query enhancement, one template update, two helper functions. No new tables, no migrations. ✓
+
+**BLIND:** No per-kind breakdown (e.g., "3 tasks, 2 posts"). No member count. No preview of the most recent content (title/snippet). All acceptable — item count + last activity gives enough signal for a directory page. More detail belongs on the space page itself.
+
+**ZOOM:** Single-iteration cluster. The right scale for a feature this small. The discover page went from "list of names" to "live directory" in one iteration. This closes state.md's option 3.
+
+**FORMALIZE:** The site has now had 28 iterations of investment. The product is feature-complete for launch: onboarding, spaces, lenses, discover with previews, agent identity, dark theme, mobile, animations, SEO. The remaining site gap (auth gate) is a Google Console action, not code. **The loop should shift direction.** Continuing to polish the site is diminishing returns. The hive itself needs attention.
+
+**Next iteration:** Shift to the hive codebase. The site is ready. Options: (a) Mind — director interface for the hive, (b) social graph integration, (c) operational autonomy (secrets, provisioning). Or: open the auth gate and observe what happens with real users.
+
+---
+
 ## Iteration 27b — 2026-03-22
 
 **Cluster:** Agent Identity (27, continued)

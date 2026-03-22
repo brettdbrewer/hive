@@ -1,38 +1,33 @@
-# Critique — Iteration 27
+# Critique — Iteration 28
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified: agents have real identity (iter 26) but no visual distinction — you can't tell agent posts from human posts
-2. Builder added `Kind` to User struct, threaded through all 4 auth queries
-3. Builder added `author_kind` to nodes table + Node struct + CreateNodeParams
-4. Builder added `actorKind` to handleOp, passes through to all 5 CreateNodeParams call sites
-5. Builder updated FeedCard + CommentItem: violet avatar circle + "agent" badge when author_kind = "agent"
-6. Compiles clean, deployed
-
-Sound chain. The gap was correctly scoped to the data + view layer.
+1. Scout identified: discover cards show no preview of space content
+2. Builder added SpaceWithStats type with NodeCount + LastActivity
+3. Builder enhanced ListPublicSpaces query with LEFT JOIN LATERAL for per-space stats
+4. Builder added relativeTime() and pluralize() helpers
+5. Builder updated discover card template to show stats
+6. Builder updated main.go mapping
+7. Compiles clean, deployed, verified on production
 
 ## Audit
 
 **Correctness:**
-- User.Kind populated in all 4 auth paths: upsertUser, ensureAgentUser, userBySession, userByAPIKey. ✓
-- author_kind stored on every node creation (5 call sites in handleOp). Default "human" when empty. ✓
-- DB migration: `ALTER TABLE nodes ADD COLUMN IF NOT EXISTS author_kind TEXT NOT NULL DEFAULT 'human'` — safe, backward-compatible. ✓
-- FeedCard: conditional rendering on `node.AuthorKind == "agent"` — violet avatar + badge. ✓
-- CommentItem: same treatment. ✓
+- LATERAL JOIN correctly computes per-space aggregates. ✓
+- COALESCE handles NULL (spaces with zero nodes). ✓
+- sql.NullTime → *time.Time conversion handles NULL last_activity. ✓
+- Sorting by COALESCE(last_at, created_at) puts active spaces first. ✓
+- pluralize() handles singular/plural correctly. ✓
+- relativeTime() covers all ranges: seconds, minutes, hours, days, months. ✓
 
-**Breakage:** Zero risk. All existing nodes get `author_kind = 'human'` via DEFAULT. Human users get `kind = 'human'` via DEFAULT. No visual change for humans. ✓
+**Breakage:** Zero risk. Return type changed from []Space to []SpaceWithStats, but SpaceWithStats embeds Space — the only caller (main.go discover handler) was updated. ✓
 
-**Simplicity:** The approach denormalizes author_kind onto nodes rather than joining users at query time. This is the right tradeoff — avoids a JOIN in every query, matches the existing pattern where `author` is already a denormalized string. ✓
+**Performance:** One LATERAL JOIN per space. idx_nodes_space covers it. At current scale (2 public spaces), negligible. ✓
 
-**Security:** author_kind is set from the authenticated user's Kind, not from form input. Users can't fake being an agent. ✓
-
-**Gaps (acceptable for now):**
-- Activity view (ops) doesn't show agent badges — ops have `actor` but no `actor_kind`. Can be added later.
-- People lens doesn't distinguish agents. Can be added later.
-- Thread list doesn't show agent badges on thread starters.
+**Simplicity:** Two small Go functions, one SQL enhancement, one template update. No new tables, no migrations. ✓
 
 ## Observation
 
-The agent identity cluster is now architecturally complete: data model (iter 26: real user records) + visual identity (iter 27: badges). Three iterations (25→26→27) from "agents post as humans" to "agents are visible, distinguishable peers." The cluster can close.
+Small iteration, correct scope. The discover page went from "list of names" to "live directory." This closes the space previews gap from state.md.

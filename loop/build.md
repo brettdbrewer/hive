@@ -1,27 +1,23 @@
-# Build Report — Iteration 27
+# Build Report — Iteration 28
 
 ## What Was Planned
 
-Agent visual identity — make agents visually distinct from humans in the UI. Thread `Kind` from user records through to node authorship and render agent badges.
+Space previews on discover cards — node count, last activity timestamp, sorted by recent activity.
 
 ## What Was Built
 
-**auth/auth.go**: Added `Kind string` to `User` struct. Updated all 4 auth queries (upsertUser, ensureAgentUser, userBySession, userByAPIKey) to SELECT and scan `kind`.
+**graph/store.go**: Added `SpaceWithStats` type (embeds `Space` + `NodeCount int` + `LastActivity *time.Time`). Changed `ListPublicSpaces` return type from `[]Space` to `[]SpaceWithStats`. Query uses `LEFT JOIN LATERAL` to compute per-space node count and max created_at. Sorting changed from `created_at DESC` to `COALESCE(last_at, created_at) DESC` — active spaces float to top.
 
-**graph/store.go**: Added `AuthorKind string` to `Node` struct and `CreateNodeParams`. Added `author_kind` column to nodes table. Updated CreateNode, GetNode, ListNodes to include author_kind in INSERT/SELECT/Scan.
+**views/discover.templ**: Added `NodeCount` and `LastActivity` fields to `DiscoverSpace`. Updated `discoverCard` to show item count ("3 items") and relative time ("2h ago") below the description. Added `pluralize()` and `relativeTime()` helpers. Relative time shows: just now, Xm ago, Xh ago, Xd ago, or month/year for older content.
 
-**graph/handlers.go**: Added `userKind()` helper. Added `actorKind` variable to handleOp. Updated all 5 CreateNodeParams call sites to pass `AuthorKind: actorKind`.
+**cmd/site/main.go**: Updated `DiscoverSpace` mapping to pass `NodeCount` and `LastActivity` from store results.
 
-**graph/views.templ**: Updated `FeedCard` and `CommentItem`:
-- Agent authors: violet avatar circle (`bg-violet-500/10 text-violet-400`) + "agent" pill badge
-- Human authors: default rose avatar, no badge
-- At a glance, you can tell who's a person and who's an agent
-
-5 files changed, deployed.
+4 files changed, deployed.
 
 ## What Works
 
-- Agent badge renders correctly for agent-authored content
-- Human content unchanged (backward compatible)
-- author_kind set from authenticated user's Kind (can't be faked)
-- DB migration safe (DEFAULT 'human' for existing rows)
+- Discover cards show node count and last activity for spaces with content
+- Spaces with zero nodes show no stats line (clean, not "0 items")
+- Spaces sorted by most recent activity — active spaces appear first
+- Relative timestamps render correctly (verified: "2 items", "1 item", timestamps showing)
+- LATERAL JOIN uses existing `idx_nodes_space` index

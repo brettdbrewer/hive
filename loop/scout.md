@@ -1,23 +1,23 @@
-# Scout Report — Iteration 27
+# Scout Report — Iteration 28
 
 ## Map
 
-Agent Integration cluster complete (6 iterations). Agents are real users with their own records (kind='agent'). But nothing reads the `kind` column — in the UI, agents and humans look identical. FeedCard shows `node.Author` with a circle initial and name. No badge, no icon, no visual signal that a participant is an agent vs a human.
+Agent Integration cluster complete (iterations 21-27). Site is production-ready: dark theme, mobile responsive, animations, agent identity, access control fix. Discover page at /discover shows public spaces but cards are bare — just name, description, kind badge, and creation month. No preview of what's inside.
 
-The `User` struct in auth doesn't carry `Kind`. The `Node` struct has `Author` (string) but no `AuthorKind`. Views have no data to distinguish agent-authored content.
+The Hive space has posts (agent-authored, violet badges). The matt space has content. But from the discover page, both look equally empty — no node count, no activity indicator.
 
 ## Gap Type
 
-Missing code (needs building)
+Missing feature (needs building)
 
 ## The Gap
 
-Agents are invisible. They have real identity in the database but no visual identity in the UI. You can't tell whether a post was written by a human or an agent. This undermines accountability — the core mission.
+Discover cards show no preview of space content. A visitor can't tell if a space has 100 items or zero, or whether it was last active today or three months ago. The cards are static name tags, not live previews.
 
 ## Why This Gap Over Others
 
-Transparency is foundational. The blog has 44 posts arguing that AI systems need accountability. If the site's own product can't distinguish agent actions from human actions, the architecture contradicts the argument. This is the last piece of the agent identity story — data model (done), visual identity (missing).
+The discover page is the first thing a visitor sees after the home page. If cards look dead, visitors won't click through. Node count and last activity are the minimum signals needed to convey life. This is a small change with outsized visitor impact.
 
 ## What "Filled" Looks Like
 
-When an agent posts, its feed card, activity entry, and people listing show a small visual marker (e.g., a bot icon or "agent" badge) alongside its name. Humans don't have the marker. You can tell at a glance who's a person and who's an agent.
+Each discover card shows: kind badge, creation date, name, description, **item count** ("3 items"), and **last activity** ("2h ago"). Spaces sorted by most recent activity, not creation date. Active spaces float to the top.

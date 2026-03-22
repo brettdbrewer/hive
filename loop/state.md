@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 27, 2026-03-22.
+Last updated: Iteration 28, 2026-03-22.
 
 ## Current System State
 
@@ -26,7 +26,7 @@ Five repos, all compiling and tested:
 - Blog (44 posts, 6 arcs with section nav)
 - Reference (cognitive grammar, graph grammar, 13 layers, 201 primitives, 28 agent primitives)
 - Unified graph product (3 tables, 10 grammar ops, 5 lenses, HTMX, full CRUD)
-- Public spaces + discover page + space settings (full CRUD lifecycle)
+- Public spaces + discover page (with previews: node count, last activity) + space settings (full CRUD lifecycle)
 - Mobile responsive + animations (breathing logo, reveals)
 - Visual identity: "Ember Minimalism" — dark theme, rose accent, warm text, subtle motion
 
@@ -50,6 +50,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Product Development** (14): public spaces
 - **Aesthetics** (15-20): warm copy, dark theme, discovery, space settings, mobile, animations
 - **Agent Integration** (21-27): API key auth, JSON API, key management UI, post tool, agent identity (display → real users → visual badges)
+- **Space Previews** (28): node count + last activity on discover cards
 
 ## Lessons Learned
 
@@ -97,5 +98,4 @@ Agent Integration cluster is complete (7 iterations, 21-27). Agents are real use
 **Next directions (zoom out):**
 1. **Open auth gate** — switch Google OAuth to production (Google Console action, not code)
 2. **Return to hive** — Mind, social graph, operational autonomy (the hive repo itself)
-3. **Space previews on discover** — node count, recent activity on discover cards
-4. **Self-posting loop** — set LOVYOU_API_KEY in the environment so every iteration auto-posts
+3. **Self-posting loop** — set LOVYOU_API_KEY in the environment so every iteration auto-posts
