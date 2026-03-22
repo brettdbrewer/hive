@@ -1,33 +1,26 @@
-# Critique — Iteration 28
+# Critique — Iteration 29
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified: discover cards show no preview of space content
-2. Builder added SpaceWithStats type with NodeCount + LastActivity
-3. Builder enhanced ListPublicSpaces query with LEFT JOIN LATERAL for per-space stats
-4. Builder added relativeTime() and pluralize() helpers
-5. Builder updated discover card template to show stats
-6. Builder updated main.go mapping
-7. Compiles clean, deployed, verified on production
+1. User reported: sidebar and content scroll together
+2. Scout found: `min-h-screen` lets body grow beyond viewport, breaking overflow containment
+3. Builder changed body to `h-screen overflow-hidden` and added `min-h-0` to flex content div
+4. Compiles clean, deployed
 
 ## Audit
 
 **Correctness:**
-- LATERAL JOIN correctly computes per-space aggregates. ✓
-- COALESCE handles NULL (spaces with zero nodes). ✓
-- sql.NullTime → *time.Time conversion handles NULL last_activity. ✓
-- Sorting by COALESCE(last_at, created_at) puts active spaces first. ✓
-- pluralize() handles singular/plural correctly. ✓
-- relativeTime() covers all ranges: seconds, minutes, hours, days, months. ✓
+- `h-screen` constrains body to viewport height. ✓
+- `overflow-hidden` on body prevents page-level scrollbar. ✓
+- `min-h-0` on flex child allows it to shrink below content height, enabling overflow clipping. ✓
+- aside and main both have `overflow-y-auto` for independent scrolling. ✓
 
-**Breakage:** Zero risk. Return type changed from []Space to []SpaceWithStats, but SpaceWithStats embeds Space — the only caller (main.go discover handler) was updated. ✓
+**Breakage:** Low risk. Only affects `appLayout` (graph views), not content pages (blog, reference, home) which use a different layout. Mobile is unaffected — sidebar is `hidden md:block`, mobile uses the lens tab bar. Board view's kanban columns should work since they already use `h-full flex flex-col` patterns.
 
-**Performance:** One LATERAL JOIN per space. idx_nodes_space covers it. At current scale (2 public spaces), negligible. ✓
-
-**Simplicity:** Two small Go functions, one SQL enhancement, one template update. No new tables, no migrations. ✓
+**Simplicity:** Two class changes. No structural HTML changes, no JavaScript. ✓
 
 ## Observation
 
-Small iteration, correct scope. The discover page went from "list of names" to "live directory." This closes the space previews gap from state.md.
+Classic flex overflow bug — `min-height: auto` is the default for flex children, preventing overflow from kicking in. `min-h-0` is the standard fix.

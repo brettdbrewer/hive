@@ -493,6 +493,24 @@ Iteration 20 completes the animation cluster and closes the aesthetic arc that b
 
 ---
 
+## Iteration 29 — 2026-03-22
+
+**Cluster:** Sidebar Fix (29)
+
+**Built:** Sticky sidebar — independent scroll for sidebar and content. Body changed from `min-h-screen` to `h-screen overflow-hidden`. Added `min-h-0` to flex content div. 2 files changed, deployed.
+
+**COVER:** User-reported bug, immediately actionable. Classic flex overflow issue — `min-height: auto` default prevents overflow clipping. ✓
+
+**BLIND:** Board view with many columns may need horizontal scroll testing. The kanban board uses `h-full flex flex-col` which should work within the new `h-screen` constraint, but untested with many items per column. Node detail view with long content should also be verified.
+
+**ZOOM:** Single-iteration fix. Two CSS class changes. The right scale for a bug fix.
+
+**FORMALIZE:** The flex overflow bug existed for 29 iterations without being caught. The loop tests features (does it work?) but doesn't test scroll behavior (does it feel right?). **Lesson 25: test the viewport, not just the feature. Scroll, resize, and overflow behavior are invisible in code review — they require actually using the product.**
+
+**Next iteration:** This is the second consecutive single-iteration cluster (28: previews, 29: sidebar fix). The site is now in good shape. The reflector's recommendation from iteration 28 stands: shift to the hive codebase.
+
+---
+
 ## Iteration 27b — 2026-03-22
 
 **Cluster:** Agent Identity (27, continued)

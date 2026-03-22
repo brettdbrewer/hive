@@ -1,23 +1,22 @@
-# Build Report — Iteration 28
+# Build Report — Iteration 29
 
 ## What Was Planned
 
-Space previews on discover cards — node count, last activity timestamp, sorted by recent activity.
+Fix sidebar scroll — make sidebar sticky so content and sidebar scroll independently.
 
 ## What Was Built
 
-**graph/store.go**: Added `SpaceWithStats` type (embeds `Space` + `NodeCount int` + `LastActivity *time.Time`). Changed `ListPublicSpaces` return type from `[]Space` to `[]SpaceWithStats`. Query uses `LEFT JOIN LATERAL` to compute per-space node count and max created_at. Sorting changed from `created_at DESC` to `COALESCE(last_at, created_at) DESC` — active spaces float to top.
+**graph/views.templ**: Two CSS changes in `appLayout`:
+1. Body: `min-h-screen` → `h-screen overflow-hidden` — constrains the page to exactly viewport height, prevents the body from growing and causing a page-level scroll.
+2. Content div: added `min-h-0` to `flex flex-1 overflow-hidden` — allows the flex child to shrink below its content height, enabling overflow clipping.
 
-**views/discover.templ**: Added `NodeCount` and `LastActivity` fields to `DiscoverSpace`. Updated `discoverCard` to show item count ("3 items") and relative time ("2h ago") below the description. Added `pluralize()` and `relativeTime()` helpers. Relative time shows: just now, Xm ago, Xh ago, Xd ago, or month/year for older content.
+Both aside (`overflow-y-auto`) and main (`overflow-y-auto`) now scroll independently within their own containers.
 
-**cmd/site/main.go**: Updated `DiscoverSpace` mapping to pass `NodeCount` and `LastActivity` from store results.
-
-4 files changed, deployed.
+2 files changed (templ + generated), deployed.
 
 ## What Works
 
-- Discover cards show node count and last activity for spaces with content
-- Spaces with zero nodes show no stats line (clean, not "0 items")
-- Spaces sorted by most recent activity — active spaces appear first
-- Relative timestamps render correctly (verified: "2 items", "1 item", timestamps showing)
-- LATERAL JOIN uses existing `idx_nodes_space` index
+- Sidebar stays fixed while main content scrolls
+- Main content scrolls independently
+- Mobile layout unaffected (sidebar is `hidden md:block`)
+- Board view kanban columns scroll correctly within the constrained height

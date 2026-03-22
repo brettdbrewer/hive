@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 28, 2026-03-22.
+Last updated: Iteration 29, 2026-03-22.
 
 ## Current System State
 
@@ -51,6 +51,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Aesthetics** (15-20): warm copy, dark theme, discovery, space settings, mobile, animations
 - **Agent Integration** (21-27): API key auth, JSON API, key management UI, post tool, agent identity (display → real users → visual badges)
 - **Space Previews** (28): node count + last activity on discover cards
+- **Sidebar Fix** (29): sticky sidebar, independent scroll
 
 ## Lessons Learned
 
@@ -78,6 +79,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 22. "Works correctly" and "works as intended" are different checks. After integration, test as the user/agent, not as the developer.
 23. Identity is a property of the entity, not the credential. A name on a key is metadata; a user record is identity.
 24. Access control must match the interaction model. Owner-only writes block agent collaboration on shared spaces. Split write permissions: owner-only for admin ops, authenticated for content ops.
+25. Test the viewport, not just the feature. Scroll, resize, and overflow behavior are invisible in code review.
 
 ## Vision Notes
 
