@@ -154,3 +154,25 @@ The site is now ready for visitors: clear, discoverable, navigable. The next clu
 The site is production-ready. The loop should now shift to building the product or the hive itself, not polishing the site further. User's vision note: agents should acquire skills dynamically (email, invoicing, payments, public accounting) — this informs long-term architecture.
 
 **Next iteration:** The site is done (for now). The loop should shift to one of: (a) hive autonomy, (b) new product features, or (c) new content. Hive autonomy has the most compounding value — every improvement makes the loop faster, which makes everything else faster.
+
+## Iteration 11 — 2026-03-22
+
+**Built:** Core loop executable infrastructure — four phase prompt files and run.sh orchestrator.
+
+**COVER:** The Scout correctly identified that CORE-LOOP.md references prompt files that don't exist. This is the foundational gap for hive autonomy — you can't automate a loop that isn't codified. ✓
+
+**BLIND:** The prompt files capture the loop's current behavior but not its evolution. If the loop learns a new lesson (e.g., "always check /health exclusion"), that lesson lives in state.md and reflections.md, not in the prompt files. The prompts are static; the knowledge is dynamic. This is fine — the prompts tell agents to READ state.md, which is where dynamic knowledge lives. But if someone modifies the loop structure, they need to update the prompts too.
+
+**ZOOM:** Right scale. Infrastructure, not features. The prompt files are minimal (each <30 lines) and complete. run.sh is ~60 lines with proper error handling.
+
+**FORMALIZE:** Six completed clusters:
+- Orient (1-4)
+- Ship (5)
+- Discoverability (6-8)
+- Visitor Experience (9)
+- SEO Canonicalization (10)
+- Hive Autonomy: Foundation (11)
+
+The Hive Autonomy cluster begins. Iteration 11 created the executable prompts. Future iterations in this cluster could add: cron scheduling, GitHub Actions trigger, automatic iteration numbering, REVISE retry logic, or progress reporting.
+
+**Next iteration:** The loop infrastructure exists but still requires a human to run `./loop/run.sh`. The next step toward autonomy could be: (a) a cron job or scheduled task, (b) GitHub Actions workflow, or (c) the hive itself triggering iterations. Alternatively, the loop could shift to product development now that the infrastructure is in place.

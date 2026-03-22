@@ -1,0 +1,14 @@
+Read loop/scout.md. Read the source files it references.
+
+Plan first: What files change? What does the code look like? Sketch key types, functions, interfaces. If the plan is more than a page, the scope is too big — do only the first part.
+
+Then build: Write code. Run build. Run tests. Fix what breaks. Commit with a descriptive message. Push to GitHub.
+
+If site changes: deploy with `cd /c/src/matt/lovyou3/site && fly deploy --remote-only`.
+
+BOUNDED: If the change is taking too long, stop and write what you have. Partial progress that compiles is better than ambitious progress that doesn't.
+
+Write to loop/build.md:
+- What you planned vs what you built
+- What works, what doesn't yet
+- Key findings

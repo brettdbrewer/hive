@@ -1,0 +1,24 @@
+Read loop/state.md FIRST — this is the accumulated knowledge from previous iterations. It tells you what exists, what's been tried, and what to focus on.
+
+Then read the codebase across all repos under /c/src/matt/lovyou3/ (eventgraph, agent, work, hive, site). Check git log for recent changes. Check deploy state (fly status -a lovyou-ai). Check what's live at lovyou.ai.
+
+MAP: Produce a brief orientation. What repos exist, what's deployed, what's working, what's broken. Name specific files, functions, URLs.
+
+EXPLORE: Given that map, navigate into the gaps. What doesn't exist that should? What's broken that shouldn't be?
+
+CATALOG the gap type:
+- Missing code (needs building)
+- Broken code (needs fixing)
+- Missing infrastructure (needs provisioning)
+- Missing quality (needs polish)
+- Missing knowledge (needs research)
+- Missing users (needs onboarding/marketing)
+
+NEED: Of all gaps, pick ONE — the most load-bearing, the one that unblocks the most subsequent capability. Your answer is TENTATIVE — a hypothesis, not a conclusion.
+
+Write to loop/scout.md:
+- Map (paragraph: current state, specific)
+- Gap type (one of the categories above)
+- The gap (one sentence)
+- Why this gap over others (paragraph)
+- What "filled" looks like (one sentence)

@@ -1,21 +1,23 @@
-# Scout Report — Iteration 10
+# Scout Report — Iteration 11
 
-## Map (from code + infra)
+## Map (from code + docs)
 
-Read state.md. Site is visitor-ready. Checked both domains — lovyou-ai.fly.dev and lovyou.ai serve identical content. SEO duplicate issue.
+Read state.md. Site is production-ready, five clusters complete. State.md recommends hive autonomy as the next cluster — the loop currently requires manual `claude -p` invocation for each phase.
+
+CORE-LOOP.md (docs/CORE-LOOP.md lines 201-212) specifies that the loop should be runnable via prompt files (`loop/scout-prompt.txt`, `loop/builder-prompt.txt`, etc.) and a shell script. These files don't exist — the spec references them but they were never created.
 
 ## Gap Type
 
-Missing quality — SEO duplicate content across two domains.
+Missing code — the core loop's executable infrastructure doesn't exist.
 
 ## The Gap
 
-Both lovyou-ai.fly.dev and lovyou.ai return 200 with identical HTML. Search engines may split page rank between them or index the wrong domain.
+CORE-LOOP.md describes a self-running loop with prompt files and a run.sh script, but none of these files exist. The loop runs only because a human manually types the Scout/Builder/Critic/Reflector prompts into Claude Code.
 
 ## Why This Gap
 
-305 pages indexed under the wrong domain wastes all SEO work from iterations 7-8. A canonical redirect is the standard fix — one middleware change, permanent resolution.
+This is the most load-bearing gap because it's recursive: making the loop easier to run makes every future iteration faster. Every other improvement (product, content, skills) requires running the loop. Reducing the loop's friction compounds across all future work. Also, it's what the Reflector explicitly recommended.
 
 ## Filled Looks Like
 
-GET lovyou-ai.fly.dev/* returns 301 → lovyou.ai/*. Health check endpoint excluded from redirect.
+`./loop/run.sh` runs all four phases in sequence, each invoking `claude -p` with the corresponding prompt file. Each prompt file is a complete, standalone instruction set.

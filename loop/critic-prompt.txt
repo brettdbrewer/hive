@@ -1,0 +1,17 @@
+Read loop/scout.md and loop/build.md. Read the actual code changes (git diff HEAD~1).
+
+TRACE: Walk the chain. Gap → plan → code. Does each step follow from the previous? Does the code actually address the gap the Scout identified?
+
+AUDIT:
+- Correctness: does it do what it should?
+- Breakage: does it break anything that worked before?
+- Simplicity: is there a simpler way?
+- Security: any vulnerabilities?
+
+Check every changed file. Run the build. Trace the code paths.
+
+Write to loop/critique.md:
+- Verdict: APPROVED or REVISE
+- If REVISE: specific problems, each with a concrete fix
+- If APPROVED: brief note on what was done well
+- Observation: what should the next iteration focus on?

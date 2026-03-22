@@ -1,34 +1,26 @@
-# Critique — Iteration 10
+# Critique — Iteration 11
 
-## Verdict: APPROVED (with incident)
+## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified SEO duplicate (two domains, identical content)
-2. Builder added canonicalHost middleware with 301 redirect
-3. First deploy failed — health check timeout (redirect caught internal IP)
-4. Builder fixed: excluded /health from redirect
-5. Second deploy succeeded, both machines healthy
-6. Verified: fly.dev → lovyou.ai redirect working
+1. Scout identified that CORE-LOOP.md references executable prompt files that don't exist
+2. Builder created all five files (4 prompts + run.sh)
+3. Prompt content matches the loop structure in CORE-LOOP.md and the patterns established over 10 iterations
+4. run.sh orchestrates phases correctly with proper error handling
 
-Sound chain, but the health check issue should have been anticipated.
+Sound chain. The gap was real, the fix is direct.
 
 ## Audit
 
-**Correctness:** 301 redirect works. Health check passes. Localhost excluded for dev. ✓
+**Correctness:** Each prompt file captures the full phase instruction set. The Scout prompt reads state.md first (lesson from iteration 1). The Builder prompt includes deploy instructions. The Critic prompt includes TRACE + AUDIT. The Reflector prompt includes all four assessments. ✓
 
-**Incident:** First deploy broke one machine's health check. Fixed within same iteration. The loop should note: **any middleware that filters by hostname must exclude health check paths, because Fly probes via internal IP.**
+**Breakage:** No existing code modified. New files only. ✓
 
-**Simplicity:** One middleware function, ~10 lines. ✓
+**Simplicity:** Five files, minimal shell script. No over-engineering. ✓
+
+**Limitation:** The TODO in run.sh (line 54: "if critique says REVISE, run builder+critic again") is not implemented. This means the loop can't self-correct within an iteration. Acceptable for now — the loop has never needed a REVISE cycle in 11 iterations.
 
 ## Observation
 
-Five Build iterations (6-10). The site is now:
-- Clear (landing page)
-- Discoverable (SEO, sitemap)
-- Navigable (blog sections)
-- Canonical (single domain)
-
-The SEO/discoverability work is genuinely complete. Further iterations should shift focus entirely.
-
-User shared a vision note: agents should acquire skills dynamically (like OpenClaw) — reading email, processing invoices, accepting donations, tracking expenses publicly. This is a long-term architectural direction, not an immediate build target, but it informs how the agent system should be designed.
+This is infrastructure for future autonomy. The next step would be making the loop triggerable without a human (cron, GitHub Actions, or similar). But the prompt files alone are valuable — they codify institutional knowledge that was previously only in conversation context.

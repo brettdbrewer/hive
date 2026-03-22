@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 10, 2026-03-22.
+Last updated: Iteration 11, 2026-03-22.
 
 ## Current System State
 
@@ -20,6 +20,15 @@ Five repos, all compiling and tested:
   - Canonical redirect (fly.dev → lovyou.ai)
   - All secrets configured on Fly
 
+**Core loop infrastructure:**
+- `loop/run.sh` — orchestrates Scout → Builder → Critic → Reflector via `claude -p`
+- `loop/scout-prompt.txt` — Scout phase instructions
+- `loop/builder-prompt.txt` — Builder phase instructions
+- `loop/critic-prompt.txt` — Critic phase instructions
+- `loop/reflector-prompt.txt` — Reflector phase instructions
+- Run: `cd /c/src/matt/lovyou3/hive && ./loop/run.sh`
+- Individual phases: `./loop/run.sh scout`, `./loop/run.sh builder`, etc.
+
 Deploy: `fly deploy --remote-only` from site repo.
 Fly/Neon resources can be scaled up per user authorization.
 
@@ -30,6 +39,7 @@ Fly/Neon resources can be scaled up per user authorization.
 - **Discoverability** (6-8): landing page, SEO, sitemap
 - **Visitor Experience** (9): blog arc navigation
 - **SEO Canonicalization** (10): fly.dev → lovyou.ai redirect
+- **Hive Autonomy: Foundation** (11): executable prompt files + run.sh
 
 ## Lessons Learned
 
@@ -40,6 +50,7 @@ Fly/Neon resources can be scaled up per user authorization.
 5. Try alternatives before declaring blockers.
 6. Name iteration clusters and recognize completion.
 7. Hostname middleware must exclude /health (Fly probes via internal IP).
+8. Codify implicit knowledge into executable artifacts — conversation context is ephemeral, files persist.
 
 ## Vision Notes
 
@@ -48,10 +59,10 @@ Fly/Neon resources can be scaled up per user authorization.
 
 ## What the Scout Should Focus On Next
 
-The site is production-ready. Stop polishing it. The next cluster should be about:
+The loop infrastructure exists but still requires manual invocation. Options for next iteration:
 
-1. **Hive autonomy** — make the core loop self-running. Highest compounding value. Currently requires manual Claude Code CLI invocation. Even a simple cron-triggered script would be a step toward autonomy.
-2. **Product development** — new features in the graph product, or new content.
+1. **Hive autonomy: scheduling** — cron job, GitHub Actions, or similar to trigger `./loop/run.sh` automatically. Continues the current cluster.
+2. **Product development** — new features in the graph product, open the auth gate, onboard users.
 3. **Agent skill architecture** — design how agents acquire and use skills dynamically.
 
-The Reflector recommends hive autonomy as the next cluster.
+The loop can now shift to any of these. The Hive Autonomy cluster could continue (scheduling) or pause here if product development is more urgent.

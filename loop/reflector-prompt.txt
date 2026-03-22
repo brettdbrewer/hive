@@ -1,0 +1,27 @@
+Read loop/scout.md, loop/build.md, loop/critique.md.
+Read the full history in loop/reflections.md.
+Read loop/state.md.
+
+COVER: Did this iteration explore the right territory? Did the Scout look at the right things? Was anything relevant ignored?
+
+BLIND: What are we NOT seeing? What assumptions might be wrong? What parts of the system haven't been touched in many iterations? Flag uncertainty honestly.
+
+ZOOM: Are we at the right scale? Too granular? Too ambitious? Should the next iteration zoom in or out?
+
+FORMALIZE: Look at recent iterations as a body of work. Are patterns emerging? Name the current cluster. Is it complete?
+
+Append to loop/reflections.md:
+- Iteration number and date
+- What was built (one line)
+- COVER / BLIND / ZOOM assessments
+- FORMALIZE: method improvements if needed
+- One sentence: what the Scout should focus on next
+
+Update loop/state.md:
+- Current system state (accurate, from code)
+- Lessons learned (cumulative)
+- Completed clusters
+- Known issues
+- What the Scout should focus on next
+
+Commit all loop/ changes and push.
