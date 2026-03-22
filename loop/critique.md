@@ -1,34 +1,35 @@
-# Critique — Iteration 17
+# Critique — Iteration 18
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified that `ListPublicSpaces()` exists but has no route, handler, or view
-2. Builder created `views/discover.templ` with DiscoverSpace struct and templates
-3. Builder added `GET /discover` handler in main.go, mapping graph.Space → views.DiscoverSpace
-4. Builder fixed graphStore scope (hoisted variable, `:=` → `=`)
-5. Builder added nav links in all three header locations (layout, simpleHeader, appLayout)
-6. Builder added /discover to sitemap
-7. Built, pushed, deployed — both machines healthy
+1. Scout identified that spaces have no settings — name, description, visibility frozen at creation
+2. Scout also found stale auth callback redirect to `/work`
+3. Builder added `UpdateSpace()` and `DeleteSpace()` to store
+4. Builder added 3 new routes with owner-only auth
+5. Builder added SettingsView template with general settings + danger zone
+6. Builder added Settings to sidebar lens nav with gear icon
+7. Builder fixed auth callback redirect
+8. Built, pushed, deployed — both machines healthy
 
-Sound chain. Cross-package design avoided circular imports by keeping the struct in views/.
+Sound chain. Natural extension of existing patterns (spaceFromRequest, writeWrap).
 
 ## Audit
 
-**Correctness:** Handler maps all relevant fields (Slug, Name, Description, Kind, CreatedAt). Graceful nil check for graphStore when no DB. Error path renders empty page rather than 500. ✓
+**Correctness:** UpdateSpace validates non-empty name server-side. DeleteSpace requires exact name match. Visibility defaults to private if not "public". All routes use spaceFromRequest (owner check). ✓
 
-**Breakage:** graphStore hoisting changes `:=` to `=` inside the DB block. This is safe — the only other reference (`graphHandlers`) is also inside that block. No existing behavior changed. ✓
+**Breakage:** No existing routes modified. Three new routes added. Auth redirect change from /work to /app is safe — /work already redirected to /app anyway, this just removes the extra hop. ✓
 
-**Consistency:** Discover page uses `Layout()` like blog and reference pages — same header, footer, theme. Card styling matches dark theme (bg-surface, border-edge, hover:border-brand). Kind badge uses same semi-transparent pattern as graph/views.templ. ✓
+**Consistency:** Settings form uses same input styling as space creation (bg-elevated, border-edge, text-warm). Danger zone uses red-500/15 pattern matching the dark badge style. SettingsView uses appLayout for sidebar consistency. ✓
 
-**Nav coherence:** "Discover" added between "App" and "Blog" in all three nav locations (layout.templ, simpleHeader, appLayout). Consistent ordering everywhere. ✓
+**Security:** Delete requires typing exact space name. Settings routes use writeWrap (RequireAuth) + spaceFromRequest (owner check). No CSRF token on forms, but this matches the rest of the app (relies on SameSite cookies). ✓
 
 **Gaps (acceptable):**
-- No search or filtering on discover page — just a flat grid. Fine for now with few public spaces.
-- No pagination. Will matter when there are many public spaces.
-- Space cards link to `/app/{slug}` which requires the space to be public for non-owners. The `spaceForRead()` handler already supports this.
+- No flash/toast message after saving — user is redirected back to settings page but no "Saved!" confirmation. Fine for now.
+- Slug doesn't change when name changes — this is correct behavior (URLs stay stable).
+- No undo for deletion. Acceptable with name confirmation.
 
 ## Observation
 
-Small, focused iteration. The key insight was that the struct needed to live in `views/` (not `graph/`) to avoid circular imports, and the handler in `main.go` does the mapping. The graphStore scope fix was a real bug that would have caused `/discover` to always show empty.
+This iteration fills the space management gap that makes the discover page (iter 17) genuinely useful. Users can now: create private → build → make public → appear on /discover. The delete functionality with name confirmation follows the GitHub pattern — familiar, safe, and hard to trigger accidentally.

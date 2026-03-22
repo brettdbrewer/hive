@@ -1,33 +1,32 @@
-# Build Report — Iteration 17
+# Build Report — Iteration 18
 
 ## What I planned
 
-Add a `/discover` page so visitors can browse public spaces without login. Wire `ListPublicSpaces()` (already in the store) to a new route, view, and nav link.
+Add space settings — update name, description, visibility after creation, and delete spaces. Fix stale auth callback redirect.
 
 ## What I built
 
-Changes across 7 files (3 templates + 3 generated + 1 Go source) in the site repo.
+Changes across 5 files in the site repo.
 
-### New: views/discover.templ
-- `DiscoverSpace` struct: Slug, Name, Description, Kind, CreatedAt
-- `DiscoverPage(spaces []DiscoverSpace)` — grid layout with empty state CTA
-- `discoverCard(sp DiscoverSpace)` — card with kind badge, date, name, description
-- `discoverKindClass(kind string)` — dark badge colors (project=indigo, community=emerald, team=amber)
-- Uses `Layout()` from views package for visual consistency with blog/reference
+### Store: graph/store.go
+- `UpdateSpace(ctx, id, name, description, visibility)` — updates mutable fields
+- `DeleteSpace(ctx, id)` — removes space (nodes and ops cascade via FK)
 
-### Modified: cmd/site/main.go
-- Hoisted `graphStore` declaration (`var graphStore *graph.Store`) above the DB block
-- Changed `:=` to `=` inside the DB block so `/discover` handler can access it
-- Added `GET /discover` handler: calls `graphStore.ListPublicSpaces()`, maps `graph.Space` → `views.DiscoverSpace`, renders page
-- Graceful degradation: if no DB, renders empty discover page
-- Added `/discover` to sitemap
+### Handlers: graph/handlers.go
+- `GET /app/{slug}/settings` → `handleSpaceSettings` — renders settings form (writeWrap, owner only)
+- `POST /app/{slug}/settings` → `handleUpdateSpace` — saves changes, validates non-empty name
+- `POST /app/{slug}/delete` → `handleDeleteSpace` — requires typing space name to confirm
+- All three routes use `writeWrap` (RequireAuth) and `spaceFromRequest` (owner check)
 
-### Modified: views/layout.templ
-- Added "Discover" link to nav bar between "App" and "Blog"
+### Views: graph/views.templ
+- `SettingsView(space, spaces, user, errMsg)` — settings page with two sections:
+  - General: name input, description textarea, visibility select (private/public with explanatory text)
+  - Danger zone: red-bordered section with name confirmation input for deletion
+- `settingsIcon()` — gear SVG icon for sidebar
+- Settings added to sidebar lens nav (appears after Activity)
 
-### Modified: graph/views.templ
-- Added "Discover" link to `simpleHeader()` nav
-- Added "Discover" link to `appLayout()` header nav
+### Auth fix: auth/auth.go
+- Callback redirect changed from `/work` to `/app` (eliminates double-redirect)
 
 ## Verification
 

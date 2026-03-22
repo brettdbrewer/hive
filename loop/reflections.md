@@ -290,3 +290,21 @@ Aesthetic cluster complete:
 **FORMALIZE:** When a store method exists but no route calls it, the gap is in wiring — not in building new infrastructure. The fastest iterations are ones where the hard work (data access, auth middleware) was already done. **Expose what you've already built before building more.**
 
 **Next iteration:** Discovery cluster complete (single iteration). Remaining product gaps: (a) open auth gate to production, (b) space settings (rename, delete, change visibility), (c) subtle animations (breathing pulse, scroll reveals). Opening auth would make the whole product actually usable by the public — biggest unlock remaining.
+
+---
+
+## Iteration 18 — 2026-03-22
+
+**Cluster:** Space Management (18)
+
+**Built:** Space settings page — edit name, description, visibility; delete with name confirmation. Store methods `UpdateSpace()` and `DeleteSpace()`. Three new handler routes with owner-only auth. Settings in sidebar lens nav. Also fixed stale auth callback redirect (`/work` → `/app`). 5 files changed, deployed.
+
+**COVER:** Scout correctly identified that frozen spaces undermine the discover page. The natural workflow (create private → build → make public) was impossible. Builder followed existing patterns (spaceFromRequest, writeWrap, appLayout) to add settings without any architectural changes. ✓
+
+**BLIND:** No flash message after saving. No client-side validation. No undo for deletion (acceptable with name confirmation). Slug is immutable even if name changes — this is a feature, not a bug (stable URLs).
+
+**ZOOM:** The auth callback fix (`/work` → `/app`) eliminated a pointless double-redirect that has existed since the work→graph rename. Small fix, shipped alongside the main feature. The delete confirmation pattern (type the name) is borrowed from GitHub — no need to invent new UX for destructive actions.
+
+**FORMALIZE:** Space settings completes the CRUD lifecycle: Create (iter 14), Read (always existed), Update + Delete (iter 18). Incomplete CRUD is a hidden product tax — users who can't edit feel trapped. **Close the CRUD loop before adding new features.**
+
+**Next iteration:** Space management complete. Remaining: (a) open auth gate (Google Console, not code), (b) subtle animations (breathing, scroll reveals), (c) space previews on discover cards. Since auth gate is a manual action, the next code gap is either animations or functional enhancements.
