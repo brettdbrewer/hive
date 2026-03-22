@@ -1,11 +1,9 @@
-# Scout Report — Iteration 46
+# Scout Report — Iteration 47
 
-## Gap: Mind uses polling in an event-driven architecture
+## Gap: Handler layer untested + SQL injection in Mind
 
-Matt: "polling? why polling? we have event driven arch"
+Two gaps, both correctness:
 
-The site is event-driven — every action is a grammar op. When `handleOp` processes a `respond` in a conversation, it already has all the context. The Mind should be triggered there, not by polling the DB every 10 seconds.
+1. **Handler tests** — store is tested (iter 45) but no HTTP round-trip tests. The handlers are the API surface that users and agents interact with.
 
-## What "Filled" Looks Like
-
-When a human sends a message in a conversation with an agent, the handler triggers the Mind immediately. No polling loop, no staleness guard, no wasted DB queries.
+2. **SQL injection** — `findAgentParticipant` uses `"{"+strings.Join(tags,",")+"}` to build a Postgres array literal. Tags with commas or braces could break or exploit the query.

@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 46, 2026-03-23.
+Last updated: Iteration 47, 2026-03-23.
 
 ## Current System State
 
@@ -70,7 +70,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Collaborative Access** (41): creation forms open to all authenticated users (not just owners)
 - **Agent Badges Completion** (42): agent badges on thread list cards (last holdout)
 - **Auto-Reply** (43-46): server-side Mind, event-driven (handler triggers on respond/converse ops)
-- **Test Infrastructure** (45): store tests, mind tests, CI with Postgres. 10 tests, all passing.
+- **Test Infrastructure** (45, 47): store, mind, handler tests. CI with Postgres. 24 test results, all passing.
 
 ## Lessons Learned
 

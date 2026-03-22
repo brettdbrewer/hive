@@ -1,22 +1,16 @@
-# Build Report — Iteration 46
+# Build Report — Iteration 47
 
 ## What was built
 
-**Event-driven Mind** — replaced polling with handler-triggered auto-reply.
+1. **Handler tests** (`graph/handlers_test.go`) — 7 test cases:
+   - CreateSpace (form POST, verify redirect + DB state)
+   - Intend op (JSON API, verify response + node fields)
+   - Express op (JSON API)
+   - Converse op (JSON API, verify conversation creation)
+   - Respond op (JSON API, reply to thread)
+   - Unknown op (verify 400 rejection)
+   - ConversationDetail (GET JSON, verify messages)
 
-### Changes
+2. **SQL injection fix** (`graph/mind.go`) — `findAgentParticipant` now uses `pq.Array(tags)` instead of string concatenation for the Postgres array parameter.
 
-1. **`graph/mind.go`** — rewritten. Removed `Run()` polling loop, `findUnreplied()` query, `maxAge`, `pollEvery`. Added `OnMessage(spaceID, slug, convo, sender)` — called by handlers when a message arrives. Added `findAgentParticipant()` to check if conversation has an agent.
-
-2. **`graph/handlers.go`** — `Handlers` struct gets `mind *Mind` field + `SetMind()` setter. `handleOp` triggers `go h.mind.OnMessage(...)` after `respond` ops in conversations and after `converse` ops (new conversations).
-
-3. **`cmd/site/main.go`** — removed polling goroutine, `context`, `signal`, `syscall` imports. Now just `graphHandlers.SetMind(mind)`.
-
-4. **`graph/mind_test.go`** — updated tests for new API: `TestMindFindAgentParticipant` (3 cases), `TestMindOnMessage` (agent ignored, human without Claude), `TestMindE2E`.
-
-### Net result
-
-- 168 insertions, 426 deletions (net -258 lines)
-- Simpler architecture: handler → Mind → Claude → insert
-- No background goroutine, no polling, no staleness guard
-- Reply happens immediately when human messages
+### Test count: 24 results (all passing in CI)

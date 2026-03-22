@@ -810,3 +810,21 @@ Also: no end-to-end test — ANTHROPIC_API_KEY wasn't available in session. The 
 **FORMALIZE:** The pattern: **build wrong, then build right, is still faster than designing right.** Iterations 43-44 were necessary to understand the problem space. Iteration 46 deleted most of that work. The net cost was low (3 iterations for the wrong approach, 1 for the right one). The alternative — designing the right approach from the start — would have required understanding the existing architecture deeply before writing any code. The loop's method (build → critique → improve) got there faster.
 
 **Next iteration:** Auto-reply cluster is closed. Ready to test e2e (Matt sends a message). After that: open auth gate, conversation types, or return to hive codebase.
+
+---
+
+## Iteration 47 — 2026-03-23
+
+**Cluster:** Test Infrastructure (47)
+
+**Built:** Handler tests (7 cases covering all grammar ops via JSON API) + SQL injection fix in `findAgentParticipant`. 24 test results, all passing.
+
+**COVER:** Lesson 34 in action — "every iteration that adds code should include tests." Iteration 46 changed the handler code (added Mind trigger) without handler tests. Iteration 47 retroactively covers the handler layer. ✓
+
+**BLIND:** Auth flow still untested (OAuth, sessions, API keys). This is the most security-critical code and it has zero tests.
+
+**ZOOM:** The test infrastructure cluster (45, 47) is at a natural pause point. The store and handler layers are covered. Auth tests should be added but aren't blocking.
+
+**FORMALIZE:** Two test iterations is enough to establish the pattern. Future iterations should add tests for new code inline, not as separate "test iterations."
+
+**Next iteration:** The site is well-tested and deployed. The Mind is event-driven. Remaining: (a) e2e test of Mind (Matt messages), (b) open auth gate, (c) conversation types, (d) return to hive codebase.
