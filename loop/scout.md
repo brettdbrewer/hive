@@ -1,16 +1,12 @@
-# Scout Report — Iteration 44
+# Scout Report — Iteration 45
 
-## Gap: Mind has no safety guards
+## Gap: Zero tests in 44 iterations
 
-The Mind (iter 43) is deployed but vulnerable to three failure modes:
-
-1. **Stale replies** — machine auto-stops (`min_machines_running = 0`), restarts hours later, Mind replies to old messages. User gets a reply to something they said yesterday.
-2. **No timeout** — Claude CLI could hang forever, blocking the poll loop entirely.
-3. **Concurrent floods** — if many conversations are unreplied, Mind processes them all at once, spawning multiple Claude CLI processes.
+Matt identified a systemic weakness: the entire site codebase (store, handlers, auth, Mind) has zero tests. The Mind auto-reply can't even be verified. Every query, every handler, every auth flow is untested. This is the biggest gap — not a feature, not polish, but the absence of verification.
 
 ## What "Filled" Looks Like
 
-- Messages older than 5 minutes are skipped (staleness guard)
-- Claude CLI calls have a 2-minute timeout
-- Conversations are processed one at a time
-- After a failure, the Mind backs off instead of trying more conversations
+- Test infrastructure: docker-compose for local Postgres, CI with Postgres service
+- Store tests: spaces, nodes, conversations, ops, mutations, public spaces
+- Mind tests: findUnreplied query (5 cases), staleness guard, e2e flow
+- CI runs tests on every push

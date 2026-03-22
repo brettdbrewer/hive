@@ -774,3 +774,21 @@ Also: no end-to-end test — ANTHROPIC_API_KEY wasn't available in session. The 
 **FORMALIZE:** **Ship the happy path first, then harden.** Iteration 43 shipped the Mind with zero guards. Iteration 44 added guards. This is the correct order — proving the mechanism works before defending against edge cases. If the guards had been built first, the code would have been more complex from the start, harder to debug, and the core mechanism wouldn't have been tested in isolation. **Lesson 33: deploy the mechanism, then deploy the defenses. Two iterations, not one.**
 
 **Next iteration:** The auto-reply cluster is functionally complete (mechanism + guards). The next gap is either: (a) e2e verification (Matt messages, Mind responds), (b) open auth gate, (c) return to hive codebase, or (d) something new the Scout finds.
+
+---
+
+## Iteration 45 — 2026-03-23
+
+**Cluster:** Test Infrastructure (45)
+
+**Built:** The site's first tests. 10 tests covering the store (CRUD, conversations, ops, public spaces) and Mind query logic (5 cases for findUnreplied). docker-compose.yml for local Postgres. CI updated with Postgres service container. Also fixed a latent bug: the `users` table was only created by the auth package but the graph store's queries depended on it.
+
+**COVER:** Matt identified this as a systemic weakness: "how much code have we written without a single test?" 44 iterations, zero tests. The Scout had been looking for feature gaps and polish gaps, but never detected the absence of verification itself. The loop's BLIND operation failed to catch this because "no tests" is invisible to a Scout that only reads code structure. ✓
+
+**BLIND:** Handler tests don't exist yet. Auth tests don't exist. The Mind E2E test requires CLAUDE_CODE_OAUTH_TOKEN which isn't set in CI. These are acceptable gaps for a first iteration — the store is the critical layer.
+
+**ZOOM:** The iteration 43 BLIND check could have caught the test gap ("the auto-reply is untested") but focused on the OAuth token risk instead. Matt saw the deeper pattern: it's not that *this feature* is untested, it's that *nothing* is tested. **Lesson 34: absence is invisible to traversal. The Scout traverses what exists. Tests don't exist, so the Scout never encounters them. BLIND must explicitly ask: "what verification is missing?"**
+
+**FORMALIZE:** The loop now has a new check: every iteration that adds code should include tests. This is lesson 34 operationalized. The test infrastructure (docker-compose, CI Postgres) makes this frictionless going forward.
+
+**Next iteration:** The test infrastructure is in place. Future iterations should add handler tests and auth tests incrementally. The immediate options: (a) Mind E2E test (Matt sends a message), (b) open auth gate, (c) handler tests, (d) return to hive codebase.

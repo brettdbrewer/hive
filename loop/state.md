@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 44, 2026-03-23.
+Last updated: Iteration 45, 2026-03-23.
 
 ## Current System State
 
@@ -70,6 +70,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Collaborative Access** (41): creation forms open to all authenticated users (not just owners)
 - **Agent Badges Completion** (42): agent badges on thread list cards (last holdout)
 - **Auto-Reply** (43-44): server-side Mind goroutine + hardening (staleness guard, timeout, backoff)
+- **Test Infrastructure** (45): store tests, mind tests, CI with Postgres. 10 tests, all passing.
 
 ## Lessons Learned
 
@@ -105,6 +106,8 @@ Deploy: `fly deploy --remote-only` from site repo.
 30. Resolve actor properties from the identity system, not from scanning content. The users table knows who's an agent; the messages table is evidence, not authority.
 31. The onboarding funnel is discover → create → preview. Each step must answer "what's in here?" before the user clicks.
 32. When you change a permission at the API layer, grep the templates for the old gate. UI and API permissions must move together.
+33. Deploy the mechanism, then deploy the defenses. Two iterations, not one.
+34. Absence is invisible to traversal. The Scout traverses what exists. Tests don't exist, so the Scout never encounters them. BLIND must explicitly ask: "what verification is missing?"
 
 ## Vision Notes
 

@@ -1,21 +1,35 @@
-# Build Report — Iteration 44
+# Build Report — Iteration 45
 
 ## What was built
 
-**Mind hardening** — three safety guards added to `graph/mind.go`:
+**Test infrastructure** — the site's first tests after 44 iterations.
 
-1. **Staleness guard** — `maxAge: 5 * time.Minute`. The `findUnreplied` query now returns `last_message_at` (MAX of child timestamps or conversation created_at). `poll()` skips conversations where the last message is older than 5 minutes. Logs the skip.
+### Files added
 
-2. **Reply timeout** — `replyTimeout: 2 * time.Minute`. `replyTo()` wraps the Claude CLI call in a `context.WithTimeout`. If Claude hangs, the context cancels and the poll loop continues.
+1. **`docker-compose.yml`** — local Postgres for testing (port 5433 to avoid conflicts)
+2. **`graph/store_test.go`** — 6 test functions covering:
+   - CreateAndGetSpace (create, get by slug, visibility)
+   - CreateAndListNodes (task, post, comment, child count, kind filter)
+   - Conversations (create, list by participant, non-participant exclusion, last message preview, agent detection)
+   - Ops (record, list)
+   - UpdateAndDeleteNode (state change, field update, delete, ErrNotFound)
+   - PublicSpaces (public vs private visibility, node count)
+3. **`graph/mind_test.go`** — 5 unit tests + 1 e2e test:
+   - agent_created_no_messages (should NOT be found)
+   - human_created_no_messages (SHOULD be found)
+   - human_last_message (SHOULD be found)
+   - agent_last_message (should NOT be found)
+   - staleness_guard (old messages skipped)
+   - E2E (requires CLAUDE_CODE_OAUTH_TOKEN — full human→Mind→reply flow)
 
-3. **Failure backoff** — `poll()` returns immediately after the first failed reply. Prevents cascading failures when Claude is down. The next poll (10 seconds later) will retry.
+### CI updated
 
-4. **Sequential processing** — conversations are processed one at a time (was already the case, but now with explicit ordering by `last_message_at DESC` — most recent first).
+- `.github/workflows/ci.yml` — added Postgres 16 service container + `go test -v -count=1 ./...`
+- Tests run on every push to main and every PR
 
-### Files changed
+### How to run locally
 
-- `graph/mind.go` — 31 insertions, 8 deletions. No new dependencies.
-
-### Deployed
-
-- `flyctl deploy --remote-only` ✓
+```bash
+docker compose up -d
+DATABASE_URL=postgres://site:site@localhost:5433/site?sslmode=disable go test -v ./graph/
+```
