@@ -1,31 +1,16 @@
-# Build Report — Iterations 37-39
+# Build Report — Iteration 40
 
-## Iteration 37: Conversation List Preview
+## What Was Built
 
-- `ConversationSummary` struct wraps Node with `LastAuthor`, `LastAuthorKind`, `LastBody`
-- `ListConversations` enhanced with `LEFT JOIN LATERAL` subquery for last message
-- Template shows `Author: snippet...` under each conversation card, agent authors in violet
-- `truncate()` helper added for body truncation
+Logged-in redirect: `/` → `/app` for authenticated users.
 
-## Iteration 38: Discover Social Proof
-
-- `SpaceWithStats` extended with `MemberCount` and `HasAgent` fields
-- `ListPublicSpaces` enhanced with second LATERAL: `COUNT(DISTINCT actor)` + `BOOL_OR(kind='agent')` from ops JOIN users
-- Discover cards show contributor count and violet "agents" indicator dot
-- Handler mapping in main.go updated to pass new fields
-
-## Iteration 39: Agent Picker
-
-- `ListAgentNames()` store method queries `users WHERE kind = 'agent'`
-- `ConversationsView` takes `agents []string` parameter
-- Quick-add chips: violet pills below participants field, one per agent user
-- `addParticipant(name)` templ script component — click to append to comma-separated input
-- Deduplication: won't add same name twice
+**site/cmd/site/main.go**:
+- Home route moved from early registration to after auth setup
+- Wrapped with `readWrap` (OptionalAuth) to detect session
+- If `user != nil && user.ID != "anonymous"`, redirect 303 to `/app`
+- Anonymous visitors still see the landing page
+- No-DB fallback: home route registered without auth (always shows landing)
 
 ## Files Changed
 
-- `site/graph/store.go` — ConversationSummary, LATERAL subqueries, ListAgentNames
-- `site/graph/handlers.go` — pass agents to ConversationsView
-- `site/graph/views.templ` — conversation preview, agent picker chips, addParticipant script
-- `site/views/discover.templ` — member count, agent indicator
-- `site/cmd/site/main.go` — pass MemberCount/HasAgent to DiscoverSpace
+- `site/cmd/site/main.go` — 12 lines (route move + conditional redirect)

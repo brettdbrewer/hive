@@ -681,3 +681,21 @@ Also: no end-to-end test — ANTHROPIC_API_KEY wasn't available in session. The 
 **FORMALIZE:** These three iterations complete the "expose what you've built" phase. The product now surfaces: conversation content (preview), community health (contributors + agents), and agent availability (picker). The onboarding funnel is: discover space (38: see activity + agents) → create conversation (39: easily add Mind) → see what's happening (37: preview messages). **Lesson 31: the onboarding funnel is discover → create → preview. Each step must answer "what's in here?" before the user clicks.**
 
 **Next iteration:** The content preview and social proof cluster is complete. The site has had 39 iterations. The remaining directions shift from polish to infrastructure: (a) end-to-end test of cmd/reply, (b) auto-reply mechanism, (c) conversation types, (d) open auth gate. Or: return to the hive codebase entirely.
+
+---
+
+## Iteration 40 — 2026-03-22
+
+**Cluster:** Return Visit (40)
+
+**Built:** Logged-in redirect — `/` redirects to `/app` for authenticated users. Anonymous visitors still see the marketing landing. One file changed, 12 lines.
+
+**COVER:** The home page was built for first visitors (iter 15). Auth was added later (iter 21+). Nobody wired them together. Returning users had to click through the marketing page every time. ✓
+
+**BLIND:** No way for logged-in users to view the landing page if they want to. Not a real issue — they've already converted. Also: `/app` shows a spaces grid, which is fine for power users but could be improved with recent activity or a dashboard view.
+
+**ZOOM:** Single-iteration fix. Two lines of conditional logic. The right scale for a redirect.
+
+**FORMALIZE:** The product has two distinct user states: discovering (anonymous) and working (authenticated). Each needs a different entry point. The marketing page is correct for discovery; the workspace is correct for work. **When the product has distinct user states, the entry point should match the state — don't make returning users walk through the front door every time.**
+
+**Next iteration:** The site is now onboarding-complete: discover → convert → work → return. Remaining infrastructure: (a) end-to-end test of cmd/reply, (b) auto-reply, (c) conversation types, (d) auth gate.

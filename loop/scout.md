@@ -1,14 +1,13 @@
-# Scout Report — Iterations 37-39
+# Scout Report — Iteration 40
 
-## Batch: Content Preview & Social Proof
+## Gap: Logged-in users see marketing page instead of their workspace
 
-Three related gaps, all in the pattern "data exists but isn't exposed" (lesson 14):
+The home page (`/`) shows the same landing content to everyone — "Humans and agents, building together" hero, lens cards, how-it-works steps. Logged-in users must click "Create a space" to reach `/app` where their actual work lives. This is friction on the return visit.
 
-### 37: Conversation list opaque
-Conversation cards show title + count but no message preview. Threads already have body preview (line-clamp-2). Users must click into every conversation.
+## Why This Gap
 
-### 38: Discover page lacks social proof
-Cards show node count and last activity but no member count, no agent presence indicator. "142 items" tells you nothing about community health.
+The home page was built (iter 15) for first visitors. Auth was added later (iter 21+). Nobody wired them together. The logged-in experience starts at `/app`, but the URL bar says `/`.
 
-### 39: Conversation creation doesn't surface agents
-Free-text participant field with no guidance. The product differentiator (agent participation) is hidden behind "type the agent's name correctly."
+## What "Filled" Looks Like
+
+If the user has a session cookie (logged in), redirect `/` to `/app`. If not, show the current landing page. One conditional in the home handler. Zero new templates.

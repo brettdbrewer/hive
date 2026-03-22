@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 39, 2026-03-22.
+Last updated: Iteration 40, 2026-03-22.
 
 ## Current System State
 
@@ -65,6 +65,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Conversations** (31-35): conversation primitive, chat view with bubbles, Mind as participant (cmd/reply), live polling updates, thinking indicator + UX polish
 - **Agent Visibility** (36): agent badges on People + Activity lenses via JOIN (consistent across all 6 lenses)
 - **Content Preview & Social Proof** (37-39): conversation list previews, discover member count + agent indicator, agent picker on conversation creation
+- **Return Visit** (40): logged-in redirect from / to /app
 
 ## Lessons Learned
 
