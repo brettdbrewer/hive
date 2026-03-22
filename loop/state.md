@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 13, 2026-03-22.
+Last updated: Iteration 14, 2026-03-22.
 
 ## Current System State
 
@@ -11,17 +11,18 @@ Five repos, all compiling and tested:
 - **agent** — unified Agent with deterministic identity, FSM, causality tracking. Complete.
 - **work** — task store for hive agent coordination. Complete.
 - **hive** — 4 agents (Strategist, Planner, Implementer, Guardian), agentic loop, budget. Complete. Has CI.
-- **site** — lovyou.ai on Fly.io. Production-ready. **Has CI** (build + templ drift check).
+- **site** — lovyou.ai on Fly.io. Production-ready. Has CI. **Public spaces now supported.**
 
-**Core loop infrastructure:**
-- `loop/run.sh` — orchestrates Scout → Builder → Critic → Reflector via `claude -p`
-- Four phase prompt files (scout, builder, critic, reflector)
-- `.github/workflows/ci.yml` — build + test on push, PR, and workflow_dispatch
-- Site also has `.github/workflows/ci.yml` — build + templ drift check
-- Run: `cd /c/src/matt/lovyou3/hive && ./loop/run.sh`
+**Product features:**
+- Blog (43 posts, 6 arcs with section nav)
+- Reference (cognitive grammar, graph grammar, 13 layers, 201 primitives, 28 agent primitives)
+- Auth (Google OAuth — test mode, can be opened whenever)
+- Unified graph product (3 tables, 10 grammar ops, 5 lenses, HTMX, full CRUD)
+- **Public spaces** — spaces can be private (owner only) or public (anyone can view)
+- OptionalAuth for read routes, RequireAuth for write routes
+- Landing page, SEO meta tags, sitemap (305 URLs), canonical redirect
 
 Deploy: `fly deploy --remote-only` from site repo.
-Fly/Neon resources can be scaled up per user authorization.
 
 ## Completed Clusters
 
@@ -31,6 +32,7 @@ Fly/Neon resources can be scaled up per user authorization.
 - **Visitor Experience** (9): blog arc navigation
 - **SEO Canonicalization** (10): fly.dev → lovyou.ai redirect
 - **Hive Autonomy** (11-13): prompt files, run.sh, CI on hive + site
+- **Product Development** (14+): public spaces
 
 ## Lessons Learned
 
@@ -41,26 +43,28 @@ Fly/Neon resources can be scaled up per user authorization.
 5. Try alternatives before declaring blockers.
 6. Name iteration clusters and recognize completion.
 7. Hostname middleware must exclude /health (Fly probes via internal IP).
-8. Codify implicit knowledge into executable artifacts — conversation context is ephemeral, files persist.
-9. Multi-repo replace directives require CI to mirror the local directory structure (checkout siblings).
-10. Templ drift check (`git diff --exit-code -- '*_templ.go'`) catches stale generated files.
+8. Codify implicit knowledge into executable artifacts.
+9. Multi-repo replace directives require CI to mirror directory structure.
+10. Templ drift check catches stale generated files.
+11. Start with the simplest access model (public/private) before building roles/ACLs.
 
 ## Vision Notes
 
-- Agents should acquire skills dynamically (like OpenClaw) — email, invoicing, payments, public accounting, any skill.
+- Agents should acquire skills dynamically (like OpenClaw).
 - Auth gate can be opened to public whenever ready.
-- Users provide OAuth tokens via `claude --setup-token`, agents build things for them via board or personal agent.
-- Social product: humans and agents build MySpace-like personal pages hosted by lovyou.ai.
-- Business use: companies use the platform to build their products (e.g., Lovatts Anthro account).
+- Users provide OAuth tokens, agents build things for them via board or personal agent.
+- Social product: humans and agents build MySpace-like personal pages.
+- Business use: companies use the platform to build products.
 - Agents and humans are peers on the social graph.
+- **Site vibe should be warm/collaborative (agents+humans together), NOT corporate/business-like.**
 
 ## What the Scout Should Focus On Next
 
-The infrastructure cluster is complete. All repos have CI, the loop is codified, the site is deployed. Time to shift to product or capability.
+Public spaces exist but lack discovery. The user flagged the site's corporate aesthetic. Options:
 
-Options:
-1. **Product development** — the unified graph product exists behind an auth gate. Open it, or build the social product (personal pages for humans + agents).
-2. **Agent capability** — design how users provide tokens, how agents get assigned to users, how agents build things via the board.
-3. **Content** — new blog posts, documentation for the product.
+1. **Site aesthetics** — rewrite copy and adjust styling to feel warm, collaborative, human+agent. This affects first impression and matches the project's actual spirit. High-impact, bounded change (home page + layout).
+2. **Discover page** — list public spaces so visitors can browse without knowing URLs.
+3. **Open auth gate** — switch Google OAuth from test mode to production so anyone can sign up.
+4. **Space settings** — allow changing visibility after creation, rename, delete spaces.
 
-The user's expanding vision (personal agents, social pages, business accounts) suggests the product direction is most aligned with intent. The Scout should assess what concrete product work would be most impactful.
+The aesthetics feedback is notable — when the founder says "that isn't our vibe at all," the next iteration should address it.

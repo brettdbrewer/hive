@@ -223,3 +223,20 @@ This is a natural stopping point. The infrastructure work is done: the loop is c
 New vision input from user: users provide OAuth tokens via `claude --setup-token`, agents build things for them via board requests or personal agent. Social product enables humans and agents to build MySpace-like personal pages. Businesses can use the platform to build their products (e.g., Lovatts Anthro account).
 
 **Next iteration:** The infrastructure cluster is complete. The loop should pivot to product development. The unified graph product exists but is behind an auth gate. The user's vision is expanding: personal agents, user-hosted pages, business accounts. The Scout should assess what product work would be most impactful.
+
+## Iteration 14 — 2026-03-22
+
+**Built:** Public spaces — visibility model (private/public), OptionalAuth middleware, read-only views for non-owners. Six files changed, deployed.
+
+**COVER:** The Scout correctly identified that spaces being owner-only blocks the entire social/business vision. One column (`visibility`) and one middleware (`OptionalAuth`) unlocks read access for the public. ✓
+
+**BLIND:** No discover page yet — public spaces exist but there's no way to find them without knowing the URL. Also no way to change visibility after creation. These are acceptable gaps for a first iteration. The visibility primitive is in place; discovery can be layered on.
+
+**ZOOM:** Right scale. One data model change with surgical propagation through handlers and views. The `isOwner` flag is minimal — no roles, no ACLs, no membership model. Just public/private.
+
+**FORMALIZE:** New cluster begins — **Product Development**.
+- Iteration 14: public spaces (foundation for social/sharing)
+
+User feedback: the site looks too corporate/business-like. The project's actual vibe is about agents and humans working together for everyone's betterment. The aesthetics should reflect warmth and collaboration, not enterprise SaaS.
+
+**Next iteration:** Public spaces exist but aren't discoverable. Options: (a) add a discover/explore page, (b) adjust site aesthetics to match the warm/collaborative vibe, (c) open the auth gate so real users can create spaces. The aesthetics feedback is significant — it affects every visitor's first impression.

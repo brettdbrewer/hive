@@ -1,27 +1,33 @@
-# Build Report — Iteration 13
+# Build Report — Iteration 14
 
 ## What I planned
 
-Create GitHub Actions CI for the site repo — the production-deployed code at lovyou.ai.
+Add public spaces — a visibility model so spaces can be shared/viewed without login. Foundation for social pages, business visibility, and agent identity.
 
 ## What I built
 
-1. **`site/.github/workflows/ci.yml`** — CI workflow with:
-   - Triggers: push to main, PRs to main, manual workflow_dispatch
-   - Installs templ at exact version from go.mod (v0.3.1001)
-   - Runs `templ generate` to regenerate from .templ source
-   - **Drift check**: `git diff --exit-code -- '*_templ.go'` catches stale generated files
-   - Runs `go build -o site ./cmd/site/`
-   - Go 1.25, ubuntu-latest
+Changes across 6 files in the site repo:
 
-2. Simpler than hive's CI — no sibling repos needed (site has no replace directives).
+1. **graph/store.go** — Added `Visibility` field to Space struct, `visibility` column (ALTER TABLE, defaults to 'private'), updated CreateSpace to accept visibility, added `ListPublicSpaces` query, updated all scan calls.
+
+2. **auth/auth.go** — Added `OptionalAuth` middleware: tries to load user from session cookie but doesn't redirect if missing. Requests proceed with or without a user context.
+
+3. **graph/handlers.go** — Split auth into `readWrap` (OptionalAuth for GET) and `writeWrap` (RequireAuth for POST/DELETE). Added `spaceForRead` method that allows access to public spaces regardless of user. Returns `isOwner` bool. Updated all 7 GET handlers to use `spaceForRead`.
+
+4. **graph/views.templ** — Added `isOwner bool` parameter to BoardView, FeedView, ThreadsView, NodeDetailView. Wrapped all create/edit/delete forms with `if isOwner`. Added visibility toggle to both space creation forms. Non-owners see read-only views.
+
+5. **cmd/site/main.go** — Wired both wrappers: `readWrap` (OptionalAuth) for GET lens routes, `writeWrap` (RequireAuth) for POST/DELETE routes.
+
+6. **graph/views_templ.go** — Regenerated from templ.
 
 ## What works
 
-- CI triggered on push, passed in 38s ✓
-- Templ generation + drift check passed (no stale files) ✓
-- Build passed ✓
+- Build passes, templ generates, deployed to Fly.io ✓
+- Public spaces viewable by anyone (no login required)
+- Private spaces remain owner-only
+- Mutation forms hidden for non-owners
+- Visibility toggle in space creation
 
 ## Key finding
 
-The templ drift check is the most valuable step — it catches a failure mode that local dev can't: someone edits a .templ file but forgets to run `templ generate` before committing.
+The auth split (OptionalAuth vs RequireAuth) is clean — one method difference. The `isOwner` flag propagated through views is the minimal change needed. No new tables, no membership model, no roles — just a single column and an access check.

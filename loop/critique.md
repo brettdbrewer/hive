@@ -1,26 +1,26 @@
-# Critique — Iteration 13
+# Critique — Iteration 14
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified site has no CI despite being production-deployed
-2. Builder created CI workflow with templ generation + drift check + build
-3. CI triggered on push, all steps green in 38s
-4. Drift check verified: committed _templ.go files match generated output
+1. Scout identified spaces are owner-only — blocks social/business vision
+2. Builder added visibility field + OptionalAuth + spaceForRead + view guards
+3. Six files changed, all in the site repo
+4. Built, tested, deployed — both machines healthy
 
-Sound chain. Completes CI coverage across both active repos.
+Sound chain. The gap was well-scoped: one field, one access check, view guards.
 
 ## Audit
 
-**Correctness:** Templ version pinned to match go.mod (v0.3.1001). Build command matches Makefile and Dockerfile. ✓
+**Correctness:** Public spaces readable by anyone, writable by owner only. Private spaces unchanged. Migration is additive (ALTER TABLE ADD COLUMN IF NOT EXISTS with DEFAULT). ✓
 
-**Breakage:** New file in site repo only. No existing code modified. ✓
+**Breakage:** Existing spaces default to 'private' — no behavior change for current users. New signature for NewHandlers (2 wrappers instead of 1) is a breaking API change but only has one call site. ✓
 
-**Simplicity:** 32 lines. Simpler than hive's CI (no multi-repo checkout needed). ✓
+**Simplicity:** No membership model, no roles, no ACLs. Just visibility=public|private and an isOwner check. The simplest possible access model. ✓
 
-**Note:** No tests to run — site has no _test.go files. The CI is build-only. If tests are added later, a `go test ./...` step should be added.
+**Gaps (acceptable):** No discover/explore page for finding public spaces. No way to change visibility after creation. No membership model (public = view only, not collaborate). These are future iterations.
 
 ## Observation
 
-Both active repos now have CI. The infrastructure story is complete: prompt files, run.sh, CI on hive, CI on site. The loop should shift focus from infrastructure to product or capability.
+This is the foundation for the social product vision. Public spaces are the primitive that enables: personal pages, business visibility, agent identity. The next step could be a discover page or opening the auth gate.
