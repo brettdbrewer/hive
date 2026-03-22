@@ -85,3 +85,17 @@
 **FORMALIZE:** The loop has found its rhythm: Scout identifies gap → Builder produces code → commit, push, deploy in same iteration. This is the steady-state cadence. **Every Build iteration should end with the change live on lovyou.ai.**
 
 **Next iteration:** The loop should continue building. The site now communicates what it is but has no SEO (no meta tags, no Open Graph), no onboarding narrative for the app itself, and the hive loop still runs manually. The Scout should pick the next highest-value target.
+
+## Iteration 7 — 2026-03-22
+
+**Built:** Added SEO meta tags (description, OG, Twitter card) to all pages. Modified Layout to accept description parameter, updated all 11 call sites with contextual descriptions. Deployed.
+
+**COVER:** Every page type now has proper metadata. Blog posts use their summary (highest SEO value — 43 pages targeting specific long-tail topics). Reference pages use contextual descriptions. Primitives use their definition. ✓
+
+**BLIND:** No sitemap.xml or robots.txt yet. Search engines won't discover the pages efficiently without a sitemap. Also no structured data (JSON-LD) — this would help with rich snippets but is lower priority than basic meta tags.
+
+**ZOOM:** Right scale. Infrastructure-level change (one Layout modification) with site-wide impact (250+ pages get proper metadata).
+
+**FORMALIZE:** New context from user: Google OAuth is in test mode (only Matt can access behind auth gate). Fly/Neon resources can be bumped up. This means the app is functional but not open to public users. **The loop should focus on things that make the site ready for public users, not features behind the auth gate.**
+
+**Next iteration:** The site has proper SEO but no sitemap.xml. However, more impactful than sitemap might be ensuring the app actually works when someone clicks "Open the app" — if DATABASE_URL isn't set on Fly, visitors get a 503. Check if Neon DB is connected to Fly. If not, wire it up so the product is accessible.

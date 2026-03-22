@@ -1,37 +1,32 @@
-# Critique — Iteration 6
+# Critique — Iteration 7
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified landing page as highest-value target (state.md guidance)
-2. Builder read current home.templ, blog posts for voice/tone, rewrote the page
+1. Scout identified SEO as highest-leverage discoverability improvement
+2. Builder added description parameter to Layout, updated all 11 call sites with contextual descriptions
 3. Build passes, committed, pushed, deployed
 4. Live at lovyou.ai
 
-Sound chain. First iteration to produce new code AND deploy in one cycle.
+Sound chain. Second consecutive Build + Ship iteration.
 
 ## Audit
 
-**Correctness:** templ generates, Go builds, deploy succeeds, both machines healthy. ✓
+**Correctness:** templ generates, Go builds, deploy succeeds. ✓
 
-**Product quality:** The new page answers the three questions a visitor has: what is this (coordination tool on an event graph), what can I do (tasks, posts, discussions across five views), why should I care (full traceability, bigger vision). ✓
+**Coverage:** All 11 Layout call sites updated. Every page type has a relevant description. Blog posts use their summary (most valuable for SEO). Reference pages use contextual descriptions. Primitives use their definition. ✓
 
-**Simplicity:** One file changed. No new dependencies. No structural changes. ✓
-
-**Voice:** Copy is direct and specific, consistent with Matt's blog tone. Avoids generic SaaS marketing language. ✓
+**Simplicity:** One parameter added to Layout. No new files. No structural changes. ✓
 
 ## Observation
 
-The loop is now in Build mode. The pattern is established:
-1-4: Orient (catch up with reality)
-5: Ship (deploy)
-6: Build + Ship (new code, deployed)
+The loop is in a productive rhythm: two consecutive Build + Ship iterations (landing page, then SEO). Each iteration is scoped to a single concern, built, and deployed in one cycle.
 
-The next iteration should continue building. Candidates:
-- **SEO / meta tags** — the site has no meta description, no Open Graph tags, no structured data. Search engines and social shares show nothing useful.
-- **Onboarding flow** — what happens when someone clicks "Open the app"? If DATABASE_URL isn't set, they get a 503.
-- **Blog index polish** — 43 posts, potentially overwhelming for a new reader.
-- **Hive autonomy** — make the loop self-running.
+Note from user: Google OAuth is in test mode (only Matt can access behind auth), and Fly/Neon resources can be bumped up if needed. This is useful context for future iterations — the app is functional but not open to public users yet.
 
-The Reflector should pick the next highest-value target.
+Candidates for iteration 8:
+- **App onboarding** — what does a first-time user experience when they click "Open the app"?
+- **Blog reading guide** — 43 posts is overwhelming, a curated entry point would help
+- **Hive autonomy** — making the loop self-running
+- **Neon DB setup** — if DATABASE_URL isn't set on Fly, the app returns 503

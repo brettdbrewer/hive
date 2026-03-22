@@ -1,25 +1,28 @@
-# Build Report — Iteration 6
+# Build Report — Iteration 7
 
 ## What I planned
 
-Rewrite the landing page to communicate product value clearly.
+Add SEO meta tags and Open Graph support to all pages.
 
 ## What I built
 
-Rewrote `views/home.templ`:
+1. **Modified Layout signature** — `Layout(title string)` → `Layout(title, description string)`. Added meta description, og:title, og:description, og:type, og:site_name, twitter:card, twitter:title, twitter:description to the `<head>`.
 
-1. **New hero** — headline "Coordination infrastructure that earns trust." Subtext explains concretely: manage tasks, post updates, hold discussions on an event graph. Two CTAs: "Open the app" + "Read the blog."
+2. **Updated all 11 call sites** across 3 template files:
+   - `home.templ` — concrete product description
+   - `blog.templ` — BlogIndex gets series description, BlogPost gets `post.Summary`
+   - `reference.templ` — each page type gets a contextual description:
+     - ReferenceIndex: ontology overview
+     - BaseGrammarPage: 15 operations description
+     - CognitiveGrammarPage: 3 base ops, 9 compositions
+     - LayerPage: reuses `layerDescription()` function
+     - AgentPrimitivesPage: 28 primitives description
+     - PrimitivePage: uses `prim.Description`
+     - GrammarIndex: 13 domain grammars description
+     - GrammarPage: uses `page.Summary`
 
-2. **Five lens cards** — shows all five views (Board, Feed, Threads, People, Activity) instead of just three. Top row of 3 + bottom row of 2. Each described in plain language with concrete actions.
-
-3. **How it works** — three-step flow: (1) Create a space, (2) Do things (create tasks, write posts, start discussions), (3) Switch lenses. Explains that each action is a named grammar operation without requiring the visitor to understand what that means.
-
-4. **Built on EventGraph** — bottom section connects to the bigger picture (signed hash-chained events, thirteen domains) with links to reference docs and GitHub. Frames lovyou.ai as "the first product, not the last."
-
-5. **Renamed `featureCard` to `lensCard`** — matches the actual terminology.
-
-Built, committed, pushed, deployed. Live at lovyou.ai.
+3. Built, committed, pushed, deployed. Live at lovyou.ai.
 
 ## Key finding
 
-This is the first iteration that produced new code AND shipped it to production in a single cycle. The loop's Orient → Ship → Build progression is working: iterations 1-4 calibrated, iteration 5 fixed deploy, iteration 6 built and deployed new code.
+Every page on lovyou.ai now has proper SEO metadata. The 43 blog posts each have their own summary as the meta description — these are the highest-value pages for search indexing since each one targets specific long-tail topics (AI accountability, event graphs, cognitive grammar, etc.).

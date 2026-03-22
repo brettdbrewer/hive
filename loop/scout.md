@@ -1,31 +1,23 @@
-# Scout Report — Iteration 6
+# Scout Report — Iteration 7
 
 ## Map (from code)
 
-Read state.md. Orient and Ship phases complete. Must build new code.
+Read state.md. Loop is in Build mode. Assessed layout.templ head section.
 
-**Home page assessment:**
-- Headline: "Trust earned, not assumed." — tagline, not product description
-- Subtext: "One graph. Fifteen operations. Every view you need." — meaningless to a new visitor
-- Three feature cards: Board, Feed, Threads — described in jargon ("grammar operations", "Express what matters")
-- No explanation of what the product IS or what a visitor can DO
-- No mention of EventGraph, GitHub, reference docs
-- Only shows 3 of 5 lenses (missing People, Activity)
-
-A new visitor learns: this is something about graphs and grammar. They don't learn: this is a place to manage projects, post updates, and have discussions with a full audit trail.
+**Finding:** Zero SEO. No meta description, no Open Graph tags, no twitter:card, no og:title. The site is invisible to search engines and renders as a blank card on social shares. 43 blog posts, 201+ reference pages — all without meta descriptions.
 
 ## Gap Type
 
-Missing quality — the home page doesn't communicate product value.
+Missing quality — every page lacks basic SEO and social sharing metadata.
 
 ## The Gap
 
-The landing page reads as a technical manifesto. A first-time visitor can't tell what lovyou.ai does, who it's for, or why they should try it. All five lenses should be shown, the three-step flow should be explained, and the bigger picture (EventGraph, thirteen domains) should be mentioned but not dominate.
+Layout template has only charset and viewport meta tags. No description, no OG tags, no Twitter card tags. This affects every page on the site.
 
 ## Why This Gap
 
-The home page is the highest-traffic entry point. Every visitor sees it. If it doesn't communicate, nothing else matters — blog, reference, app all become invisible. This is the highest-leverage code change available.
+Highest leverage for discoverability. 43 blog posts and 200+ reference pages with proper meta descriptions = 250+ pages indexed with relevant snippets instead of blank entries. Social shares (Twitter, Slack, Discord) will show title + description instead of nothing.
 
 ## Filled Looks Like
 
-A visitor landing on lovyou.ai understands within 10 seconds: (1) this is a coordination tool, (2) you can manage tasks, post updates, and discuss things, (3) it's all on one graph with full traceability, (4) there's a bigger vision behind it.
+Every page has meta description, og:title, og:description, og:type, og:site_name, twitter:card, twitter:title, twitter:description. Blog posts use their summary. Reference pages use contextual descriptions. Primitives use their definition.
