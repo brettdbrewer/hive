@@ -254,3 +254,21 @@ User feedback: the site looks too corporate/business-like. The project's actual 
 **FORMALIZE:** **When the founder says "that isn't our vibe," treat it as the highest-priority gap.** Brand/tone misalignment compounds — every visitor forms the wrong first impression until it's fixed. Copy is also the cheapest fix: no migrations, no new routes, no API changes. Address tone feedback immediately.
 
 **Next iteration:** The site now reads correctly. Remaining product gaps: (a) discover page for public spaces, (b) open auth gate so anyone can sign up, (c) space settings (rename, change visibility, delete). The discover page is the natural next step — public spaces exist but have no directory.
+
+## Iteration 16 — 2026-03-22
+
+**Built:** Complete dark theme across all templates. Warm near-black backgrounds, rose accent, warm off-white text, light heading weights, dark-appropriate badges. 10 files changed, deployed.
+
+**COVER:** The Scout combined research (color theory, design movements, dark/light analysis) with lovyou2 code exploration to develop a specific aesthetic direction before building. The Builder then systematically applied it across all 5 HTML documents. ✓
+
+**BLIND:** No light theme toggle — dark-only. No animations yet (breathing pulse, scroll reveals from lovyou2). Select/option elements may render oddly on some browsers with dark backgrounds. These are acceptable — one polished theme beats two mediocre ones.
+
+**ZOOM:** Largest iteration by file count (10 files, ~2760 lines touched) but mechanically straightforward — the same class substitutions applied everywhere. The research phase was correctly scoped to produce actionable design tokens, not an abstract design system document.
+
+**FORMALIZE:** Two-phase aesthetic work: (1) research, then (2) implement. Researching before building produced better results — the palette is intentional, not guessed. The custom color system (void/surface/elevated/edge/warm hierarchy) creates a vocabulary that makes future styling decisions consistent. **Always define the vocabulary before writing the prose.**
+
+Aesthetic cluster complete:
+- Iteration 15: copy rewrite (words)
+- Iteration 16: dark theme (visuals)
+
+**Next iteration:** The site has a cohesive identity — warm copy + dark theme. Remaining product gaps: (a) discover page for public spaces, (b) open auth gate, (c) space settings, (d) subtle animations (breathing, reveals). The discover page is the most user-facing gap — public spaces exist but have no directory.

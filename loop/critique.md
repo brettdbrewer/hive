@@ -1,26 +1,31 @@
-# Critique — Iteration 15
+# Critique — Iteration 16
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified corporate language as gap — "Coordination infrastructure that earns trust" reads like enterprise SaaS, not a place where humans and agents collaborate
-2. Builder rewrote all copy in home.templ and footer tagline in layout.templ
-3. Four files changed (2 templates + 2 generated), all in site repo
-4. Built, pushed, deployed — both machines healthy
+1. Scout identified visual identity gap — copy says warm, pixels say generic SaaS
+2. Research phase: color theory, dark/light analysis, typography, design movements
+3. Builder implemented complete dark theme across 5 templates + generated files
+4. 10 files changed, all in site repo
+5. Built, pushed, deployed — both machines healthy
 
-Sound chain. The gap was well-scoped: tone, not structure.
+Sound chain. Research informed design decisions rather than guessing.
 
 ## Audit
 
-**Correctness:** All copy accurately describes the product. "Five ways to see it" matches the five lenses. "43 posts" matches the blog count. Links point to correct routes. ✓
+**Correctness:** All templates use consistent custom color classes (bg-void, text-warm, etc.). Prose styles hardcoded to match theme. Badge functions updated for dark context. No color class mismatches found. ✓
 
-**Breakage:** No structural changes — same components, same routes, same data flow. Only string literals changed. Zero risk of regression. ✓
+**Breakage:** No structural or routing changes. Same components, same data flow. Only visual changes. Zero risk of functional regression. ✓
 
-**Tone:** The new copy reads as intended — warm, inviting, peer-oriented. "Humans and agents, building together" is the project's actual thesis. "Create a space for your project, your community, or just yourself" frames the product as personal, not enterprise. "Built in the open" signals transparency without jargon. ✓
+**Consistency:** All 5 HTML documents (layout, appLayout, SpaceIndex, SpaceOnboarding) share the same theme via themeBlock(). Prose styles in layout.templ use matching hex values. Badge helper functions all use the same semi-transparent pattern. ✓
 
-**Gaps (acceptable):** The reference section and blog still use some technical language — but that's appropriate for those contexts. The aesthetics work here is limited to copy; visual design (colors, spacing, illustrations) could evolve further but isn't a priority when the words are right.
+**Gaps (acceptable):**
+- No light theme toggle — dark-only for now. Correct decision: build one theme well before two.
+- No custom font loaded — using system fonts. Saves a network request and avoids FOUT.
+- No animations yet (breathing pulse, scroll reveals). These are future iterations.
+- Select/option elements may look odd on some browsers with dark backgrounds (browser chrome defaults). Minor.
 
 ## Observation
 
-Copy is the cheapest lever with the largest first-impression impact. This iteration changed ~50 lines of HTML text and shifted the entire site personality. The architectural investment of previous iterations (lenses, graph, public spaces) is now framed correctly for the audience.
+This is the biggest single-iteration change (10 files, ~2760 lines touched) but also one of the lowest-risk — purely visual, no data or routing changes. The research phase was essential: without it, the dark theme would have been "dark mode" instead of "Ember Minimalism." The palette choices (warm near-black, rose accent, warm off-white) give the site a distinctive identity that matches both the project's values and the lovyou2 inspiration.

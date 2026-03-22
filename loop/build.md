@@ -1,32 +1,42 @@
-# Build Report — Iteration 15
+# Build Report — Iteration 16
 
 ## What I planned
 
-Rewrite site copy and styling from corporate/enterprise language to warm, collaborative tone that matches the project's spirit: humans and agents building together.
+Apply a dark theme with warm rose accent across all site templates — layout, home, blog, reference, and graph/app views. Research-informed aesthetic: "Ember Minimalism."
 
 ## What I built
 
-Changes across 4 files (2 templates + 2 generated) in the site repo:
+Changes across 10 files (5 templates + 5 generated) in the site repo.
 
-1. **views/home.templ** — Complete copy rewrite:
-   - Hero: "Coordination infrastructure that earns trust" → "Humans and agents, building together."
-   - Meta description: "A place where humans and agents build together"
-   - CTA: "Open the app" → "Create a space" / "Read the blog" → "Read the story"
-   - Section: "Five views. One graph." → "Your space, five ways to see it"
-   - All five lens descriptions rewritten to be approachable and warm
-   - How it works step 2: "grammar operation on the event graph" → "Humans and agents both contribute"
-   - Bottom section: "Built on EventGraph" with hash-chain jargon → "Built in the open" with community narrative
-   - "43 posts on how we think about graphs, consciousness, grammar, and building things that actually help people"
+### Theme system (layout.templ @theme block)
+New Tailwind v4 custom colors replacing the old indigo-on-gray:
+- `--color-brand: #e8a0b8` (rose, was #6366f1 indigo)
+- `--color-void: #09090b` (page background, warm near-black)
+- `--color-surface: #111113` (cards/panels)
+- `--color-elevated: #18181b` (hover states, inputs)
+- `--color-edge: #1e1e22` (borders)
+- `--color-warm: #f0ede8` (primary text, warm off-white)
+- `--color-warm-secondary: #c8c4bc` (body text)
+- `--color-warm-muted: #78756e` (captions)
+- `--color-warm-faint: #4a4844` (disabled text)
 
-2. **views/layout.templ** — Footer tagline: "trust earned, not assumed" → "humans and agents, building together"
+### Templates updated
+1. **layout.templ** — theme colors, dark prose styles, dark header/footer
+2. **home.templ** — light heading weight (300), dark cards, dark CTA buttons
+3. **blog.templ** — dark blog cards, dark arc nav pills, dark post pages
+4. **reference.templ** — dark reference cards, dark spec tables, dark primitive pages
+5. **graph/views.templ** — shared themeBlock(), dark appLayout, dark sidebar, dark forms/inputs, dark badge colors (bg-indigo-500/15 instead of bg-indigo-100), updated helper functions (stateColorHex, priorityDotHex, stateBgClass, kindBadgeClass, opBadgeClass)
 
-## What works
+### Key design decisions
+- Button text: `text-void` (dark) on rose background, not white
+- Badges: semi-transparent backgrounds (`bg-indigo-500/15 text-indigo-400`) instead of light pastels
+- Headings: `font-light` (300) at large sizes for sacred minimalism feel
+- Prose: hardcoded hex colors match the theme (blockquote border = rose, code bg = elevated)
+- Ring offset: `ring-offset-void` for selected state buttons in dark context
+
+## Verification
 
 - `templ generate` — success
 - `go build -o /tmp/site.exe ./cmd/site/` — success
 - Committed and pushed to main
-- Deployed to Fly.io — both machines healthy, live at lovyou.ai
-
-## Key finding
-
-The tone shift was entirely in copy — no structural, routing, or data model changes needed. The page template structure (hero, lens cards, how-it-works, footer) remained the same. Good architecture lets you change the message without changing the machinery.
+- Deployed to Fly.io — both machines healthy
