@@ -1,15 +1,15 @@
-# Critique — Iteration 40
+# Critique — Iteration 41
 
 ## Verdict: APPROVED
 
 ## Audit
 
-- 303 redirect (SeeOther) is correct for GET → GET redirect. ✓
-- No-DB fallback preserved. ✓
-- Anonymous detection: `user.ID != "anonymous"` handles the anonymous wrapper case. ✓
-- Landing page still accessible via direct URL for logged-in users who want to see it? No — all `/` requests redirect. This is acceptable; the landing is for first-time visitors, not returning users.
+- Creation forms (Board, Feed, Threads, Reply) now match API permissions. ✓
+- Admin operations (state, edit, delete) remain owner-only. ✓
+- Consistent pattern: `user.Name != "" && user.Name != "Anonymous"` matches Conversations form (iter 31). ✓
+- `boardColumn` param renamed from `isOwner` to `canWrite` for clarity. ✓
 
 ## Gaps
 
-- No way for logged-in users to view the landing page (e.g., `/home` or `/?landing=1`). Minor — they've already converted.
-- `/app` could be smarter — show recent conversations, not just spaces list. Future iteration.
+- The `isOwner` param is still passed to `BoardView`, `FeedView`, `ThreadsView`, and `NodeDetailView` for admin operations. Could be refactored to pass both `isOwner` and `canWrite` as separate booleans for clarity. Minor — the current approach works.
+- No per-node ownership check. Any authenticated user can reply to any node. This is correct for the collaboration model but will need per-node permissions when untrusted users join.

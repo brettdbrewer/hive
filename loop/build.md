@@ -1,16 +1,18 @@
-# Build Report — Iteration 40
+# Build Report — Iteration 41
 
 ## What Was Built
 
-Logged-in redirect: `/` → `/app` for authenticated users.
+Opened creation forms to all authenticated users on public spaces. Previously Board, Feed, Threads, and Reply forms were `isOwner`-gated — only space owners could see them. Now any authenticated user can create tasks, posts, threads, and replies.
 
-**site/cmd/site/main.go**:
-- Home route moved from early registration to after auth setup
-- Wrapped with `readWrap` (OptionalAuth) to detect session
-- If `user != nil && user.ID != "anonymous"`, redirect 303 to `/app`
-- Anonymous visitors still see the landing page
-- No-DB fallback: home route registered without auth (always shows landing)
+**Changes (views.templ only):**
+- Board "New task" button: `isOwner` → `user.Name != "" && user.Name != "Anonymous"`
+- Board column inline form: `isOwner` → `canWrite` (renamed param)
+- Feed "New post" form: same change
+- Threads "New thread" form: same change
+- Node detail reply form: same change
+
+**Preserved as owner-only:** Node state changes, node edit, node delete, space settings.
 
 ## Files Changed
 
-- `site/cmd/site/main.go` — 12 lines (route move + conditional redirect)
+- `site/graph/views.templ` — 5 conditionals changed from `isOwner` to auth check

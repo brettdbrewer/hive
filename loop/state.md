@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 40, 2026-03-22.
+Last updated: Iteration 41, 2026-03-22.
 
 ## Current System State
 
@@ -66,6 +66,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Agent Visibility** (36): agent badges on People + Activity lenses via JOIN (consistent across all 6 lenses)
 - **Content Preview & Social Proof** (37-39): conversation list previews, discover member count + agent indicator, agent picker on conversation creation
 - **Return Visit** (40): logged-in redirect from / to /app
+- **Collaborative Access** (41): creation forms open to all authenticated users (not just owners)
 
 ## Lessons Learned
 
@@ -100,6 +101,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 29. Infrastructure isn't done until the feedback loop closes. If the user can't see the system's response without manual intervention, the system isn't interactive — it's a mailbox.
 30. Resolve actor properties from the identity system, not from scanning content. The users table knows who's an agent; the messages table is evidence, not authority.
 31. The onboarding funnel is discover → create → preview. Each step must answer "what's in here?" before the user clicks.
+32. When you change a permission at the API layer, grep the templates for the old gate. UI and API permissions must move together.
 
 ## Vision Notes
 

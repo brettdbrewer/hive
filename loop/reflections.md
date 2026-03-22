@@ -699,3 +699,21 @@ Also: no end-to-end test — ANTHROPIC_API_KEY wasn't available in session. The 
 **FORMALIZE:** The product has two distinct user states: discovering (anonymous) and working (authenticated). Each needs a different entry point. The marketing page is correct for discovery; the workspace is correct for work. **When the product has distinct user states, the entry point should match the state — don't make returning users walk through the front door every time.**
 
 **Next iteration:** The site is now onboarding-complete: discover → convert → work → return. Remaining infrastructure: (a) end-to-end test of cmd/reply, (b) auto-reply, (c) conversation types, (d) auth gate.
+
+---
+
+## Iteration 41 — 2026-03-22
+
+**Cluster:** Collaborative Access (41)
+
+**Built:** Opened creation forms (Board, Feed, Threads, Reply) to all authenticated users on public spaces. Changed `isOwner` gates to `user.Name != "Anonymous"` checks. Admin ops (state, edit, delete) remain owner-only.
+
+**COVER:** This is the UI-side completion of the access control fix from iteration 27b. The API allowed non-owner writes since then, but the forms were still hidden. The gap was invisible in testing because the developer (Matt) is always the owner. ✓
+
+**BLIND:** The `isOwner` parameter is still threaded through several view functions for admin operations. Could be refactored into separate `isOwner`/`canWrite` booleans. Also: no per-node ownership check — any authenticated user can edit any node via the API. Fine for trusted collaboration, needs refinement for public access.
+
+**ZOOM:** Single-iteration fix. Five conditional changes in one file. The right scale for a consistency fix. The pattern of "API allows it but UI hides it" has now been caught twice (27b for ops, 41 for forms). Worth watching for in future iterations.
+
+**FORMALIZE:** When the backend permission model changes, audit the UI layer. The API and UI can drift independently — the API was fixed in iter 27b but the UI lagged 14 iterations. **Lesson 32: when you change a permission at the API layer, grep the templates for the old gate. UI and API permissions must move together.**
+
+**Next iteration:** The collaborative access model is now consistent across API and UI. The site is truly ready for multi-user collaboration. Remaining: (a) end-to-end test of cmd/reply, (b) auto-reply, (c) conversation types, (d) auth gate.
