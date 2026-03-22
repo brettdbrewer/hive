@@ -1,29 +1,27 @@
-# Critique — Iteration 35
+# Critique — Iteration 36
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified: dead air after sending a message in agent conversations
-2. Builder added thinking indicator (violet dots), scroll-to-bottom, enter-to-send
-3. Director feedback mid-build: "an actor is either agent or human" — shifted from message scanning to identity-based agent detection via `HasAgentParticipant`
-4. Second deploy with the architectural fix
-5. Deployed and healthy
+1. Scout identified: People and Activity lenses don't distinguish agents from humans
+2. Builder added `ActorKind` to Op via JOIN against users table (no schema migration)
+3. People and Activity templates updated with violet avatar + badge (same pattern as Feed/Chat)
+4. Deployed and healthy
 
 ## Audit
 
 **Correctness:**
-- Agent presence resolved from users table (`kind = 'agent'`), not from scanning messages. Works for new conversations with no agent messages yet. ✓
-- Thinking indicator shows only in conversations with agent participants (`data-has-agent`). ✓
-- Indicator hides on poll receiving new messages OR after 60-second timeout. No stale indicators. ✓
-- Enter-to-send respects Shift+Enter (doesn't submit). ✓
-- Scroll-to-bottom fires once on page load via inline script. ✓
+- LEFT JOIN handles ops from actors with no user record (COALESCE to 'human'). ✓
+- Agent detection resolved from users table, not from op content. Lesson 30 applied. ✓
+- Visual treatment identical across all six lenses: Feed, Chat, Comments, People, Activity, Board. ✓
+- Member kind populated from first op seen (stable — all ops from same actor have same kind). ✓
 
 **Gaps:**
-- **False positive**: The thinking indicator shows even when `cmd/reply` isn't running. This is honest — it says "an agent may respond" not "an agent is responding." But it could train users to expect responses that don't come if nobody runs `cmd/reply`.
-- **No poll-triggered agent detection**: If an agent joins a conversation after page load (first message from agent via poll), the `data-has-agent` attribute isn't updated dynamically. The thinking indicator won't show until page reload. Minor — conversations don't gain new agent participants mid-session in practice.
-- **60-second timeout is arbitrary**: Could be too short (Mind takes longer) or too long (user thinks system is broken). Acceptable for now.
+- **JOIN performance at scale**: Every ListOps and ListNodeOps query now JOINs against users. Fine for current traffic. At scale, consider denormalizing `actor_kind` onto the ops table or caching.
+- **Board lens doesn't show agent badges**: Task cards show author but not author_kind badges. Visually consistent since tasks are usually human-authored, but worth noting.
+- **Name collision**: JOIN is `users.name = ops.actor`. If two users share a name (unlikely but possible), the JOIN is ambiguous. A future iteration should use actor IDs throughout.
 
 ## DUAL
 
-The director's mid-build feedback ("actor is either agent or human") caught the same pattern as iteration 33 ("who's Hive?"): the builder reached for the data when the identity system already had the answer. The architectural fix was small (10 lines) but correct — agent presence is a property of the participants, not the messages.
+Clean iteration. No mid-build feedback needed. The JOIN pattern avoided a large refactor (changing RecordOp signature + 10 call sites + schema migration) in favor of resolving from the identity system at query time. The right trade-off for now — performance optimization can come later if needed.

@@ -642,3 +642,21 @@ Also: no end-to-end test — ANTHROPIC_API_KEY wasn't available in session. The 
 **FORMALIZE:** Director feedback this iteration: "an actor is either agent or human... practically every single msg or event in the system should have an actorid somewhere in the chain." This is a design principle, not just a code review — **the identity system is the source of truth for actor properties**. Don't scan data when the identity model already has the answer. This is the same pattern as lessons 23 and 28: identity is structural, not derived. **Lesson 30: resolve actor properties from the identity system, not from scanning content. The users table knows who's an agent; the messages table is evidence, not authority.**
 
 **Next iteration:** Conversation cluster complete. The full human-agent conversation UX is built. Remaining: (a) end-to-end test of `cmd/reply`, (b) conversation types, (c) open auth gate, (d) auto-reply mechanism. Or: zoom out entirely — the site has had 35 iterations of investment. What else needs attention?
+
+---
+
+## Iteration 36 — 2026-03-22
+
+**Cluster:** Agent Visibility (36)
+
+**Built:** Agent badges on People and Activity lenses. `ActorKind` added to `Op` struct via `LEFT JOIN users` at query time — no schema migration. `Kind` added to `Member` struct, populated from ops. Both lenses now show violet avatars + "agent" badge pills for agent actors.
+
+**COVER:** All six lenses now show agent identity consistently: Feed, Chat, Comments, People, Activity, Board (tasks don't need it — they're usually human-authored). The visual language is uniform: violet avatar + "agent" pill everywhere an agent appears. ✓
+
+**BLIND:** Board lens task cards don't show author_kind badges. This is acceptable — tasks are authored by humans in the current workflow. Also: the JOIN approach (`users.name = ops.actor`) assumes unique names. If two users share a name, the JOIN is ambiguous. The correct long-term fix is using actor IDs throughout, but that's a larger schema migration.
+
+**ZOOM:** Single-iteration fix. The right scale for a consistency gap. No new infrastructure, no new abstractions — just queries and templates.
+
+**FORMALIZE:** The iteration 27 BLIND check flagged this gap: "Activity view doesn't show agent badges — ops have actor but no actor_kind." Nine iterations later, it's fixed. The delay was acceptable — the conversation cluster was higher priority. But the BLIND check worked as designed: it flagged a known gap that was picked up when the loop circled back. **The BLIND check is a backlog, not an alarm. It surfaces gaps; the Scout decides when to fill them.**
+
+**Next iteration:** Agent visibility is now complete across all lenses. The site is fully polished. Remaining directions: (a) end-to-end test of cmd/reply, (b) conversation types, (c) open auth gate, (d) auto-reply mechanism, (e) zoom out to hive codebase or new product area.

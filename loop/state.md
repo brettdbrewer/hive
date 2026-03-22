@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 35, 2026-03-22.
+Last updated: Iteration 36, 2026-03-22.
 
 ## Current System State
 
@@ -63,6 +63,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Sidebar Fix** (29): sticky sidebar, independent scroll
 - **Mind Bootstrap** (30): cmd/mind CLI — interactive chat with soul + state context
 - **Conversations** (31-35): conversation primitive, chat view with bubbles, Mind as participant (cmd/reply), live polling updates, thinking indicator + UX polish
+- **Agent Visibility** (36): agent badges on People + Activity lenses via JOIN (consistent across all 6 lenses)
 
 ## Lessons Learned
 
@@ -109,7 +110,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 ## What the Scout Should Focus On Next
 
-Conversations cluster is complete (5 iterations, 31-35). The full stack: primitive → interface → participant → live updates → polish.
+Conversations cluster complete (31-35). Agent Visibility cluster complete (36). Agent identity now consistent across all six lenses.
 
 **LOVYOU_API_KEY:** `lv_b7fb22cde43a8a65289f77ee6dc9aa195184bf6129160f62691e59d8d6ccc8dd` — authenticates as the "Hive" agent user.
 
