@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 18, 2026-03-22.
+Last updated: Iteration 19, 2026-03-22.
 
 ## Current System State
 
@@ -11,7 +11,7 @@ Five repos, all compiling and tested:
 - **agent** — unified Agent with deterministic identity, FSM, causality tracking. Complete.
 - **work** — task store for hive agent coordination. Complete.
 - **hive** — 4 agents (Strategist, Planner, Implementer, Guardian), agentic loop, budget. Complete. Has CI.
-- **site** — lovyou.ai on Fly.io. Production-ready. Has CI. **Dark theme + warm copy + discover + space settings.**
+- **site** — lovyou.ai on Fly.io. Production-ready. Has CI. **Dark theme, mobile responsive, full product.**
 
 **Product features:**
 - Blog (43 posts, 6 arcs with section nav)
@@ -19,10 +19,11 @@ Five repos, all compiling and tested:
 - Auth (Google OAuth — test mode, can be opened whenever)
 - Unified graph product (3 tables, 10 grammar ops, 5 lenses, HTMX, full CRUD)
 - Public spaces (private/public visibility, OptionalAuth for reads)
-- **Discover page** (`/discover`) — public space directory, grid of cards, kind badges, no auth required
-- **Space settings** — edit name, description, visibility; delete with name confirmation
+- Discover page (`/discover`) — public space directory
+- Space settings — edit name, description, visibility; delete with confirmation
+- **Mobile responsive** — lens tab bar, compact headers, responsive footer
 - Landing page, SEO meta tags, sitemap (306 URLs), canonical redirect
-- **Visual identity**: dark theme (near-black #09090b), rose accent (#e8a0b8), warm off-white text (#f0ede8), light heading weights, "Ember Minimalism"
+- Visual identity: "Ember Minimalism" — dark theme, rose accent, warm text
 
 Deploy: `fly deploy --remote-only` from site repo.
 
@@ -38,6 +39,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Aesthetics** (15-16): warm copy rewrite, dark theme with rose accent
 - **Discovery** (17): `/discover` page for browsing public spaces
 - **Space Management** (18): settings page (edit, visibility toggle, delete)
+- **Mobile Responsiveness** (19): lens tab bar, compact headers, responsive layout
 
 ## Lessons Learned
 
@@ -54,8 +56,9 @@ Deploy: `fly deploy --remote-only` from site repo.
 11. Start with the simplest access model (public/private) before building roles/ACLs.
 12. When the founder says "that isn't our vibe," treat it as highest-priority.
 13. Define the vocabulary before writing the prose — custom color tokens make future styling consistent.
-14. Expose what you've already built before building more — wiring existing code to a route is faster than new infrastructure.
-15. Close the CRUD loop before adding new features — incomplete CRUD is a hidden product tax.
+14. Expose what you've already built before building more.
+15. Close the CRUD loop before adding new features.
+16. If the sidebar is hidden on mobile, something else must replace it — test on smallest screen.
 
 ## Vision Notes
 
@@ -69,12 +72,12 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 ## What the Scout Should Focus On Next
 
-Space management complete. Full CRUD lifecycle exists. Options:
+The site is functionally complete for public launch. Everything works on desktop and mobile. Options for refinement:
 
-1. **Open auth gate** — switch Google OAuth from test mode to production (Google Console action, not code). Biggest product unlock but not a code iteration.
-2. **Subtle animations** — breathing pulse on brand elements, scroll reveals, gentle transitions. Would add life to the dark theme. Pure CSS/JS, no backend changes.
-3. **Space previews on discover** — show node count, recent activity, member count on discover cards. Requires a store query enhancement + view update.
-4. **Grammar op labels** — rename operations in the UI from internal names (intend, express, decompose) to user-friendly labels (Create task, Post, Add subtask).
-5. **Mobile responsive sidebar** — sidebar is `hidden md:block`, so mobile users can't navigate between lenses.
+1. **Subtle animations** — breathing pulse on brand elements, scroll reveals, gentle transitions. Would add life to the dark theme. Pure CSS, no backend.
+2. **Space previews on discover** — show node count, recent activity on discover cards. Store query + view update.
+3. **Grammar op labels** — user-friendly names in the UI (e.g., "Create task" instead of "intend"). Small UX improvement.
+4. **Open auth gate** — switch Google OAuth to production (Google Console action, not code).
+5. **Blog post** — write about what was built (the loop, the product, the aesthetic).
 
-The animations and mobile responsiveness are the most visible gaps for visitors. Space previews adds more depth to the discover page.
+Animations would give the site the most distinctive feel. The product works — now it needs to breathe.

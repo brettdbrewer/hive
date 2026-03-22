@@ -1,32 +1,38 @@
-# Build Report — Iteration 18
+# Build Report — Iteration 19
 
 ## What I planned
 
-Add space settings — update name, description, visibility after creation, and delete spaces. Fix stale auth callback redirect.
+Make the site usable on mobile — the app sidebar is completely hidden (`hidden md:block`), and header nav overflows on small screens.
 
 ## What I built
 
-Changes across 5 files in the site repo.
+Changes across 4 files (2 templates + 2 generated) in the site repo.
 
-### Store: graph/store.go
-- `UpdateSpace(ctx, id, name, description, visibility)` — updates mutable fields
-- `DeleteSpace(ctx, id)` — removes space (nodes and ops cascade via FK)
+### Mobile lens bar (graph/views.templ)
+- New `mobileLensTab` component — compact horizontal tab with active state highlighting
+- Horizontal scrollable lens bar (`md:hidden`) placed between header and main content
+- Shows Board, Feed, Threads, People, Activity, Settings as compact tabs
+- Uses `overflow-x-auto` for smooth horizontal scroll on narrow screens
 
-### Handlers: graph/handlers.go
-- `GET /app/{slug}/settings` → `handleSpaceSettings` — renders settings form (writeWrap, owner only)
-- `POST /app/{slug}/settings` → `handleUpdateSpace` — saves changes, validates non-empty name
-- `POST /app/{slug}/delete` → `handleDeleteSpace` — requires typing space name to confirm
-- All three routes use `writeWrap` (RequireAuth) and `spaceFromRequest` (owner check)
+### App header responsive (graph/views.templ)
+- Desktop nav links hidden on mobile (`hidden md:flex`)
+- Breadcrumb simplified: "lovyou.ai / Space Name" on mobile (drops "App" segment)
+- Space name truncated with `truncate` class
+- Padding reduced to `px-4` on mobile, `md:px-6` on desktop
 
-### Views: graph/views.templ
-- `SettingsView(space, spaces, user, errMsg)` — settings page with two sections:
-  - General: name input, description textarea, visibility select (private/public with explanatory text)
-  - Danger zone: red-bordered section with name confirmation input for deletion
-- `settingsIcon()` — gear SVG icon for sidebar
-- Settings added to sidebar lens nav (appears after Activity)
+### simpleHeader responsive (graph/views.templ)
+- Separate mobile nav (`flex md:hidden`) with just App + Discover + avatar
+- Full nav preserved for desktop (`hidden md:flex`)
 
-### Auth fix: auth/auth.go
-- Callback redirect changed from `/work` to `/app` (eliminates double-redirect)
+### Content pages responsive (views/layout.templ)
+- Header: mobile nav shows App, Blog, Ref (abbreviated); desktop shows all 5 links
+- Main content: reduced padding on mobile (`px-4 py-8` vs `md:px-6 md:py-12`)
+- Footer: stacks vertically on mobile (`flex-col md:flex-row`)
+
+### Board view responsive (graph/views.templ)
+- Reduced padding on mobile (`p-4 md:p-6`)
+- Title truncates on narrow screens
+- Board already uses `overflow-x-auto` for horizontal scroll — no change needed
 
 ## Verification
 

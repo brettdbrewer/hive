@@ -308,3 +308,21 @@ Aesthetic cluster complete:
 **FORMALIZE:** Space settings completes the CRUD lifecycle: Create (iter 14), Read (always existed), Update + Delete (iter 18). Incomplete CRUD is a hidden product tax — users who can't edit feel trapped. **Close the CRUD loop before adding new features.**
 
 **Next iteration:** Space management complete. Remaining: (a) open auth gate (Google Console, not code), (b) subtle animations (breathing, scroll reveals), (c) space previews on discover cards. Since auth gate is a manual action, the next code gap is either animations or functional enhancements.
+
+---
+
+## Iteration 19 — 2026-03-22
+
+**Cluster:** Mobile Responsiveness (19)
+
+**Built:** Mobile navigation for the entire site. Horizontal lens tab bar (`md:hidden`) for the app so mobile users can switch views. Compact header nav for content pages (App/Blog/Ref on mobile, full set on desktop). Responsive footer (stacks vertically). Reduced padding throughout. 4 files changed, deployed.
+
+**COVER:** Scout identified that the sidebar was `hidden md:block` — completely invisible on mobile. This meant ~50% of web traffic would see broken navigation. Builder used a CSS-only approach (Tailwind breakpoints, no JS) to add a mobile lens bar and split headers into mobile/desktop variants. ✓
+
+**BLIND:** No hamburger menu — mobile nav is abbreviated rather than collapsible. This trades completeness for simplicity: mobile users see the most important links (App, Blog) but not all five. No touch-specific interactions (swipe between lenses). Feed/threads/people views weren't individually checked for mobile layout but use `max-w-2xl` which adapts naturally.
+
+**ZOOM:** The mobile lens bar is the key innovation — a horizontal scrollable tab strip that appears only below `md` breakpoint. No JavaScript state, no toggle logic, no animation. Just a `nav` with `overflow-x-auto` and compact `px-3 py-1.5` tabs. Same pattern used by many mobile web apps.
+
+**FORMALIZE:** Test on the smallest screen, not just the default browser window. Desktop-first development creates invisible gaps for mobile visitors. **If the sidebar is hidden on mobile, something else must replace it.**
+
+**Next iteration:** Mobile responsiveness complete. Site is usable on all screen sizes. Remaining product gaps: (a) subtle animations for polish, (b) space previews on discover cards, (c) grammar op labels (user-friendly names). The site is functionally complete for public launch — everything after this is refinement.

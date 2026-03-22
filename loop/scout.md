@@ -1,36 +1,30 @@
-# Scout Report — Iteration 18
+# Scout Report — Iteration 19
 
 ## Map (from code + state)
 
-Read state.md. Discovery cluster complete (iter 17). Auth gate is a Google Cloud Console action, not code — skip.
+Read state.md. Space management cluster complete (iter 18). CRUD lifecycle closed.
 
-Examined space management: `CreateSpace()` exists with visibility set at creation time. But no `UpdateSpace()`, no `DeleteSpace()`. No settings route, handler, or UI. Once a space is created, its name, description, and visibility are permanently frozen.
-
-Also: auth callback (auth.go:228) redirects to `/work` instead of `/app`. Works via double-redirect through the `/work` → `/app` handler, but wasteful.
+Examined mobile experience: the app sidebar is `hidden md:block` — completely invisible on screens < 768px. Mobile users see space content but have no way to switch between lenses (Board, Feed, Threads, People, Activity, Settings). The header nav in both layout.templ and appLayout also has no mobile adaptation — 5+ links at `gap-6` will overflow on small screens.
 
 ## Gap Type
 
-Missing feature — spaces have no settings page.
+Missing feature — no mobile navigation.
 
 ## The Gap
 
-Spaces cannot be managed after creation. No way to:
-- Change visibility (private ↔ public) — critical for the discover page to be useful
-- Edit name or description
-- Delete a space
-
-The discover page (iter 17) makes visibility changes important: a user builds something in private, then needs to make it public so it appears on `/discover`.
-
-Auth callback has a stale redirect to `/work` instead of `/app`.
+On mobile:
+1. **App sidebar gone** — lenses, space list, and "New space" link are all invisible. User is trapped on whatever lens they landed on.
+2. **Header nav overflow** — 5 links in a row with gap-6 wraps poorly on narrow screens.
+3. **App header breadcrumb** — "lovyou.ai / App / Space Name" plus nav links is too wide for mobile.
 
 ## Why This Gap
 
-If users can't change visibility after creation, the discover page's value is limited. Users must know at creation time whether they want a public space. The natural workflow is: create private → build → make public when ready.
+The site is publicly deployed. Anyone can visit on a phone. If the app product is inaccessible on mobile, the whole experience breaks for ~50% of web traffic.
 
 ## Filled Looks Like
 
-1. Store methods: `UpdateSpace()`, `DeleteSpace()`
-2. Handlers: `GET /app/{slug}/settings` (settings form), `POST /app/{slug}/settings` (update), `POST /app/{slug}/delete` (delete with confirmation)
-3. Views: settings page with name/description/visibility form + danger zone delete
-4. Sidebar: "Settings" link in lens nav
-5. Auth callback: redirect to `/app` instead of `/work`
+1. **Mobile lens bar** — horizontal scrollable lens nav below the header, visible only on mobile (`md:hidden`). Shows lens icons/labels as compact tabs.
+2. **Hamburger menu** for header nav — collapse nav links behind a toggle on small screens.
+3. **Or simpler:** add a compact horizontal lens strip at the top of the main content area on mobile, keep the full sidebar on desktop.
+
+The simplest approach: a horizontal lens strip (`md:hidden`) above the main content on mobile, since adding a hamburger menu with JS state management adds complexity.
