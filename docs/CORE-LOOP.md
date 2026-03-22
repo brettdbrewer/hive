@@ -113,6 +113,11 @@ AUDIT: Compare what was built against what should exist.
 - Simplicity: is there a simpler way?
 - Security: any vulnerabilities?
 
+DUAL: When something fails, don't just validate forward (trace the
+chain). Also analyze backward — find the failure, then trace WHY it
+exists (root cause analysis). Validate and root cause analysis are
+duals: same operations, opposite starting points.
+
 EXHAUSTIVE: Check every changed file. Run every test. Trace every
 code path. Don't sample.
 
@@ -140,6 +145,12 @@ BLIND: What are we NOT seeing? What assumptions might be wrong?
 What parts of the system haven't been touched in many iterations?
 What would someone outside this loop notice? Flag uncertainty
 honestly — Blind is structurally hard to perform alone.
+
+FIXPOINT CHECK: If the Scout found no gaps, or if the last several
+iterations all feel "complete," that's a local fixpoint — not proof
+of global completeness. Invoke Blind hardest when everything feels
+done. The feeling of completeness is the strongest signal that
+external input is needed.
 
 ZOOM: Are we at the right scale? Too granular (polishing details
 when the foundation is shaky)? Too big (attempting rewrites when
@@ -178,6 +189,36 @@ The cognitive grammar has nine operations (three base applied to three base). Th
 ```
 
 Every cell is filled. No operation is performed by two agents (no redundancy). No cell is empty (no gap). Four agents, nine operations, complete coverage.
+
+## Higher-Order Structure
+
+Post 44 examined the operations *on* operations — what you can do with the nine cognitive operations beyond composing them. Three results directly shape how the loop runs:
+
+### Pipeline Ordering
+
+The optimal sequence for applying operations is **Need first, Traverse second, Derive third.** Detect absence → navigate to it → fill it. Gap → Navigate → Produce. This isn't arbitrary — it mirrors the derivation method's own step order and falls out of the grammar's structure.
+
+The loop already follows this at the macro level: Scout identifies gaps (Need), Builder navigates and produces (Traverse + Derive), Critic detects problems (Need), Reflector calibrates (Need + Traverse + Derive). Within each agent, prompts should also follow this ordering — assess what's missing before exploring, explore before producing.
+
+### Fixpoint Awareness
+
+Each base operation has a terminal state. Derive's fixpoint is tautology (deriving produces itself). Traverse's fixpoint is circularity (navigation leads back to start). Need's fixpoint is completeness (no gaps detected). When all three fixpoints are reached simultaneously, the system has either finished or stalled — and the grammar can't distinguish between the two from inside.
+
+**When the Scout finds no gaps, that's a local fixpoint, not proof of global completeness.** "No gaps detected" means "no gaps from this vantage." The Reflector's BLIND operation becomes critical at fixpoints — it's the only operation designed to question whether convergence is genuine. When the loop feels done, invoke Blind hardest.
+
+### Irreversibility
+
+The cognitive operations are irreversible. You can't un-derive, un-traverse, or un-need. The closest thing to an inverse is Revise (Need + Derive), which *supersedes* rather than undoes. The original isn't deleted — it's marked as superseded by something newer.
+
+This is why `loop/reflections.md` is append-only and `loop/state.md` is overwritten (superseded) each iteration rather than edited in place. The architecture mirrors the epistemology: knowledge accumulates, it never retracts. The wrong thing is still there in the history; it's just been superseded. You can trace back and understand *why* it was wrong.
+
+### Depth
+
+Iterating any operation (f(f(f(x)))) produces the same operation at increasing levels of meta-reflection. The grammar converges in 3-4 passes — beyond that, you're doing the same thing with longer sentences. This sets the practical ceiling for meta-reflection: the Reflector should reflect on the loop (depth 1) and occasionally on its own reflection patterns (depth 2), but depth 3+ is diminishing returns.
+
+### Duality
+
+Derive and Need are duals — fill and detect-emptiness. Every named function has a dual with the same operations in reversed order. Validate (Trace + Audit) dualizes to root cause analysis (Audit + Trace — find the failure, then trace backwards from it). The Critic should use both: validate forward (does the chain hold?) and analyze backward (if something fails, why?).
 
 ## Self-Application
 

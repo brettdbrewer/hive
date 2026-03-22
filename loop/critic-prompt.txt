@@ -8,6 +8,8 @@ AUDIT:
 - Simplicity: is there a simpler way?
 - Security: any vulnerabilities?
 
+DUAL: When something fails, don't just validate forward. Also analyze backward — find the failure, trace WHY it exists (root cause analysis).
+
 Check every changed file. Run the build. Trace the code paths.
 
 Write to loop/critique.md:
