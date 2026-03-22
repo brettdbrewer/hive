@@ -1,11 +1,9 @@
-# Scout Report — Iteration 49
+# Scout Report — Iteration 50
 
-## Gap: Identity system uses names as identifiers (13 bugs)
+## Gap: Tags display raw hex IDs instead of names
 
-Every identity reference in the codebase — author, actor, assignee, conversation participants — stores and matches on display names instead of user IDs. This broke when Matt's OAuth name ("Matt Searles") didn't match "Matt" in conversation tags.
+Iter 49 changed tags to store user IDs (correct). But the templates render `tag` directly — showing `36509418df854dd4a709cfee3e915a17` instead of "hive". Also, existing data (30 nodes, 30 ops) had empty `author_id`/`actor_id` columns.
 
-This is not a polish gap. It's a broken data model that would fail at any scale beyond one user.
+## What "Filled" Looks Like
 
-## Root Cause
-
-The loop failed to catch this. The Critic's AUDIT checklist had correctness, breakage, simplicity, security — but no identity check. 49 iterations of code built on name-matching without a single agent flagging it.
+Conversation list and detail views show participant display names (resolved from IDs). Existing data has `author_id`/`actor_id` populated.
