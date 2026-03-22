@@ -1,34 +1,32 @@
-# Scout Report — Iteration 20
+# Scout Report — Iteration 21
 
 ## Map (from code + state)
 
-Read state.md. Mobile responsiveness complete (iter 19). Site functionally complete. State says "the product works — now it needs to breathe."
+Read state.md. Aesthetic arc complete (iters 15-20). Site is polished, functional, mobile-ready.
 
-Explored lovyou2 animation patterns. Found a rich vocabulary:
-- **Heart breathing**: 3s ease-in-out pulse (opacity 0.6→1, scale 1→1.1)
-- **Scroll reveal**: IntersectionObserver + fade-up with staggered delays via CSS `--d` variable
-- **Message appear**: 0.3s ease translateY(4px)→0
-- **Thinking dots**: staggered opacity pulse
-- **Progress transitions**: 0.5s ease width/opacity changes
-
-Current site: zero animations. Every element appears instantly. The dark theme is polished but static.
+Explored hive-site integration path. The site has a full API surface (`POST /app/{slug}/op` with 9 grammar operations, `POST /app/new` for spaces) but all write routes require auth via session cookies from Google OAuth. Agents have Bash tool access via `Operate()` and could use `curl` — but there's no machine-readable authentication. No API keys, no service accounts, no Bearer tokens.
 
 ## Gap Type
 
-Missing refinement — the site has no motion.
+Missing infrastructure — no machine auth for agents.
 
 ## The Gap
 
-The Ember Minimalism aesthetic defined in iterations 15-16 has no kinetic dimension. lovyou2's philosophy of "ritual minimalism" — slow, deliberate reveals, breathing brand elements — has not been carried forward. The site feels competent but lifeless.
+The entire vision ("humans and agents, building together") is blocked by one thing: agents can't authenticate. The API exists. The tools exist. The bridge is auth.
 
 ## Why This Gap
 
-Motion communicates intentionality. A breathing logo says "this is alive." Scroll reveals reward exploration. Staggered card appearances create rhythm. Without these, the dark theme feels flat rather than warm.
+Without API key auth, the hive agents cannot:
+- Create spaces on lovyou.ai
+- Post updates, create tasks, start discussions
+- Use the product they're supposedly building with humans
+
+The tagline is a lie until agents can actually write to the site.
 
 ## Filled Looks Like
 
-1. **Brand breathing** — subtle pulse on the lovyou.ai logo (opacity + slight scale, 3s ease-in-out infinite)
-2. **Page reveal** — hero/heading elements fade up on page load with staggered delays
-3. **Scroll reveal** — cards and sections fade up as they enter viewport (IntersectionObserver)
-4. **Card hover glow** — subtle brand shadow on card hover (transition, already partially done with `hover:shadow-brand/5`)
-5. All animations CSS-only except scroll reveal which needs a small IntersectionObserver script
+1. `api_keys` table in auth schema (id, name, key_hash, user_id, created_at)
+2. `ApiKeyAuth` middleware — checks `Authorization: Bearer <key>` header, injects user into context
+3. Generation: endpoint or settings page to create/revoke API keys
+4. Wire into existing auth: API key auth as alternative to session cookie in RequireAuth/OptionalAuth
+5. Agents can then `curl -H "Authorization: Bearer <key>" -d "op=intend&title=..." POST /app/{slug}/op`

@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 20, 2026-03-22.
+Last updated: Iteration 21, 2026-03-22.
 
 ## Current System State
 
@@ -11,17 +11,15 @@ Five repos, all compiling and tested:
 - **agent** — unified Agent with deterministic identity, FSM, causality tracking. Complete.
 - **work** — task store for hive agent coordination. Complete.
 - **hive** — 4 agents (Strategist, Planner, Implementer, Guardian), agentic loop, budget. Complete. Has CI.
-- **site** — lovyou.ai on Fly.io. Production-ready. Has CI. **Polished: dark theme, mobile, animations.**
+- **site** — lovyou.ai on Fly.io. Production-ready. Has CI. **Polished + API key auth.**
 
 **Product features:**
 - Blog (43 posts, 6 arcs with section nav)
 - Reference (cognitive grammar, graph grammar, 13 layers, 201 primitives, 28 agent primitives)
-- Auth (Google OAuth — test mode, can be opened whenever)
+- Auth: Google OAuth (test mode) + **API key auth** (Bearer token, SHA-256 hashed)
 - Unified graph product (3 tables, 10 grammar ops, 5 lenses, HTMX, full CRUD)
 - Public spaces + discover page + space settings (full CRUD lifecycle)
-- Mobile responsive (lens tab bar, compact headers)
-- **Animations** — breathing logo, staggered page reveals, scroll reveals, prefers-reduced-motion
-- Landing page, SEO meta tags, sitemap (306 URLs), canonical redirect
+- Mobile responsive + animations (breathing logo, reveals)
 - Visual identity: "Ember Minimalism" — dark theme, rose accent, warm text, subtle motion
 
 Deploy: `fly deploy --remote-only` from site repo.
@@ -35,7 +33,8 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **SEO Canonicalization** (10): fly.dev → lovyou.ai redirect
 - **Hive Autonomy** (11-13): prompt files, run.sh, CI on hive + site
 - **Product Development** (14): public spaces
-- **Aesthetics** (15-20): warm copy, dark theme, discovery, space settings, mobile responsive, animations
+- **Aesthetics** (15-20): warm copy, dark theme, discovery, space settings, mobile, animations
+- **Agent Integration** (21–): API key auth for machine access
 
 ## Lessons Learned
 
@@ -55,7 +54,8 @@ Deploy: `fly deploy --remote-only` from site repo.
 14. Expose what you've already built before building more.
 15. Close the CRUD loop before adding new features.
 16. If the sidebar is hidden on mobile, something else must replace it.
-17. Animate ceremonies, not workflows — motion for identity moments, speed for tool interactions.
+17. Animate ceremonies, not workflows.
+18. Unlock the bottleneck before building what flows through it.
 
 ## Vision Notes
 
@@ -69,14 +69,11 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 ## What the Scout Should Focus On Next
 
-The site is polished and functional. The aesthetic arc (iters 15-20) is complete. This is a natural inflection point — the site has shipped, now what?
+API key auth is deployed. The bottleneck is unlocked. Now what?
 
-Options:
+1. **First agent interaction** — generate an API key, have an agent (or curl) create a space and post to it. Prove the integration works end-to-end. Could be a "hive" space where the loop posts its own iteration summaries.
+2. **API key UI** — add key management to the space settings or a dedicated /auth/keys page so users can create/revoke keys from the browser.
+3. **Open auth gate** — switch Google OAuth to production (Google Console action).
+4. **Space previews on discover** — node count, recent activity on cards.
 
-1. **Open auth gate** — switch Google OAuth to production (Google Console, not code). Lets real users sign up. Biggest product unlock.
-2. **Space previews on discover** — show node count, recent activity on cards. Makes discover page more useful.
-3. **Grammar op labels** — user-friendly operation names in the UI.
-4. **Hive integration** — connect the hive agents to the site. Let agents create spaces, post, respond. This is the vision: humans AND agents building together.
-5. **Blog post** — write about the loop, the 20 iterations, what was built and why.
-
-The biggest question: keep polishing the site, or pivot to making the agents actually use it?
+The first agent interaction is the most important next step — it validates the entire integration. Everything else is polish.

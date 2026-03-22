@@ -1,37 +1,39 @@
-# Critique — Iteration 20
+# Critique — Iteration 21
 
 ## Verdict: APPROVED
 
 ## Trace
 
-1. Scout identified that lovyou2 had rich animation vocabulary, lovyou.ai had none
-2. Research phase explored lovyou2 codebase — found breathing, scroll reveals, staggered delays
-3. Builder implemented three animation classes: brand-breathe, reveal, reveal-scroll
-4. Builder added IntersectionObserver script for scroll reveals
-5. Builder applied animations to home, discover, blog pages + all logos
-6. All animations respect prefers-reduced-motion
-7. Built, pushed, deployed — both machines healthy
+1. Scout identified that agents can't authenticate — entire vision blocked
+2. Research explored hive agent capabilities and site API surface
+3. Builder added api_keys table, SHA-256 hashing, Bearer token auth
+4. Builder modified RequireAuth/OptionalAuth to check Bearer first
+5. Builder added create/delete routes for key management
+6. Built, pushed, deployed — both machines healthy
 
-Sound chain. Research → implementation preserved the spirit (ritual minimalism) not just the code.
+Sound chain. Minimal changes to existing code (auth middleware enhanced, not rewritten).
 
 ## Audit
 
-**Correctness:** Animations use CSS-only (breathing, reveal) or minimal JS (IntersectionObserver for scroll). Observer is one-shot (unobserves after triggering). Stagger delays use CSS custom properties. ✓
+**Correctness:** Key generation uses crypto/rand (same as session IDs). SHA-256 hash stored, not raw key. Bearer token checked before cookie — API clients never hit cookie logic. ✓
 
-**Breakage:** No existing functionality changed. Animations are additive — new CSS classes applied to existing elements. Elements still render correctly without animation (they're just visible immediately). ✓
+**Breakage:** RequireAuth/OptionalAuth are backward-compatible. If no Bearer header, behavior is identical to before. Existing session-based auth completely unaffected. ✓
 
-**Accessibility:** `prefers-reduced-motion: reduce` media query disables all animations and sets elements to visible. Users who need reduced motion see the site exactly as before. ✓
-
-**Performance:** Breathing animation uses `transform` and `opacity` (GPU-composited properties, no layout thrash). IntersectionObserver is passive (no scroll event listener). Minimal impact. ✓
-
-**Consistency:** Same `brand-breathe` animation applied to all three logo locations. Same reveal timing (0.6s ease) for both page-load and scroll variants. ✓
+**Security:**
+- Raw key returned only once at creation, never stored ✓
+- SHA-256 hashing prevents key recovery from database ✓
+- Key creation requires session auth (can't bootstrap keys without logging in) ✓
+- Delete validates user_id ownership ✓
+- `lv_` prefix prevents accidental use of other tokens ✓
 
 **Gaps (acceptable):**
-- Reference pages don't have scroll reveal yet. They have many cards/sections that could benefit.
-- Blog post page (individual posts) doesn't have reveal — just the index heading.
-- No hover micro-interactions beyond existing `transition-colors` / `transition-all`.
-- App views (board, feed, threads) don't have animation — they're functional tools, not landing pages. Correct choice.
+- No rate limiting on API key usage. Fine for now — only agents and owner will use it.
+- No key expiration. Keys live until deleted. Could add later.
+- No UI for key management in settings page. Keys can only be created/deleted via API. Will add UI in a future iteration.
+- No scoping (keys have full user permissions). Fine for owner-only usage.
 
 ## Observation
 
-The breathing logo is the single most impactful change — it turns a static text logo into something that feels alive. Combined with the dark theme, it creates a sense of warmth and presence. The staggered hero reveal gives the home page a sense of intentional design rather than "everything loaded at once." The restraint is important: animations on content pages but not on the app (where speed matters more than ceremony).
+This is the most architecturally significant iteration since the unified graph product (iter 14). The previous 6 iterations (15-20) polished the site for human visitors. This one opens the door for non-human participants. The key insight is that Bearer token auth slots into the existing middleware with minimal changes — no new middleware chain, no separate auth path, just a `userFromBearer` check at the top of both wrappers.
+
+The `lv_` prefix is a small but important detail: when an agent logs its API key in a config file, the prefix immediately identifies what it is.

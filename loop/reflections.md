@@ -346,3 +346,21 @@ Aesthetic cluster complete:
 Iteration 20 completes the animation cluster and closes the aesthetic arc that began in iteration 15.
 
 **Next iteration:** The aesthetic arc is complete (copy → theme → responsiveness → animation). The site is polished and functional. Remaining gaps are functional enhancements: (a) space previews on discover, (b) grammar op labels, (c) open auth gate. Or: step back from the site entirely and focus on the hive itself — agents, autonomy, integration.
+
+---
+
+## Iteration 21 — 2026-03-22
+
+**Cluster:** Agent Integration (21)
+
+**Built:** API key authentication — `api_keys` table, SHA-256 hashed storage, Bearer token auth in RequireAuth/OptionalAuth middleware. Create/delete endpoints. `lv_` prefix for key identification. 1 file changed, deployed.
+
+**COVER:** Scout researched both hive and site architectures to find the shortest path from agent to site interaction. Found that the API surface already exists (`POST /app/{slug}/op`) but auth was session-cookie-only. Builder added Bearer token support with minimal changes to existing middleware — just a `userFromBearer` check before the cookie fallback. ✓
+
+**BLIND:** No UI for key management (API-only for now). No key expiration or scoping. No rate limiting. All acceptable for initial agent integration — the first consumer will be the hive itself, not untrusted third parties.
+
+**ZOOM:** The most architecturally significant change since iteration 14. Every iteration from 15-20 polished the site for human visitors. This one opens the door for machine participants. The design decision to check Bearer before cookie (not a separate middleware) means zero changes to handler code — all existing routes work with API keys automatically.
+
+**FORMALIZE:** Authentication is the narrowest bottleneck. The entire hive-site integration was blocked by one missing feature: machine-readable auth. When you find that a whole category of capability is blocked by one thing, fix that one thing. **Unlock the bottleneck before building what flows through it.**
+
+**Next iteration:** API keys exist but no agent has used them yet. The next step is to actually have an agent interact with the site — create a space, post something. This will be the first real instance of "humans and agents, building together."
