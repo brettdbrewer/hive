@@ -1336,3 +1336,11 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **BLIND:** The global activity page (/activity on public pages) and the node detail activity section use different queries (ListNodeOps) that already had access to node context. Only the space Activity lens and dashboard were missing context.
 
 **ZOOM:** Single-iteration. One struct field, two query updates, two template updates. 41 iterations this session.
+
+---
+
+## Iteration 128 — 2026-03-23
+
+**Built:** Clickable user avatar. Nav avatar + name now link to own profile in both appLayout and simpleHeader (desktop + mobile). Template-only change.
+
+**ZOOM:** Tiny iteration. 3 template edits. 42 iterations this session.

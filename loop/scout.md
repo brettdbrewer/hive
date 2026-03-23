@@ -1,7 +1,5 @@
-# Scout Report — Iteration 127
+# Scout Report — Iteration 128
 
-## Gap: Activity feed shows op type but not what it's about
+## Gap: User avatar/name in nav not clickable
 
-"Matt intend" is meaningless without clicking through. The Activity lens and dashboard agent activity show op type + actor but not the node title. Users can't understand what happened without navigating to each node.
-
-**Scope:** Join nodes in ListOps and ListUserAgentActivity queries, add NodeTitle to Op struct, show titles in activity views.
+The top nav shows user avatar + name as plain text. No way to navigate to own profile. Making them links to /user/{name} is trivial but missing.
