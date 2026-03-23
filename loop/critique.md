@@ -1,2 +1,2 @@
-# Critique — Iterations 157-160
-PASS. Font loaded via Google Fonts CDN with preconnect. Ember glow uses CSS pseudo-element (no JS). All changes are CSS/template only — no handler changes. Reduced-motion respected.
+# Critique — Iteration 161
+PASS. All secondary content still accessible via footer links. No functionality lost. Nav is now scannable — 3 items max.

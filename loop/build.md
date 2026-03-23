@@ -1,6 +1,12 @@
-# Build Report — Iterations 157-160
+# Build Report — Iteration 161
 
-**157:** Source Serif 4 display font, ember glow hero, italic serif logo, refined board columns.
-**158:** Serif headings on ALL public pages (Blog, Search, Activity, Reference, Knowledge, Market, Discover) and ALL in-app lenses (Feed, Threads, Chat, People, Activity, Settings, etc).
-**159:** Refined footer — italic serif logo, Blog/Reference links, more spacious padding.
-**160:** Sidebar active lens indicator (left border accent). Task card hover with brand shadow. Smoother transition durations.
+## Unified nav
+
+**Before:** 3 headers with different link sets (9, 5, 6 links). No user avatar on public pages. Different padding.
+
+**After:** All 3 headers use same pattern:
+- Desktop: Discover, Blog, [My Work or avatar+logout]
+- Mobile: Discover, [My Work or avatar]
+- App layout adds breadcrumb: logo / My Work / SpaceName
+
+Secondary links (Market, Knowledge, Activity, Search, Reference) moved to footer. Both footers (public + simple) now match: italic logo + tagline left, link grid right.

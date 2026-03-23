@@ -1,2 +1,3 @@
-# Scout Report — Iterations 157-160 (Visual)
-Visual refresh. Typography, atmosphere, and polish across the entire site.
+# Scout Report — Iteration 161
+## Gap: Nav inconsistent across pages
+3 different navs with 3 different link sets and styles. Public had 9 links, app had 5, dashboard had 6.
