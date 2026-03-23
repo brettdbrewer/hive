@@ -66,11 +66,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Post iteration summary.
+	// Post iteration summary to Feed.
 	title := fmt.Sprintf("Iteration %s", iteration)
 	if err := post(apiKey, baseURL, title, string(build)); err != nil {
 		fmt.Fprintf(os.Stderr, "post: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Create task on Board and mark complete.
+	if err := createTask(apiKey, baseURL, title, string(build)); err != nil {
+		fmt.Fprintf(os.Stderr, "task: %v\n", err)
+		// Non-fatal — feed post succeeded.
 	}
 
 	// Sync loop state to the Mind.
@@ -142,6 +148,63 @@ func syncMindState(apiKey, baseURL, state string) error {
 	if resp.StatusCode >= 400 {
 		b, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+	return nil
+}
+
+func createTask(apiKey, baseURL, title, description string) error {
+	// Create task (intend op).
+	payload, _ := json.Marshal(map[string]string{
+		"op":          "intend",
+		"title":       title,
+		"description": description,
+	})
+	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("intend: HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	// Parse response to get node ID.
+	var result struct {
+		Node struct {
+			ID string `json:"id"`
+		} `json:"node"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil || result.Node.ID == "" {
+		// Can't complete without ID, but task was created.
+		return nil
+	}
+
+	// Complete the task.
+	completePayload, _ := json.Marshal(map[string]string{
+		"op":      "complete",
+		"node_id": result.Node.ID,
+	})
+	req2, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(completePayload))
+	req2.Header.Set("Authorization", "Bearer "+apiKey)
+	req2.Header.Set("Accept", "application/json")
+	req2.Header.Set("Content-Type", "application/json")
+
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		return err
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp2.Body)
+		return fmt.Errorf("complete: HTTP %d: %s", resp2.StatusCode, b)
 	}
 	return nil
 }
