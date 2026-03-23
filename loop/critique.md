@@ -1,5 +1,5 @@
-# Critique — Iteration 112
+# Critique — Iteration 113
 
 ## Verdict: APPROVED
 
-Clean query with LEFT JOIN for kind. Limited to 20 members. Avatar + name + kind badge pattern consistent with rest of UI.
+Simple nav addition. Consistent placement (top of sidebar, start of mobile bar).

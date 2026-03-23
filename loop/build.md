@@ -1,3 +1,3 @@
-# Build Report — Iteration 112
+# Build Report — Iteration 113
 
-Member list on space overview. New ListMembers store query joins space_members with users for kind resolution. Shows member avatars, names with profile links, agent badges. Displayed between quick links and pinned content on the overview page.
+"My Work" link added to sidebar (desktop) and mobile lens bar. Home icon + "My Work" text links to /app. One click back to the dashboard from any space.

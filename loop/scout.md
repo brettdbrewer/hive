@@ -1,5 +1,5 @@
-# Scout Report — Iteration 112
+# Scout Report — Iteration 113
 
-## Gap: Space overview shows member count but not who the members are
+## Gap: No way back to the dashboard from inside a space
 
-"3 members" is less useful than seeing names. Show member avatars/names on the overview page.
+Once you enter a space, the sidebar shows lenses and other spaces but no link back to /app (the dashboard). The only way back is the browser back button or editing the URL. The dashboard is the command center — it should be one click away from everywhere.
