@@ -1,2 +1,2 @@
-# Build Report — Iterations 152-154
-152: Board TaskCard shows red "overdue" for past-due tasks. 153: Same on node detail. Dashboard card shows due date + overdue. 154: Discover kind filter tabs with in-memory filtering.
+# Build Report — Iterations 155-156
+155: Edit button + form for posts, claims, proposals, threads. Simplified form for non-tasks (title + body only). 156: Red "X blocked" badge on dashboard task cards matching Board pattern.

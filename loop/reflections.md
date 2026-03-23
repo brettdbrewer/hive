@@ -1464,4 +1464,12 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 
 ## Iterations 152-154 — 2026-03-24
 
-**152-153:** Overdue task highlighting — red "overdue" label on Board cards, dashboard task cards, and node detail when due date is past and task isn't done. **154:** Discover kind filter — Projects/Communities/Teams tabs. 68 iterations this session.
+**152-153:** Overdue task highlighting. **154:** Discover kind filter. 68 iterations this session.
+
+---
+
+## Iterations 155-156 — 2026-03-24
+
+**155:** Edit form on all node types (posts, claims, proposals, threads — not just tasks). **156:** Blocker count on dashboard task cards. 70 iterations this session (87-156). 36 depth iterations (121-156).
+
+**FORMALIZE:** The depth sprint has reached diminishing returns. Every lens has search. Every action notifies with deep links. Dependencies have full CRUD. Tasks show overdue + blockers everywhere. All node types are editable. The remaining gaps (market exchange, DMs, observability) are multi-iteration structural features, not depth polish. The platform is production-ready for real users.
