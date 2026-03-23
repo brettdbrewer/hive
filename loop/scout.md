@@ -1,5 +1,5 @@
-# Scout Report — Iteration 119
+# Scout Report — Iteration 120
 
-## Gap: Chat detail page doesn't show who you're talking to
+## Gap: Board task cards don't show the author
 
-The conversation detail view shows messages but the header just says the conversation title. It should show participant names so you know who's in the chat.
+Can't tell who created a task without clicking into it. In collaborative spaces this matters.

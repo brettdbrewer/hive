@@ -1228,3 +1228,9 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 ## Iteration 119 — 2026-03-23
 
 **Built:** Clickable node links in activity feed. Navigate from any op to the affected node.
+
+---
+
+## Iteration 120 — 2026-03-23
+
+**Built:** Author avatars on task cards. Shows who created → who's assigned. 34 iterations this session.

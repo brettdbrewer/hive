@@ -1,5 +1,5 @@
-# Critique — Iteration 119
+# Critique — Iteration 120
 
 ## Verdict: APPROVED
 
-Clean conditional: link when NodeID present, span when not. No new queries.
+Smart deduplication: when author == assignee, only assignee shown. Arrow separator makes the delegation flow visible (Matt → Hive). Agent author uses violet styling matching the rest of the UI.

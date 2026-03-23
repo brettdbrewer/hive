@@ -1,3 +1,3 @@
-# Build Report — Iteration 119
+# Build Report — Iteration 120
 
-Activity feed ops now link to their target nodes. When an op has a NodeID, the op name becomes a clickable link to /app/{slug}/node/{id}. Ops without NodeID (join, leave) remain plain text. opItem template now takes spaceSlug param.
+Author avatars on Board task cards. Shows author initial (violet for agents, muted for humans) with arrow → to assignee when different. When author == assignee, only shows assignee. Agent authors get violet styling.
