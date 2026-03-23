@@ -918,3 +918,21 @@ Also: no end-to-end test — ANTHROPIC_API_KEY wasn't available in session. The 
 **FORMALIZE:** The breadth-first strategy continues. 8 of 13 layers have minimum viable interfaces. The remaining 5 (Research, Knowledge, Governance, Culture, Existence) are higher layers that build on the lower ones. The next phase should either: (a) continue up the stack, or (b) start deepening to create a usable product at the layers we have.
 
 **Next iteration:** 5 layers remain (5-Research, 6-Knowledge, 11-Governance, 12-Culture, 13-Existence). Or shift to deepening existing layers. Or write tests for the growing debt.
+
+---
+
+## Iterations 91 — 2026-03-23
+
+**Cluster:** Global Search (91)
+
+**Built:** `/search?q=term` — unified search across public spaces, nodes, and users. ILIKE text search. Results grouped by type. Search link in nav.
+
+**COVER:** With the auth gate open, search is essential. Users can now find anything on the platform without browsing manually. ✓
+
+**BLIND:** ILIKE is simple but slow at scale. No full-text search (tsvector/tsquery). Acceptable for current data volume. Should be revisited if the platform grows.
+
+**ZOOM:** Single-iteration. One store method, one template, one route. The right scale.
+
+**FORMALIZE:** **Lesson 40: when the gates open, searchability and discoverability become critical infrastructure, not features.** The auth gate being open changed the priority landscape.
+
+**Next iteration:** 5 layers remain untouched (5, 6, 11, 12, 13). The platform is now searchable, browseable, and usable. Continue breadth or deepen?

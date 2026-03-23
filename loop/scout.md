@@ -1,20 +1,23 @@
-# Scout Report — Iteration 90
+# Scout Report — Iteration 91
 
-## Gap: No trust signals between users — Layer 9 (Relationship) missing
+## Gap: No search — the platform is discoverable but not searchable
 
-User profiles exist (iter 80) but are read-only — you can see someone's activity but can't express trust in them. The vision says Layer 9 adds "vulnerability, attunement, betrayal, repair, forgiveness." We don't need all that yet. We need the foundation: **endorsement**.
+The auth gate is open. Real users can sign up. But there's no way to search for anything. The discover page lists spaces. The market page searches tasks. There's no unified search across spaces, content, or users.
 
-The market (Layer 2) shows available tasks. Users can claim them. But there's no way to evaluate whether to trust someone who claims your task. No reputation, no endorsements, no track record beyond raw op count.
+A user who heard about lovyou.ai and wants to find a specific space, post, or person has to browse manually. This is the biggest usability gap for a public platform.
 
 ## What "Filled" Looks Like
 
-On user profiles (`/user/{name}`), logged-in users see an "Endorse" button. Endorsements are visible on the profile: "Endorsed by X, Y, Z" with count. The `endorse` grammar op records the relationship.
+`/search?q=term` — a unified search page that finds:
+- **Spaces** matching name or description
+- **Content** (tasks, posts, threads) matching title or body from public spaces
+- **Users** matching name
 
-This is the simplest trust signal — binary (endorsed or not), public, one-directional. It becomes the building block for portable reputation across spaces.
+Results grouped by type. Linked to the relevant pages. Search box in the header for easy access.
 
 ## Approach
 
-1. New grammar op: `endorse` — records endorsement of a user (payload: `{"target_user_id": "..."}`)
-2. New store queries: `CountEndorsements(ctx, userID)`, `HasEndorsed(ctx, fromID, toID)`
-3. Update profile page to show endorsement count and endorse button
-4. Profile handler passes auth context to enable the button
+1. New store query: `Search(ctx, query, limit)` — searches spaces, nodes, and users
+2. New template in views/search.templ
+3. New route `GET /search` in main.go
+4. Add search box to the header/nav

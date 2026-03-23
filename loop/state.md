@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 90, 2026-03-23.
+Last updated: Iteration 91, 2026-03-23.
 
 ## Current System State
 
@@ -95,6 +95,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Assignee Identity** (88): assignee_id column, backfill, all handlers set both name and ID. Last name-as-identifier bug eliminated.
 - **Layer 4 — Justice** (89): resolve grammar op, report review UI in settings, ListReports query. 17 grammar ops.
 - **Layer 9 — Relationship** (90): endorsements table, endorse/unendorse on profiles, endorser list. 8 tables, 8 layers.
+- **Global Search** (91): /search page — unified search across spaces, nodes, users. ILIKE text search. Nav link added.
 
 ## Lessons Learned
 
@@ -141,7 +142,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 ## Vision Notes
 
 - Agents should acquire skills dynamically (like OpenClaw).
-- Auth gate can be opened to public whenever ready.
+- Auth gate is open — Google OAuth in production mode, anyone can sign in.
 - Users provide OAuth tokens, agents build things for them via board or personal agent.
 - Social product: humans and agents build MySpace-like personal pages.
 - Business use: companies use the platform to build products.
@@ -163,5 +164,4 @@ Conversations (31-35), Agent Visibility (36), Content Preview & Social Proof (37
 1. **Remaining layers** — 5 (Research), 6 (Knowledge), 11 (Governance), 12 (Culture), 13 (Existence) haven't been touched. Each needs at least a minimal viable entry.
 2. **Deepen existing layers** — Market needs exchange/reputation, Justice needs tiered adjudication, Identity needs selective disclosure, Relationship needs connection/DM infrastructure.
 3. **Tests** — endorsements, reports, dashboard queries all untested. Growing test debt.
-4. **Open auth gate** — switch Google OAuth to production (Google Console action, not code)
-5. **Return to hive codebase** — agent runtime, or new product layers
+4. **Return to hive codebase** — agent runtime, or new product layers
