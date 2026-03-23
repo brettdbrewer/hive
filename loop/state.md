@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 97, 2026-03-23.
+Last updated: Iteration 98, 2026-03-23.
 
 ## Current System State
 
@@ -137,6 +137,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Layer 5 — Build** (95): Changelog lens — completed tasks as build history. No new ops, new lens on existing data.
 - **Layer 12 — Culture** (96): pin/unpin ops, pinned boolean column, pinned items sort first. 23 ops.
 - **Layer 13 — Being** (97): reflect op — existential accountability. 24 ops. **ALL 13 LAYERS TOUCHED.**
+- **Depth: Pin UI** (98): pin/unpin buttons on node detail, pin indicators on Feed (brand border + label) and Board (pin icon). Layer 12 now usable.
 
 ## Lessons Learned
 
