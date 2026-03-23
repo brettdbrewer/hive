@@ -1,11 +1,7 @@
-# Scout Report — Iteration 122
+# Scout Report — Iteration 123
 
-## Gap: Task dependencies are invisible
+## Gap: No UI to create task dependencies
 
-The `depend` op creates dependencies (stored in `node_deps` table). `BlockerCount` is calculated and shown as a red "X blocked" badge on Board task cards. But that's a dead end — users can't see WHICH tasks are blocking them or what they're blocking. Clicking through reveals nothing.
+Iter 122 made dependencies visible. But there's no form to CREATE them — users can only add dependencies via the JSON API or Mind. The `depend` op handler exists but there's no UI form. This completes the dependency feature.
 
-When Mind decomposes tasks and adds dependencies, the dependency structure is invisible. Users see "2 blocked" and have no way to understand why or navigate the chain.
-
-The infrastructure exists (table, handler, count calculation). The gap is purely UI: show blocking/blocked tasks as clickable links on the node detail page.
-
-**Scope:** Add a "Dependencies" section to NodeDetailView showing blockers (tasks this depends on) and dependents (tasks that depend on this) as navigable links with status indicators.
+**Scope:** Add a dependency form to the task detail page — select dropdown of space tasks to mark as dependencies.

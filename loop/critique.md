@@ -1,18 +1,13 @@
-# Critique — Iteration 122
-
-## Derivation chain
-Gap (dependencies invisible) → Plan (show deps/dependents on detail) → Code (2 store methods + handler + template) → Deploy
+# Critique — Iteration 123
 
 ## AUDIT
 
-**Correctness:** PASS. `ListDependencies` joins correctly (what this depends on). `ListDependents` joins the reverse direction (what depends on this). Both sorted incomplete-first. Template shows both sections with status indicators.
+**Correctness:** PASS. Form posts op=depend with node_id and depends_on. Dropdown excludes self and existing deps.
 
-**Breakage:** PASS. Template signature changed from 7 to 9 params. Only one call site, updated. No other callers found.
+**Breakage:** PASS. Single call site updated.
 
-**Simplicity:** PASS. Two store methods follow the exact same pattern as existing `ListBlockers`. `depRow` reuses `stateBgClass`/`stateLabel`. Amber border on incomplete deps provides visual urgency.
+**Simplicity:** PASS. Select dropdown — simplest working approach.
 
-**Identity:** PASS. Dependencies fetched by node ID.
+**Tests:** SOFT PASS. Depend op handler already existed and is covered by existing handler tests pattern.
 
-**Tests:** SOFT PASS. No new tests. Methods follow tested patterns.
-
-## Verdict: PASS (no revision needed)
+## Verdict: PASS (no revision)

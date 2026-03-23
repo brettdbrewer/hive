@@ -1266,3 +1266,19 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **ZOOM:** Single-iteration build. 2 store methods, 1 handler update, 1 template section, 1 new component. The right scale.
 
 **FORMALIZE:** Two consecutive depth iterations (121-122). The pattern: take an existing infrastructure layer (ops.payload for knowledge, node_deps for dependencies) and make it visible. The data was there; the UI wasn't. This is the cheapest kind of depth — no schema changes, no new ops, just surfacing what already exists. 36 iterations this session.
+
+---
+
+## Iteration 123 — 2026-03-23
+
+**Cluster:** Depth — Dependency Completion (122-123)
+
+**Built:** Dependency creation UI. Select dropdown of space tasks on node detail, excluding self and existing deps. The depend op now has both read (iter 122) and write (iter 123) UI. The dependency feature is complete: create, view, navigate.
+
+**COVER:** The dependency cluster (122-123) follows the pattern: read first, write second. Iter 122 surfaced existing data. Iter 123 gave users the ability to create new dependencies. Two iterations for a complete feature. ✓
+
+**BLIND:** No way to REMOVE dependencies. Once added, a dependency is permanent. Also: the dropdown lists all tasks in the space — could get unwieldy with 100+ tasks. A search-based picker would scale better.
+
+**ZOOM:** Single-iteration. Right scale. Dropdown approach is the simplest that works.
+
+**FORMALIZE:** Three consecutive depth iterations (121-123). The depth phase is producing genuine usability: Knowledge has evidence, Dependencies have full CRUD (minus delete). 37 iterations this session.
