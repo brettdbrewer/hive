@@ -4,9 +4,9 @@ If loop/critique.md exists and says REVISE, this is a revision round: read the c
 
 Otherwise, plan first: What files change? What does the code look like? Sketch key types, functions, interfaces. If the plan is more than a page, the scope is too big — do only the first part.
 
-Then build: Write code. Run build. Run tests. Fix what breaks. Commit with a descriptive message. Push to GitHub.
+Then build: Write code. Fix what breaks.
 
-If site changes: deploy with `cd /c/src/matt/lovyou3/site && /c/Users/matt_/.fly/bin/flyctl deploy --remote-only`.
+If site changes: ship with `cd /c/src/matt/lovyou3/site && ./ship.sh "iter N: description"` — this generates templ, builds, tests, deploys, commits, and pushes in one command.
 
 BOUNDED: If the change is taking too long, stop and write what you have. Partial progress that compiles is better than ambitious progress that doesn't.
 

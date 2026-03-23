@@ -24,4 +24,4 @@ Update loop/state.md:
 - Known issues
 - What the Scout should focus on next
 
-Commit all loop/ changes and push.
+Close the iteration: `LOVYOU_API_KEY=lv_... ./loop/close.sh` — this posts to lovyou.ai (feed + board), commits loop/ artifacts, and pushes. Validates all artifact files exist.
