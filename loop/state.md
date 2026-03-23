@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 181, 2026-03-24.
+Last updated: Iteration 183, 2026-03-24.
 
 ## Current System State
 
@@ -64,7 +64,7 @@ Five repos, all compiling and tested:
 | 12 | Evolution | — | — |
 | 13 | Being | — | — |
 
-**24 grammar ops total.** 9 database tables (+ endorsements). ~52 routes. 26 test functions across 5 test files. **All 13 product layers have minimum viable entries.**
+**25 grammar ops total (+ react).** 10 database tables (+ reactions). ~53 routes. 26 test functions across 5 test files. **All 13 product layers have minimum viable entries.**
 
 **Product layers (13 of 13):**
 | Layer | Name | Status | Ops |
@@ -169,16 +169,21 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 **All 20 UX tickets from the research sprint are COMPLETE.**
 
+- **Social Layer Sprint** (182-183): Code Graph on /reference (65 primitives). Message reactions (emoji) with toggle, hover picker, HTMX reactivity. Social layer spec written (4 modes, 33 planned iterations).
+
+**Social layer spec at hive/loop/social-spec.md. Phase 1 (Chat Foundation) in progress.**
+
 ## What the Scout Should Focus On Next
 
 **THE GOVERNING CHALLENGE:** If we're not better than existing products in form AND function AND philosophy, we offer no real value in switching. The philosophy is strong (13 layers, 15 grammar operations, soul). The form is improving. The FUNCTION of Work and Social must be dramatically better than Linear and Discord/Twitter.
 
-**Urgent board tickets (do in order):**
-1. Add Code Graph (65 primitives) to /reference — the spec exists in eventgraph/docs/codegraph-spec.md
-2. Deep research: what makes each social platform great (Discord, Twitter, Reddit, Slack, Instagram) — map to our 15 grammar operations
-3. Deep research: what makes Linear/Asana great — map to our Work grammar
-4. Spec Social layer apps using Code Graph primitives — Chat (Messenger/Slack), Rooms (Discord), Public Square (Twitter), Forum (Reddit)
-5. Build from spec, not from intuition
+**Phase 1 — Chat Foundation (from social-spec.md):**
+1. ~~Reactions (emoji on messages)~~ — DONE (iter 183)
+2. Reply-to linkage (fix existing partial implementation)
+3. Message edit/delete
+4. Unread count per conversation
+5. DM vs group conversation distinction
+6. Message search
 
 **Key insight:** The Social layer should encompass ALL modes of communication that major platforms offer. Each mode maps to different compositions of the 15 grammar operations. Our architecture can express things no platform can (Endorse, Delegate, Consent, Annotate, Merge) — those are our differentiators. But the baseline interactions (post, reply, like, share, DM, thread, channel) must be at least as good as the best existing implementation.
 

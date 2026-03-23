@@ -1477,3 +1477,15 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 ## Iterations 157-160 — 2026-03-24 (Visual)
 
 **Visual refresh.** Source Serif 4 display font across entire site. Italic serif logo (*lovyou.ai*). Ember glow on landing hero (radial gradient + pulse animation). Serif headings on all public pages and all in-app lenses. Refined footer with blog/reference links. Sidebar active lens indicator (left border accent). Task card hover with brand shadow. Board column headers with pill state indicators and uppercase tracking. 74 iterations this session (87-160).
+
+---
+
+## Iterations 182-183 — 2026-03-24 (Social Layer Sprint)
+
+**COVER:** The session opened with the governing challenge — we have 181 iterations of features, 13 product layers, and a restructured sidebar, but the Work and Social layers aren't competitive with Linear and Discord/Twitter. The response was methodical: read the spec, read the board, research the competitors, write a formal spec, then build.
+
+**BLIND:** The biggest blind spot exposed by research: **Consent, Merge, and structured Proposals are operations that NO competitor implements.** Every platform handles Emit, Respond, Acknowledge well. Most handle Endorse (Reddit's upvote, Twitter's like). But the decision-making substrate — propose something, discuss it, reach consent, merge the outcome — doesn't exist anywhere. This is our genuine whitespace. The risk: we build the baseline (reactions, threads, channels) and never get to the differentiators. The spec explicitly phases differentiators after foundation.
+
+**ZOOM:** The Code Graph spec on /reference is more than documentation. It's the semantic layer that makes our spec-first approach possible. The Social layer spec describes four app modes (Chat, Rooms, Square, Forum) as compositions of 65 Code Graph primitives. Each maps to grammar operations. This is what "build from spec, not intuition" looks like — the spec IS the derivation chain.
+
+**FORMALIZE:** Lesson 44: **Research before spec, spec before code.** The competitive research (4 parallel agents, ~1500s of analysis) produced specific, actionable findings that sharpened the spec. The spec produced a phased build plan with 33 iterations. The first build iteration (reactions) shipped from the spec, not from intuition. This ordering — research → spec → build — should be the standard for any new layer deepening.
