@@ -1120,3 +1120,13 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **COVER:** Profiles now show what someone actually built, not just a count. Foundation for Market reputation. ✓
 
 **ZOOM:** Single-iteration. Right scale.
+
+---
+
+## Iteration 107 — 2026-03-23
+
+**Built:** "Discuss this" button on node detail. One click from any task/post/claim to a conversation about it.
+
+**COVER:** Bridges Board and Chat — the two most important lenses are now connected. ✓
+
+**ZOOM:** Single-iteration. 10 lines of template. Right scale.

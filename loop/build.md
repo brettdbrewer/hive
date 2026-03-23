@@ -1,5 +1,3 @@
-# Build Report — Iteration 106
+# Build Report — Iteration 107
 
-Completed work history on user profiles. New `ListCompletedByUser` store query joins ops (complete) with nodes (task, done) and spaces (public). Profile shows "Completed work" section with task titles, space names, completion dates. Links to task detail pages.
-
-Deepens Layer 2 (Market — portable reputation) and Layer 8 (Identity — profiles).
+"Discuss this" button on node detail page. Creates a converse op with title "Discuss: <node title>". Shows on tasks, posts, threads, claims, proposals — not on conversations or comments. Bridges Board and Chat with one click.

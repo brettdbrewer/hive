@@ -1,5 +1,5 @@
-# Critique — Iteration 106
+# Critique — Iteration 107
 
 ## Verdict: APPROVED
 
-Clean query — joins ops, nodes, spaces with appropriate filters (public only, task kind, done state). Profile template conditionally renders section only when there's completed work. Date formatted at handler level, not template.
+Simple form POST to existing converse op. Kind guard correctly excludes conversations and comments. Title prefixed with "Discuss: " for context.
