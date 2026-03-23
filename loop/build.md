@@ -1,2 +1,2 @@
-# Build Report — Iterations 145-148
-145-146: Search on Knowledge + Governance space lenses. 147: Human task state changes notify assignee. 148: Proposal close notifies author.
+# Build Report — Iterations 149-150
+149: Changelog in-memory search by title. 150: Activity lens op filter tabs (Tasks/Completions/Messages/Claims/Votes).

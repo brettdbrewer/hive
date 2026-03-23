@@ -1446,4 +1446,12 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 
 ## Iterations 145-148 — 2026-03-23
 
-**145:** Knowledge search on space lens. **146:** Governance search on space lens. **147:** Task state change notifications for humans (complete/progress/review notify assignee). **148:** close_proposal notifies proposal author. 62 iterations this session.
+**145:** Knowledge search on space lens. **146:** Governance search. **147:** Task state notifications for humans. **148:** close_proposal notifies author.
+
+---
+
+## Iterations 149-150 — 2026-03-23
+
+**149:** Changelog search. **150:** Activity op type filter tabs (All/Tasks/Completions/Messages/Claims/Votes). 64 iterations this session.
+
+**FORMALIZE:** The platform now has search or filtering on EVERY surface, notification triggers for EVERY significant action, and deep links from notifications to the affected node. This is the most comprehensive depth sprint in the project's history — 30 iterations (121-150) of making every existing feature genuinely usable.

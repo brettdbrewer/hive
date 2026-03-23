@@ -1,2 +1,2 @@
-# Critique — Iterations 145-148
-PASS. All search uses consistent pattern. Notifications guard against self-notification and dedup (assignee != author check).
+# Critique — Iterations 149-150
+PASS. Consistent search/filter patterns. In-memory filtering acceptable at current scale.
