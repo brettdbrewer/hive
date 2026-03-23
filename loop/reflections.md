@@ -1150,3 +1150,15 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **COVER:** Board is now navigable for spaces with many tasks. ✓
 
 **ZOOM:** Single-iteration. Right scale.
+
+---
+
+## Iteration 110 — 2026-03-23
+
+**Built:** Space invites — generate shareable link, join via token. First growth feature.
+
+**COVER:** Private spaces are now shareable. The collaboration bottleneck (owner-only access) is broken. ✓
+
+**ZOOM:** Single-iteration. Clean. 11 tables.
+
+**FORMALIZE:** 24 iterations this session (87-110). The platform is genuinely usable: 13 layers, notifications, search, invites, filtering, onboarding. The next session should focus on real user feedback.

@@ -1,9 +1,9 @@
-# Scout Report — Iteration 109
+# Scout Report — Iteration 110
 
-## Gap: Board has no filtering — all tasks shown regardless of assignee or priority
+## Gap: No way to share a space with someone
 
-Spaces with many tasks become hard to navigate. No way to filter by assignee ("show me my tasks") or search by title. The Board shows everything grouped by state with no way to narrow down.
+Public spaces are discoverable. Private spaces are invisible to everyone except the owner. There's no invite link, no share button, no way to bring someone into your space. For a collaboration platform, this is a critical gap.
 
 ## What "Filled" Looks Like
 
-A filter bar on the Board with: text search (title), assignee filter dropdown. Filters via query params so they're bookmarkable and shareable.
+A "Copy invite link" button on Settings that generates a `/join/{token}` URL. Visiting the URL while logged in joins you to the space. Simple token-based invites, no email integration needed.

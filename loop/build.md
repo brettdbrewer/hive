@@ -1,3 +1,5 @@
-# Build Report — Iteration 109
+# Build Report — Iteration 110
 
-Board filtering. Search by title (text input) and filter by assignee (dropdown). Filters applied in Go after fetch. Query params (?q=&assignee=) so filters are bookmarkable. Clear link when filters active. Assignee dropdown auto-submits on change. Onboarding only shows when filters are empty AND board is empty.
+Space invites. New `invites` table (token, space_id, created_by). Generate invite link from Settings (owner-only). `/join/{token}` route accepts invite — joins user to space and redirects. Reuses existing invite if one exists. Invite URL shown as copyable field on Settings.
+
+11 tables total. First growth feature — spaces can now be shared.
