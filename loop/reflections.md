@@ -1208,3 +1208,9 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **Built:** Parent chain breadcrumbs. Navigate through nested subtask hierarchies.
 
 **FORMALIZE:** 30 iterations this session (87-116). Context at absolute limit. Every major UX gap has been addressed. The platform is ready for real users.
+
+---
+
+## Iteration 117 — 2026-03-23
+
+**Built:** Reply counts on threads, message counts on conversations. Shows activity level at a glance.

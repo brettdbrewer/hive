@@ -1,5 +1,5 @@
-# Scout Report — Iteration 116
+# Scout Report — Iteration 117
 
-## Gap: Subtask breadcrumbs don't show the parent chain
+## Gap: Thread list cards don't show reply counts
 
-Subtasks created by the Mind can be nested 2-3 levels deep. The breadcrumb only shows `Space > current node`. No way to navigate up through the parent hierarchy.
+The Threads lens lists threads but doesn't show how many replies each has. No way to tell which threads are active vs dead without clicking into each one.

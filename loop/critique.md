@@ -1,5 +1,5 @@
-# Critique — Iteration 116
+# Critique — Iteration 117
 
 ## Verdict: APPROVED
 
-Parent walk limited to 5 levels (BOUNDED). Each parent is a separate DB query — acceptable at low depth but would need batch loading at scale. Breadcrumb links truncated at 150px for long titles.
+Uses existing computed ChildCount. No new queries. Conditional rendering (hidden when 0).
