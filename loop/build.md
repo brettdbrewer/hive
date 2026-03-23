@@ -1,21 +1,19 @@
-# Build Report — Iteration 123
+# Build Report — Iteration 124
 
-## Add dependency form — dropdown to create task dependencies from node detail
+## Notification badge in sidebar — unread count visible from every space
 
 ### Changes
 
 **handlers.go:**
-- `handleNodeDetail` now fetches space tasks (kind=task), filters out self and existing deps, passes to template for dropdown
+- Added `UnreadCount int` to `ViewUser` struct
+- `viewUser()` now calls `store.UnreadCount()` to populate the count for authenticated users
 
 **views.templ:**
-- `NodeDetailView` signature extended with `spaceTasks []Node`
-- Dependencies section now shows "Add dependency..." dropdown when authenticated user is viewing a task
-- Dropdown shows task title + state label, excludes self and existing dependencies
+- "My Work" link in sidebar now shows a brand-colored badge with unread count when > 0
+- Badge uses `ml-auto` to push to the right of the link, matching the dashboard's badge style
 
-### Files changed
-- `graph/handlers.go` — space task fetch + filtering
-- `graph/views.templ` — form + dropdown
-- `graph/views_templ.go` — generated
+### Impact
+Every page that uses `appLayout` (all space lenses) now shows the notification count. Users don't need to navigate to the dashboard to know something happened.
 
 ### Deployed
-`ship.sh` — all green. No 408 this time.
+`ship.sh` — all green.

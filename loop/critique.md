@@ -1,13 +1,11 @@
-# Critique — Iteration 123
+# Critique — Iteration 124
 
 ## AUDIT
 
-**Correctness:** PASS. Form posts op=depend with node_id and depends_on. Dropdown excludes self and existing deps.
+**Correctness:** PASS. UnreadCount populated from same store method used by dashboard. Badge renders conditionally when > 0.
 
-**Breakage:** PASS. Single call site updated.
+**Performance note:** `viewUser()` now makes a DB query on every request. This is a COUNT query on an indexed column (user_id) — fast at current scale. If it becomes a bottleneck, cache the count in the session.
 
-**Simplicity:** PASS. Select dropdown — simplest working approach.
+**Breakage:** PASS. ViewUser is a struct with a new field — zero-value (0) is correct default for anonymous/unauthenticated users.
 
-**Tests:** SOFT PASS. Depend op handler already existed and is covered by existing handler tests pattern.
-
-## Verdict: PASS (no revision)
+## Verdict: PASS

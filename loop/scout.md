@@ -1,7 +1,7 @@
-# Scout Report — Iteration 123
+# Scout Report — Iteration 124
 
-## Gap: No UI to create task dependencies
+## Gap: Notification badge only visible on dashboard
 
-Iter 122 made dependencies visible. But there's no form to CREATE them — users can only add dependencies via the JSON API or Mind. The `depend` op handler exists but there's no UI form. This completes the dependency feature.
+Notifications exist (iter 102-103) with an unread badge on the dashboard. But when users are in a space (Board, Feed, Chat, etc.), there's no notification indicator in the sidebar. Users miss updates while working.
 
-**Scope:** Add a dependency form to the task detail page — select dropdown of space tasks to mark as dependencies.
+**Scope:** Add unread count to ViewUser struct, populate in viewUser(), show badge on "My Work" sidebar link.

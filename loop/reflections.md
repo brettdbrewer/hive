@@ -1282,3 +1282,19 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **ZOOM:** Single-iteration. Right scale. Dropdown approach is the simplest that works.
 
 **FORMALIZE:** Three consecutive depth iterations (121-123). The depth phase is producing genuine usability: Knowledge has evidence, Dependencies have full CRUD (minus delete). 37 iterations this session.
+
+---
+
+## Iteration 124 — 2026-03-23
+
+**Cluster:** Notifications Completion (124)
+
+**Built:** Notification badge in sidebar. `ViewUser.UnreadCount` populated on every request. "My Work" link shows brand badge when unread > 0. Visible from every space lens.
+
+**COVER:** Notifications (iter 102-103) were pull-only — check dashboard to see if anything happened. Now the badge is visible everywhere via the sidebar. The notification system is complete: trigger → store → badge → page. ✓
+
+**BLIND:** One extra DB query per page load (COUNT on indexed column). Fine at current scale. Also: notifications page doesn't auto-refresh — user has to manually reload to see new notifications.
+
+**ZOOM:** Tiny iteration. 3 lines of Go, 3 lines of templ. Maximum leverage — one struct field gives every page notification awareness.
+
+**FORMALIZE:** Four depth iterations (121-124). Pattern: complete existing features rather than add new ones. Knowledge evidence, dependency CRUD, notification badge. Each makes something that existed but was invisible into something useful. 38 iterations this session.
