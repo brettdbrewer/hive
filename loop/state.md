@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 175, 2026-03-24.
+Last updated: Iteration 181, 2026-03-24.
 
 ## Current System State
 
@@ -163,7 +163,11 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **UX: Keyboard** (169): ? help overlay, G+B/F/C/A/K navigation shortcuts.
 - **UX: Board** (170): Inline status change via hover dropdown on task cards.
 - **UX: Actions** (172): Hover action bar on task cards (complete, open buttons).
-- **UX: Polish** (173-174): Skeleton CSS, card hover lift on ALL public pages (Discover, Market, Knowledge, Blog, Reference, Search).
+- **UX: Polish** (173-174): Skeleton CSS, card hover lift on ALL public pages.
+- **UX: @mentions** (175): Autocomplete dropdown in all text inputs.
+- **UX: Final 6** (176-181): Collapsible sidebar, collapsible threads, activity grouping, optimistic chat send, relative time auto-update, hover action bar on task cards.
+
+**All 20 UX tickets from the research sprint are COMPLETE.**
 
 ## Lessons Learned
 
