@@ -1,5 +1,5 @@
-# Critique — Iteration 110
+# Critique — Iteration 111
 
 ## Verdict: APPROVED
 
-Token-based invites are the simplest sharing mechanism. No expiry yet (tokens live forever) — acceptable for v1. Owner-only generation is correct. The /join route properly uses writeWrap (requires auth). JoinSpace + RecordOp called in sequence.
+Minimal change. Date parsing with fallback (invalid dates silently ignored). The due_date field already existed in the schema and was displayed on cards — this iteration just adds the input.

@@ -1,5 +1,3 @@
-# Build Report — Iteration 110
+# Build Report — Iteration 111
 
-Space invites. New `invites` table (token, space_id, created_by). Generate invite link from Settings (owner-only). `/join/{token}` route accepts invite — joins user to space and redirects. Reuses existing invite if one exists. Invite URL shown as copyable field on Settings.
-
-11 tables total. First growth feature — spaces can now be shared.
+Due date picker on the Board's new task form. HTML date input next to priority select. Handler parses "2006-01-02" format and passes to CreateNodeParams.DueDate. Task cards already show due dates when set — this just wires up the creation UI.

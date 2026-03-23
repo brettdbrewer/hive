@@ -1162,3 +1162,11 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **ZOOM:** Single-iteration. Clean. 11 tables.
 
 **FORMALIZE:** 24 iterations this session (87-110). The platform is genuinely usable: 13 layers, notifications, search, invites, filtering, onboarding. The next session should focus on real user feedback.
+
+---
+
+## Iteration 111 — 2026-03-23
+
+**Built:** Due date picker on task creation form. Wires up existing schema field.
+
+**ZOOM:** Tiny iteration. One input, one parse. Dead schema brought to life.

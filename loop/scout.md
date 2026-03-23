@@ -1,9 +1,5 @@
-# Scout Report — Iteration 110
+# Scout Report — Iteration 111
 
-## Gap: No way to share a space with someone
+## Gap: Tasks have due dates in the schema but no UI to set them
 
-Public spaces are discoverable. Private spaces are invisible to everyone except the owner. There's no invite link, no share button, no way to bring someone into your space. For a collaboration platform, this is a critical gap.
-
-## What "Filled" Looks Like
-
-A "Copy invite link" button on Settings that generates a `/join/{token}` URL. Visiting the URL while logged in joins you to the space. Simple token-based invites, no email integration needed.
+The `due_date` column exists. Task cards show due dates when set. But there's no way to set a due date — the new task form and edit form don't include a date picker. Dead schema.
