@@ -1,5 +1,5 @@
-# Critique — Iteration 114
+# Critique — Iteration 115
 
 ## Verdict: APPROVED
 
-Correctly uses existing join op. Three states handled: non-member (join button), member (status text), owner (neither). IsMember check added to handler.
+One line changed. Correctly hidden for owners (can't leave your own space). Uses existing leave op path.

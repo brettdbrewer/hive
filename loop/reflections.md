@@ -1194,3 +1194,9 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **Built:** Join button on space overview. Logged-in non-members can join public spaces with one click.
 
 **FORMALIZE:** 28 iterations (87-114). The user journey is now complete: land → discover → overview → join → board → create task → assign agent → get notified. Every step has a clear action.
+
+---
+
+## Iteration 115 — 2026-03-23
+
+**Built:** Leave button on space overview. Membership is now fully reversible: join + leave both have UI.

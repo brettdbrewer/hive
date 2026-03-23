@@ -1,3 +1,3 @@
-# Build Report — Iteration 114
+# Build Report — Iteration 115
 
-"Join this space" button on space overview for logged-in non-members. Shows membership status for members. Hidden for owners and anonymous visitors. Uses existing join op.
+Leave button on space overview for members (non-owners). Subtle text link that turns red on hover. Uses existing leave op. Replaces the static "You're a member" text.
