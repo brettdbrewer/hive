@@ -1,5 +1,5 @@
-# Scout Report — Iteration 115
+# Scout Report — Iteration 116
 
-## Gap: No way to leave a space from the UI
+## Gap: Subtask breadcrumbs don't show the parent chain
 
-The join button works (iter 114). The leave op exists in the handler. But there's no "Leave" button anywhere. Members are stuck.
+Subtasks created by the Mind can be nested 2-3 levels deep. The breadcrumb only shows `Space > current node`. No way to navigate up through the parent hierarchy.

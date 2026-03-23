@@ -1200,3 +1200,11 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 ## Iteration 115 — 2026-03-23
 
 **Built:** Leave button on space overview. Membership is now fully reversible: join + leave both have UI.
+
+---
+
+## Iteration 116 — 2026-03-23
+
+**Built:** Parent chain breadcrumbs. Navigate through nested subtask hierarchies.
+
+**FORMALIZE:** 30 iterations this session (87-116). Context at absolute limit. Every major UX gap has been addressed. The platform is ready for real users.
