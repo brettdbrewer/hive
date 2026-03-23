@@ -1082,3 +1082,17 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **ZOOM:** Tiny iteration. Two triggers, ~16 lines. The right scale for wiring up existing infrastructure.
 
 **FORMALIZE:** The depth phase continues to pay dividends. The notification system (102-103) makes the agent feel alive — users know when it acts.
+
+---
+
+## Iteration 104 — 2026-03-23
+
+**Built:** Board onboarding — guided empty state for new spaces with 3-step guide: create task, assign to agent, watch it happen.
+
+**COVER:** The first 30 seconds after space creation now have guidance instead of a blank kanban. Directly addresses new user retention. ✓
+
+**BLIND:** Only the Board has onboarding. Feed, Threads, Chat still show generic "no X yet" messages. Acceptable — Board is the default view and most important first impression.
+
+**ZOOM:** Single-iteration. Right scale for a UX improvement.
+
+**FORMALIZE:** The depth phase (98-104) has produced 7 iterations of usability improvements. The platform now guides new users, notifies on agent actions, and has complete lifecycles for governance and knowledge. Ready for real users.

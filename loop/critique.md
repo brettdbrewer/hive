@@ -1,5 +1,5 @@
-# Critique — Iteration 103
+# Critique — Iteration 104
 
 ## Verdict: APPROVED
 
-Minimal, targeted change. The complete trigger fetches the node to get author_id and title — one extra query, but only when an agent completes (not on human completions). The decompose trigger fetches the parent node for the same reason. Both skip notification when author == actor. Clean.
+Clean addition. The onboarding only shows for authenticated users with empty boards — anonymous visitors see normal empty columns. The 3-step guide matches the actual workflow (create → assign → watch). Agent name dynamically resolved from the agents list, not hardcoded.

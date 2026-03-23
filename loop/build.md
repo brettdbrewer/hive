@@ -1,8 +1,7 @@
-# Build Report — Iteration 103
+# Build Report — Iteration 104
 
-Two notification triggers added to complete the feedback loop:
+Board onboarding for empty spaces. When all board columns are empty and user is authenticated, shows a 3-step guide: (1) Create a task, (2) Assign to agent, (3) Watch it happen. Links to conversations as alternative.
 
-1. **complete op by agent** → notifies task author: "Hive completed your task: <title>"
-2. **decompose op by agent** → notifies parent task author: "Hive broke down your task: <title>"
+**Changes:** `boardEmpty()` helper checks if all columns have zero nodes. `boardOnboarding` template shows the guided steps. Conditionally rendered in BoardView.
 
-Both only fire when the actor is an agent and the author is someone else. 2 lines of notification logic each, using the existing `notify` helper from iter 102.
+Deploy had a transient Fly auth error on one machine but the other is running v130 healthy.
