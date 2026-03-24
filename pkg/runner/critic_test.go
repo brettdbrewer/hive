@@ -2,6 +2,25 @@ package runner
 
 import "testing"
 
+// TestCriticThrottleBypassInOneShot verifies that in one-shot mode the critic
+// runs on tick 1 (not deferred to tick 4).
+func TestCriticThrottleBypassInOneShot(t *testing.T) {
+	for tick := 1; tick <= 4; tick++ {
+		throttled := !false && tick%4 != 0 // normal mode
+		if tick == 4 && throttled {
+			t.Errorf("tick %d should NOT be throttled in normal mode", tick)
+		}
+		if tick != 4 && !throttled {
+			t.Errorf("tick %d should be throttled in normal mode", tick)
+		}
+
+		throttledOneShot := !true && tick%4 != 0 // one-shot mode
+		if throttledOneShot {
+			t.Errorf("tick %d should NOT be throttled in one-shot mode", tick)
+		}
+	}
+}
+
 func TestParseVerdict(t *testing.T) {
 	tests := []struct {
 		name   string

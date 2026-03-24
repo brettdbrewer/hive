@@ -1,29 +1,19 @@
-# Scout Report — Iteration 227
+# Scout Report — Iteration 228
 
 ## Gap Identified
 
-**The hive can build and review, but it can't decide what to build.** Without a Scout, a human must create and assign tasks. The Scout closes the autonomous loop:
+**The three roles work in isolation but have never run as a pipeline.** Lesson 55: "The autonomous loop is closed but untested as a pipeline." This is Phase 2 item 11: "Test: full Scout → Builder → Critic cycle."
 
-```
-Scout creates tasks → Builder implements → Critic reviews → repeat
-```
-
-This is Phase 2 item 8 from hive-runtime-spec.md. With Builder (224-225) and Critic (226) done, Scout is the final piece that enables fully autonomous operation.
+Currently requires three separate commands. One command should run the full cycle.
 
 ## Plan
 
-Implement `runScout` in the runner:
-
-1. Read `state.md` from the hive repo (os.ReadFile — no LLM needed for reading)
-2. Read recent git log from the target repo (what was recently shipped)
-3. Read the current board (what tasks already exist)
-4. Call `Reason()` (haiku, fast, cheap) with: state context + git log + board summary + "what's the next concrete, implementable gap?"
-5. Parse the response for: task title, description, priority
-6. Create the task on the board via API
-7. Assign it to the hive agent
-
-The Scout runs every ~8 ticks (~2 minutes). It only creates a task if the board has fewer than 3 open tasks assigned to the agent (prevents task pile-up).
+1. Add `--pipeline` mode to cmd/hive — runs Scout → Builder → Critic in sequence on the same repo
+2. Scout creates a task → Builder claims and implements → Critic reviews the commit
+3. All three share the same API client, budget, and repo path
+4. Pipeline exits after one full cycle (like one-shot but for all three roles)
+5. Run it and verify end-to-end: task appears on board, code committed, review posted
 
 ## Priority
 
-**P0** — This is the last piece for autonomous operation. Builder + Critic + Scout = self-sustaining development loop.
+**P0** — Phase 2 item 11. This proves the hive can operate autonomously in a single command.

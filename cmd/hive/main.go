@@ -1,6 +1,10 @@
 // Command hive runs hive agents.
 //
-// New mode (runner): one process per agent role, polls lovyou.ai.
+// Pipeline mode: runs Scout → Builder → Critic in one full cycle.
+//
+//	go run ./cmd/hive --pipeline --repo ../site --space hive
+//
+// Single role: one process per agent role, polls lovyou.ai.
 //
 //	go run ./cmd/hive --role builder --repo ../site --space hive
 //
@@ -46,6 +50,7 @@ func main() {
 func run() error {
 	// Runner mode flags.
 	role := flag.String("role", "", "Agent role (builder, scout, critic, monitor). Enables runner mode.")
+	pipeline := flag.Bool("pipeline", false, "Run Scout → Builder → Critic in sequence (one full cycle)")
 	space := flag.String("space", "hive", "lovyou.ai space slug")
 	apiBase := flag.String("api", "https://lovyou.ai", "lovyou.ai API base URL")
 	budget := flag.Float64("budget", 10.0, "Daily budget in USD")
@@ -62,6 +67,9 @@ func run() error {
 	autoApprove := flag.Bool("yes", false, "Auto-approve authority (legacy runtime mode)")
 	flag.Parse()
 
+	if *pipeline || *role == "pipeline" {
+		return runPipeline(*space, *apiBase, *repo, *budget, *agentID)
+	}
 	if *role != "" {
 		return runRunner(*role, *space, *apiBase, *repo, *budget, *agentID, *oneShot)
 	}
@@ -70,9 +78,10 @@ func run() error {
 	}
 
 	fmt.Fprintln(os.Stderr, "usage:")
-	fmt.Fprintln(os.Stderr, "  Runner mode:  hive --role builder --repo ../site [--space hive] [--budget 10]")
+	fmt.Fprintln(os.Stderr, "  Pipeline:     hive --pipeline --repo ../site [--space hive] [--budget 10]")
+	fmt.Fprintln(os.Stderr, "  Single role:  hive --role builder --repo ../site [--space hive] [--budget 10]")
 	fmt.Fprintln(os.Stderr, "  Legacy mode:  hive --human Matt --idea 'description' [--store postgres://...]")
-	return fmt.Errorf("specify --role or --human")
+	return fmt.Errorf("specify --pipeline, --role, or --human")
 }
 
 // ─── Runner mode ─────────────────────────────────────────────────────
@@ -134,6 +143,73 @@ func runRunner(role, space, apiBase, repoPath string, budget float64, agentID st
 	log.Printf("hive agent starting: role=%s model=%s space=%s repo=%s agent-id=%s one-shot=%v",
 		role, model, space, absRepo, agentID, oneShot)
 	return r.Run(ctx)
+}
+
+// ─── Pipeline mode ───────────────────────────────────────────────────
+
+// runPipeline runs Scout → Builder → Critic in sequence. One full cycle.
+func runPipeline(space, apiBase, repoPath string, budget float64, agentID string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	apiKey := os.Getenv("LOVYOU_API_KEY")
+	if apiKey == "" {
+		return fmt.Errorf("LOVYOU_API_KEY required")
+	}
+
+	if repoPath == "" {
+		repoPath = "."
+	}
+	absRepo, err := filepath.Abs(repoPath)
+	if err != nil {
+		return fmt.Errorf("resolve repo: %w", err)
+	}
+
+	hiveDir := findHiveDir()
+	client := api.New(apiBase, apiKey)
+
+	roles := []string{"scout", "builder", "critic"}
+	for _, role := range roles {
+		select {
+		case <-ctx.Done():
+			log.Printf("[pipeline] interrupted during %s", role)
+			return nil
+		default:
+		}
+
+		log.Printf("[pipeline] ── %s ──", role)
+
+		model := runner.ModelForRole(role)
+		provider, err := intelligence.New(intelligence.Config{
+			Provider:     "claude-cli",
+			Model:        model,
+			MaxBudgetUSD: budget,
+		})
+		if err != nil {
+			return fmt.Errorf("provider for %s: %w", role, err)
+		}
+
+		r := runner.New(runner.Config{
+			Role:       role,
+			AgentID:    agentID,
+			SpaceSlug:  space,
+			RepoPath:   absRepo,
+			HiveDir:    hiveDir,
+			APIClient:  client,
+			Provider:   provider,
+			RolePrompt: runner.LoadRolePrompt(hiveDir, role),
+			BudgetUSD:  budget,
+			OneShot:    true,
+		})
+
+		if err := r.Run(ctx); err != nil {
+			log.Printf("[pipeline] %s error: %v", role, err)
+			// Continue to next role — don't abort pipeline on non-fatal errors.
+		}
+	}
+
+	log.Printf("[pipeline] ── cycle complete ──")
+	return nil
 }
 
 // findHiveDir returns the hive repo directory by walking up from cwd.

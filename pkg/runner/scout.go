@@ -17,8 +17,8 @@ const maxAgentTasks = 3
 
 // runScout reads project state and creates concrete tasks for the builder.
 func (r *Runner) runScout(ctx context.Context) {
-	// Run every 8th tick (~2 minutes at 15s interval).
-	if r.tick%8 != 0 {
+	// Run every 8th tick (~2 minutes at 15s interval). Always run in one-shot mode.
+	if !r.cfg.OneShot && r.tick%8 != 0 {
 		return
 	}
 

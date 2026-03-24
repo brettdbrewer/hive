@@ -11,8 +11,8 @@ import (
 // runCritic scans for recent builder commits and reviews them.
 // Uses Reason() (no tools, fast, cheap) to analyze diffs.
 func (r *Runner) runCritic(ctx context.Context) {
-	// Only run every 4th tick (60s at default interval).
-	if r.tick%4 != 0 {
+	// Only run every 4th tick (60s at default interval). Always run in one-shot mode.
+	if !r.cfg.OneShot && r.tick%4 != 0 {
 		return
 	}
 

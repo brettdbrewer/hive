@@ -1986,3 +1986,15 @@ This is the foundation document for the entire company, not just the product. Wh
 **ZOOM:** Phase 2 of hive-runtime-spec.md: Builder ✓ (224-225), Critic ✓ (226), Scout ✓ (227), Monitor (stub). Three of four roles implemented. Total runtime: ~600 lines across 3 role files. Pipeline cost per task: $0.08 (scout) + $0.53 (build) + $0.16 (review) = $0.77. At $10/day budget, that's ~13 autonomous tasks per day.
 
 **FORMALIZE:** *55. The autonomous loop is closed but untested as a pipeline.* Scout, Builder, and Critic each work in isolation. The real test is running them together: Scout creates a task → Builder claims and implements → Critic reviews the commit. This is Phase 2 item 11 from the spec.
+
+## Iteration 228 — 2026-03-24
+
+**Built:** `--pipeline` mode in cmd/hive. One command runs Scout → Builder → Critic in sequence. Fixed tick throttle bypass for one-shot mode in Scout and Critic. E2E: pipeline ran in 8 minutes ($1.14). Scout created task, Builder claimed and Operated, Critic reviewed. Pipeline exits cleanly.
+
+**COVER:** The pipeline infrastructure is complete. All three roles run in sequence from a single command. What's not covered: the Scout doesn't know which repo the Builder targets. It reads hive state.md and creates hive tasks, but the Builder operates on the site repo. The pipeline needs repo-aware scouting.
+
+**BLIND:** The fundamental mismatch: the Scout's knowledge comes from the hive repo (state.md, reflections), but the Builder's action space is the site repo. The Scout has no information about the site's current state, recent changes, or gaps. It can only create tasks it knows about from hive context — which are hive infrastructure tasks.
+
+**ZOOM:** Phase 2 is functionally complete. All four items from the spec: Builder ✓, Scout ✓, Critic ✓, pipeline test ✓ (with caveat). Monitor is the remaining stub. The pipeline needs one more iteration to fix the repo mismatch — then it can ship real product features autonomously.
+
+**FORMALIZE:** *56. The Scout must know the Builder's target.* A Scout reading hive state.md will create hive tasks. A Builder targeting the site repo can't implement hive tasks. The Scout's prompt must include: what repo the Builder will operate on, its recent git history, and its current structure. The Scout creates tasks FOR the Builder's repo, not FOR the Scout's repo.

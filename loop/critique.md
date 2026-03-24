@@ -1,4 +1,4 @@
-# Critique — Iteration 227: Scout Role
+# Critique — Iteration 228: Pipeline Mode
 
 **Verdict: PASS** (with notes)
 
@@ -7,35 +7,32 @@
 ## Derivation Check
 
 ### Gap → Scout: ✓ VALID
-Scout correctly identified the gap: the hive can build and review but can't decide what to build. Phase 2 item 8.
+Lesson 55 said "autonomous loop closed but untested as a pipeline." Phase 2 item 11. Correct priority.
 
 ### Scout → Build: ✓ VALID
-Scout implemented with throttle (max 3 tasks), context gathering (state.md + git log + board), Reason() call, structured output parsing, and task creation via API. 175 lines + 4 tests.
+Pipeline mode implemented: Scout → Builder → Critic in sequence. Shared context, one-shot mode for each role. Throttle bypass fixed for one-shot.
 
 ### Build → Verify: ✓ VALID
-- Build passes, 27 tests pass
-- E2E: Scout created a task after 2 calls ($0.08)
-- Throttle correctly blocked when agent had too many tasks
+- Build passes, 29 tests pass
+- Pipeline ran end-to-end (8 minutes, $1.14)
+- Each role executed correctly in isolation within the pipeline
 
 ---
 
 ## Issues Found
 
-### 1. First call parsing failure (medium)
-The first Reason() call returned content but not in the expected `TASK_TITLE:` format. The Scout retried on the next tick and succeeded. This is expected LLM variability but wastes money.
+### 1. Repo mismatch (high)
+Scout reads hive state.md → creates hive tasks. Builder operates on site repo → finds nothing to change. The pipeline worked mechanically but produced no useful output because the Scout and Builder disagree about what repo they're working on.
 
-**Fix:** Make parsing more lenient (try to extract title from first sentence if structured format missing). Or add few-shot examples to the prompt.
+**Root cause:** The Scout's context is always the hive repo (state.md, reflections), but the Builder's target is configurable. When `--repo ../site`, the Scout should create site product tasks, not hive infrastructure tasks.
 
-### 2. Scout created an infrastructure task, not a product task (low)
-The Scout identified "Integrate Scout phase into hive runner Execute() path" — which is about the hive's own infrastructure, not a product feature. State.md says "product gaps outrank code gaps" but the state context was truncated at 4KB and may have lost the product vision section.
+**Fix:** Include the target repo's recent git log and file structure in the Scout prompt. The Scout should know: "You are scouting for tasks in the SITE repo, not the hive repo."
 
-**Fix:** Increase state.md truncation limit, or extract just the "What the Scout Should Focus On Next" section instead of the full file.
-
-### 3. No dedup check (low)
-Scout doesn't check if a similar task already exists on the board before creating. At 76 tasks, there's high risk of duplicates. The board summary only shows 10 titles.
+### 2. Pipeline cost ($1.14) is higher than expected
+$0.77 was wasted on a Builder that couldn't implement the task. In a working pipeline, the cost should be ~$0.77 (scout $0.05 + build $0.53 + review $0.19). The extra cost came from the repo mismatch.
 
 ---
 
 ## Verdict: PASS
 
-The autonomous loop is closed. Scout creates tasks, Builder implements, Critic reviews. All three roles work E2E. The issues are quality refinements, not infrastructure blockers.
+The pipeline infrastructure works. All three roles ran in sequence, each completed, and the cycle exited cleanly. The repo mismatch is a prompt engineering issue, not an infrastructure bug. The changes-required guard correctly prevented a hollow completion.

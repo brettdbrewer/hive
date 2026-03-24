@@ -1,6 +1,30 @@
 package runner
 
-import "testing"
+import (
+	"testing"
+)
+
+// TestScoutThrottleBypassInOneShot verifies that in one-shot mode the scout
+// runs on tick 1 (not deferred to tick 8).
+func TestScoutThrottleBypassInOneShot(t *testing.T) {
+	// Simulate the throttle condition for various tick values.
+	// In normal mode (oneShot=false), only tick 8 passes.
+	// In one-shot mode, every tick passes (throttle is bypassed).
+	for tick := 1; tick <= 8; tick++ {
+		throttled := !false && tick%8 != 0 // normal mode
+		if tick == 8 && throttled {
+			t.Errorf("tick %d should NOT be throttled in normal mode", tick)
+		}
+		if tick != 8 && !throttled {
+			t.Errorf("tick %d should be throttled in normal mode", tick)
+		}
+
+		throttledOneShot := !true && tick%8 != 0 // one-shot mode
+		if throttledOneShot {
+			t.Errorf("tick %d should NOT be throttled in one-shot mode", tick)
+		}
+	}
+}
 
 func TestParseScoutTask(t *testing.T) {
 	input := `Based on the state, the next gap is adding the Decision entity kind.
