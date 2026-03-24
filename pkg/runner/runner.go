@@ -256,6 +256,15 @@ func (r *Runner) workTask(ctx context.Context, t api.Node) {
 			return // stay in-progress
 		}
 
+		// Check for file changes — implementation tasks should produce code.
+		hasChanges := r.hasUncommittedChanges()
+		if !hasChanges {
+			log.Printf("[builder] DONE but no file changes — leaving in-progress")
+			_ = r.cfg.APIClient.CommentTask(r.cfg.SpaceSlug, t.ID,
+				"Operate returned DONE but no files were changed. Task may need a different approach.")
+			return
+		}
+
 		// Commit and push.
 		if err := r.commitAndPush(t); err != nil {
 			log.Printf("[builder] commit/push error: %v", err)
@@ -341,19 +350,14 @@ func (r *Runner) verifyBuild() error {
 
 // ─── Git operations ──────────────────────────────────────────────────
 
-func (r *Runner) commitAndPush(t api.Node) error {
-	// Check for uncommitted changes.
+func (r *Runner) hasUncommittedChanges() bool {
 	cmd := exec.Command("git", "status", "--porcelain")
 	cmd.Dir = r.cfg.RepoPath
-	out, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("git status: %w", err)
-	}
-	if len(bytes.TrimSpace(out)) == 0 {
-		log.Printf("[builder] no changes to commit")
-		return nil
-	}
+	out, _ := cmd.Output()
+	return len(bytes.TrimSpace(out)) > 0
+}
 
+func (r *Runner) commitAndPush(t api.Node) error {
 	// Stage all changes.
 	if err := r.git("add", "-A"); err != nil {
 		return fmt.Errorf("git add: %w", err)
@@ -417,7 +421,12 @@ var priorityOrder = map[string]int{
 func pickHighestPriority(nodes []api.Node) api.Node {
 	best := nodes[0]
 	for _, n := range nodes[1:] {
-		if priorityOrder[n.Priority] < priorityOrder[best.Priority] {
+		np := priorityOrder[n.Priority]
+		bp := priorityOrder[best.Priority]
+		if np < bp {
+			best = n
+		} else if np == bp && n.CreatedAt > best.CreatedAt {
+			// Same priority: prefer newest (most likely to be a fresh assignment).
 			best = n
 		}
 	}

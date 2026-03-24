@@ -55,6 +55,30 @@ func TestPickHighestPriorityEmpty(t *testing.T) {
 	}
 }
 
+func TestPickHighestPriorityRecencyTiebreak(t *testing.T) {
+	// Same priority: newest should win.
+	nodes := []api.Node{
+		{ID: "old", Priority: "high", CreatedAt: "2026-03-22T00:00:00Z"},
+		{ID: "new", Priority: "high", CreatedAt: "2026-03-24T00:00:00Z"},
+	}
+	got := pickHighestPriority(nodes)
+	if got.ID != "new" {
+		t.Errorf("pickHighestPriority returned ID=%s, want 'new' (recency tiebreak)", got.ID)
+	}
+}
+
+func TestPickHighestPriorityPriorityBeatsRecency(t *testing.T) {
+	// Higher priority beats newer date.
+	nodes := []api.Node{
+		{ID: "new-low", Priority: "low", CreatedAt: "2026-03-24T00:00:00Z"},
+		{ID: "old-urgent", Priority: "urgent", CreatedAt: "2026-03-20T00:00:00Z"},
+	}
+	got := pickHighestPriority(nodes)
+	if got.ID != "old-urgent" {
+		t.Errorf("pickHighestPriority returned ID=%s, want 'old-urgent' (priority beats recency)", got.ID)
+	}
+}
+
 func TestCostTracker(t *testing.T) {
 	ct := CostTracker{BudgetUSD: 10.0}
 

@@ -1,33 +1,25 @@
-# Scout Report — Iteration 224
+# Scout Report — Iteration 225
 
 ## Gap Identified
 
-**The runner is built but can't be tested end-to-end.** Three blockers:
+**The runtime proved the plumbing works (iter 224). Now prove it can ship code.**
 
-### 1. No agent identity awareness
-The runner fetches ALL open tasks from the board but has no way to know its own user ID. It can't filter "my tasks" vs "everyone's tasks." Currently treats every task with any assignee as a "my task" — meaning it will try to work tasks assigned to other agents or humans.
+Iter 224's builder completed a design task (no code changes). The runtime has never shipped a real commit to production. Three critique issues remain:
 
-**Fix:** Add `agentID` field to runner.Config + `--agent-id` flag to cmd/hive. Builder only works tasks assigned to this ID, or claims unassigned tasks.
+1. **Double role prompt** — Provider created with `SystemPrompt: rolePrompt` AND runner prepends rolePrompt in instruction. Wastes tokens, doubles the context.
+2. **No recency tiebreak** — When multiple tasks share priority, first from API wins. Builder should prefer newest tasks (most likely to be fresh assignments).
+3. **No "changes required" check** — Builder marks DONE even when Operate produces no file changes. Should require at least one changed file for implementation tasks.
 
-### 2. Board is 95% noise
-76 open/active tasks. 71 are unassigned. Most are either:
-- **Already completed** — UX tickets (Cmd+K, DnD, inline reply, etc.) shipped in iters 162-181 but never closed on the board
-- **Vision-level** — "Design the Market Graph product", "Open Source AI Agent Framework" — too big for a single Operate call
-- **Duplicates** — three "AI Agent Audit Trail" tasks
-
-Without filtering, the builder will claim the first unassigned task it finds — likely a stale UX ticket or a vision task it can't implement.
-
-### 3. No concrete test task
-Need a small, implementable task on the board that exercises the full flow: claim → Operate → build verify → commit → push → close. Something like "add entity kind X to the site" where X is a proven pipeline change.
+After fixes, re-run the builder on the Policy entity task (high priority, assigned, created today). This is the acid test: can the runtime ship a real commit?
 
 ## Plan
 
-1. Add `AgentID` field to runner.Config + `--agent-id` flag to cmd/hive
-2. Filter builder to only work tasks assigned to `AgentID`, or claim unassigned
-3. Create a concrete test task on the board via the API (something small — add the Policy entity kind)
-4. Assign it to the hive agent
-5. Run the builder and observe the full flow
+1. Fix double role prompt — remove SystemPrompt from provider config, keep role prompt only in instruction
+2. Add recency tiebreak — sort by priority first, then by created_at descending (newest first)
+3. Add "changes required" guard — after DONE, if no git changes detected and task is implementation, leave in-progress
+4. Re-run builder on Policy entity task
+5. Verify: task claimed → code changed → build passes → commit pushed → task closed
 
 ## Priority
 
-**P0** — this is Phase 1 item 7 from hive-runtime-spec.md. Without it, we don't know the runtime works.
+**P0** — This completes the runtime proof. Iter 224 proved the flow. Iter 225 proves the output.

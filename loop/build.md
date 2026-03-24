@@ -1,58 +1,59 @@
-# Build Report — Iteration 224: Hive Runtime E2E Test
+# Build Report — Iteration 225: Builder Ships Code to Production
 
 ## What This Iteration Does
 
-Completes Phase 1 of hive-runtime-spec.md by adding agent identity filtering, one-shot mode, and running the first end-to-end test of the builder flow.
+Fixes 3 critique issues from iter 224, then runs the builder on a real coding task. The hive ships its first autonomous code commit to production.
 
-## Changes (since iter 223)
+## Runner Fixes
 
-### New files (iter 223 → 224)
-| File | Lines | What |
-|------|-------|------|
-| `pkg/api/client.go` | 175 | lovyou.ai REST client — Bearer auth, GetTasks, PostOp, Claim, Complete, Comment |
-| `pkg/runner/runner.go` | 462 | Tick loop, builder flow, cost tracking, role model selection, build verification, git commit/push |
-| `pkg/runner/runner_test.go` | 110 | 12 tests — parseAction, pickHighestPriority, CostTracker, ModelForRole, extractSummary |
+### 1. Removed double role prompt
+Provider no longer gets `SystemPrompt: rolePrompt`. Role prompt is only in the instruction (where it has task context). Saves ~500 tokens per call.
 
-### Modified files
-| File | What |
-|------|------|
-| `cmd/hive/main.go` | Dual-mode: `--role` (new runner) / `--human` (legacy). Added `--agent-id`, `--one-shot` flags |
+### 2. Recency tiebreak in task selection
+`pickHighestPriority` now tiebreaks by `created_at` descending when tasks share the same priority. Newest tasks are preferred — most likely to be fresh assignments, not stale work.
 
-### Iteration 224 changes
-| File | What |
-|------|------|
-| `pkg/runner/runner.go` | Added `AgentID` + `OneShot` to Config. Builder filters by agent user ID. One-shot exit after task. |
-| `cmd/hive/main.go` | Added `--agent-id` and `--one-shot` flags, passed to runner. |
+### 3. Changes-required guard
+After ACTION: DONE, builder checks `git status --porcelain`. If no files changed, the task stays in-progress with a comment explaining the issue. Prevents hollow completions.
 
-### Retired
-| Deleted | Lines removed |
-|---------|-------------|
-| `cmd/loop/` (main.go, fast.go) | ~760 |
-| `cmd/daemon/main.go` | ~296 |
-| `agents/.sessions/` | session files |
+### 4. Extracted `hasUncommittedChanges()` helper
+Factored git status check out of `commitAndPush` into reusable helper.
 
-## End-to-End Test Result
+## Builder E2E Result
 
 ```
-$ LOVYOU_API_KEY=lv_... go run ./cmd/hive --role builder --repo ../site --space hive \
-    --agent-id 36509418df854dd4a709cfee3e915a17 --one-shot --budget 5
-
-[builder] runner started (repo=.../site, space=hive, interval=15s, budget=$5.00)
-[builder] working task 54c51491c770108fedaea48b86327cca: Design the Market Graph product
-  ⏳ working done (4m19s)
-[builder] Operate done (cost=$0.4568, tokens=64+10513)
+[builder] working task 61f38992: Add Policy entity kind to the site
+  ⏳ working done (2m49s)
+[builder] Operate done (cost=$0.5325, tokens=31+7912)
 [builder] action: DONE
-[builder] no changes to commit
-[builder] task 54c51491c770108fedaea48b86327cca DONE
-[builder] one-shot complete
-[builder] cost summary: $0.4568 / $5.00 (calls=1, in=64, out=10513)
+[builder] committed and pushed: [hive:builder] Add Policy entity kind to the site
+[builder] task 61f38992 DONE
 ```
 
-**Flow verified:** fetch → filter by agent ID → Operate → parse ACTION → build verify → commit check → close task → cost summary → exit.
+**2m49s. $0.53. One Operate call. Real code committed and pushed.**
 
-**Issue found:** Builder picked a stale design task instead of the Policy coding task (both high priority, design task came first). Need: priority-based ordering with recency tiebreak, or task tagging for "implementable" vs "design".
+## Hive's Code Changes (autonomous)
+
+| File | What |
+|------|------|
+| `site/graph/store.go` | `KindPolicy = "policy"` constant |
+| `site/graph/handlers.go` | `handlePolicies` handler (34 lines) |
+| `site/graph/views.templ` | `policiesIcon()`, sidebar + mobile nav, `PoliciesView` template (81 lines) |
+| `site/graph/views_templ.go` | Generated |
+
+## Human Fix (Critic catch)
+
+The builder missed adding `KindPolicy` to the `intend` op's kind allowlist (line 1487 of handlers.go). Without this, creating a policy via the API would fall through to KindTask. Fixed manually and deployed.
+
+## Files Changed (hive repo)
+
+| File | What |
+|------|------|
+| `cmd/hive/main.go` | Removed SystemPrompt from provider config |
+| `pkg/runner/runner.go` | Recency tiebreak, changes-required guard, hasUncommittedChanges helper |
+| `pkg/runner/runner_test.go` | 2 new tests (recency tiebreak, priority-beats-recency) |
 
 ## Build
 
-- `go.exe build -buildvcs=false ./...` ✓
-- `go.exe test ./...` ✓ (12 new + all existing pass)
+- `go build ./...` ✓ (hive + site)
+- `go test ./...` ✓ (14 runner tests + all existing)
+- `flyctl deploy --remote-only` ✓ — Policy entity live on lovyou.ai

@@ -100,12 +100,12 @@ func runRunner(role, space, apiBase, repoPath string, budget float64, agentID st
 	hiveDir := findHiveDir()
 
 	// Create intelligence provider.
+	// Role prompt is passed in the instruction (with task context), not as system prompt.
 	model := runner.ModelForRole(role)
 	provider, err := intelligence.New(intelligence.Config{
 		Provider:     "claude-cli",
 		Model:        model,
 		MaxBudgetUSD: budget,
-		SystemPrompt: runner.LoadRolePrompt(hiveDir, role),
 	})
 	if err != nil {
 		return fmt.Errorf("provider: %w", err)
@@ -114,7 +114,7 @@ func runRunner(role, space, apiBase, repoPath string, budget float64, agentID st
 	// Create API client.
 	client := api.New(apiBase, apiKey)
 
-	// Load role prompt (also passed as instruction context, not just system prompt).
+	// Load role prompt for injection into task instructions.
 	rolePrompt := runner.LoadRolePrompt(hiveDir, role)
 
 	// Create and run the runner.

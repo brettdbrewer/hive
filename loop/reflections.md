@@ -1950,3 +1950,15 @@ This is the foundation document for the entire company, not just the product. Wh
 **FORMALIZE:** *51. Test the runtime on a task you control.* The first E2E test picked up a stale task because the board was noisy. When testing autonomous systems, create a dedicated task, assign it explicitly, and verify the system picks that specific task — not whatever happens to sort first. Control the test input.
 
 *52. A design task needs a design artifact.* The builder "completed" a design task by thinking about it — no file written, no spec produced. The task was closed but the work evaporated. Builder should verify that Operate produced changes before marking DONE, or distinguish design vs implementation tasks.
+
+## Iteration 225 — 2026-03-24
+
+**Built:** Fixed 3 critique issues (double role prompt, recency tiebreak, changes-required guard). Ran builder on Policy entity task. **First autonomous code commit to production.** 2m49s, $0.53. Builder produced KindPolicy constant, handlePolicies handler, PoliciesView template, sidebar/mobile nav entries. Deployed to lovyou.ai. Human fixed one miss: KindPolicy not added to intend allowlist.
+
+**COVER:** The builder can ship entity pipeline changes autonomously. What's not covered: the builder has no knowledge of project conventions (CLAUDE.md), coding standards, or the intend allowlist pattern. It follows the template pattern by reading adjacent code, but doesn't know the full checklist. The Critic role would catch these — it knows to trace "new kind" → "all kind guards."
+
+**BLIND:** The builder operates without a CLAUDE.md or coding standards context. It only sees the role prompt and task description. This means it can follow patterns it sees in adjacent code, but can't enforce rules that aren't visible in the immediate context (like the intend allowlist being 400 lines away from the handler). The fix isn't "bigger prompts" — it's a Critic agent that runs `grep` for completeness.
+
+**ZOOM:** The runtime is now proven at both levels: plumbing (iter 224, design task) and production (iter 225, code task). The gap shifts from "can it work?" to "can it work without supervision?" The answer is "almost" — 116/117 lines were correct, one line missed. That's 99.1% accuracy on the first try. The Critic role turns "almost" into "yes."
+
+**FORMALIZE:** *53. The builder follows patterns, not rules.* It reads adjacent code and replicates the pattern. But rules that aren't visible in the immediate context (like an allowlist 400 lines away) will be missed. Pattern-following is necessary but not sufficient. The Critic must enforce completeness by grep-checking all code paths that the change touches.*
