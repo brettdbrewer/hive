@@ -1,4 +1,4 @@
-# Critique — Iteration 226: Critic Role
+# Critique — Iteration 227: Scout Role
 
 **Verdict: PASS** (with notes)
 
@@ -7,48 +7,35 @@
 ## Derivation Check
 
 ### Gap → Scout: ✓ VALID
-Scout correctly identified the gap: no automated code review. Builder ships code but nobody checks it. Critic role is Phase 2 item 9.
+Scout correctly identified the gap: the hive can build and review but can't decide what to build. Phase 2 item 8.
 
 ### Scout → Build: ✓ VALID
-Critic implemented as specified: git log scan, diff review, Reason() call, verdict parsing, fix task creation. 170 lines. Tests cover all helpers.
+Scout implemented with throttle (max 3 tasks), context gathering (state.md + git log + board), Reason() call, structured output parsing, and task creation via API. 175 lines + 4 tests.
 
 ### Build → Verify: ✓ VALID
-- Build passes, 23 tests pass
-- E2E tested: Critic found and reviewed the correct builder commit
-- Bug found and fixed (regex escaping)
-
----
-
-## Invariant Audit
-
-| Invariant | Status | Reason |
-|-----------|--------|--------|
-| 12 VERIFIED | ✓ Pass | 9 tests for critic helpers. E2E tested on production. |
-| 13 BOUNDED | ✓ Pass | 24h window, diff truncation at 15KB. |
+- Build passes, 27 tests pass
+- E2E: Scout created a task after 2 calls ($0.08)
+- Throttle correctly blocked when agent had too many tasks
 
 ---
 
 ## Issues Found
 
-### 1. Critic PASSed the allowlist miss (medium)
-The Critic reviewed the Policy commit (which was missing `KindPolicy` in the intend allowlist) and returned PASS. The review prompt asks about "ALL relevant guards, allowlists, and switch statements" but the diff only shows what changed — the allowlist line is 400 lines away and not in the diff.
+### 1. First call parsing failure (medium)
+The first Reason() call returned content but not in the expected `TASK_TITLE:` format. The Scout retried on the next tick and succeeded. This is expected LLM variability but wastes money.
 
-**Root cause:** Diff-only review can't catch omission errors in distant code. The Critic sees what was added but doesn't know what SHOULD have been added elsewhere.
+**Fix:** Make parsing more lenient (try to extract title from first sentence if structured format missing). Or add few-shot examples to the prompt.
 
-**Fix options:**
-- (a) Include the full file context (expensive, blows up prompt)
-- (b) Have the Critic use Operate() to grep for related patterns (slower but accurate)
-- (c) Add entity-specific checklists ("new KindX → check intend allowlist")
+### 2. Scout created an infrastructure task, not a product task (low)
+The Scout identified "Integrate Scout phase into hive runner Execute() path" — which is about the hive's own infrastructure, not a product feature. State.md says "product gaps outrank code gaps" but the state context was truncated at 4KB and may have lost the product vision section.
 
-Option (b) is the right long-term answer. Defer to Phase 3.
+**Fix:** Increase state.md truncation limit, or extract just the "What the Scout Should Focus On Next" section instead of the full file.
 
-### 2. No review state persistence (low)
-The Critic has no memory of which commits it has already reviewed. On restart, it re-reviews all commits from the last 24h. Not a problem at current volume but will waste money when the builder ships multiple commits per day.
-
-**Fix:** Track reviewed commit hashes in a file or via API comments.
+### 3. No dedup check (low)
+Scout doesn't check if a similar task already exists on the board before creating. At 76 tasks, there's high risk of duplicates. The board summary only shows 10 titles.
 
 ---
 
 ## Verdict: PASS
 
-The Critic infrastructure works. It finds builder commits, reviews them via Reason(), and can create fix tasks. The diff-only limitation (issue 1) is a known design tradeoff — the Critic catches syntax/pattern errors but not omission errors in distant code. This is exactly the class of bug the human caught in iter 225. Upgrading to Operate()-based review (Phase 3) will close this gap.
+The autonomous loop is closed. Scout creates tasks, Builder implements, Critic reviews. All three roles work E2E. The issues are quality refinements, not infrastructure blockers.

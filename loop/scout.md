@@ -1,24 +1,29 @@
-# Scout Report — Iteration 226
+# Scout Report — Iteration 227
 
 ## Gap Identified
 
-**No automated code review.** The builder ships code but nobody checks it. Iter 225's allowlist miss was caught manually. The Critic role is Phase 2 item 9 from hive-runtime-spec.md.
+**The hive can build and review, but it can't decide what to build.** Without a Scout, a human must create and assign tasks. The Scout closes the autonomous loop:
 
-The builder follows patterns (99.1% accuracy). The Critic enforces completeness — checking that every code path touched by a change is updated. This is the difference between "almost works" and "works."
+```
+Scout creates tasks → Builder implements → Critic reviews → repeat
+```
+
+This is Phase 2 item 8 from hive-runtime-spec.md. With Builder (224-225) and Critic (226) done, Scout is the final piece that enables fully autonomous operation.
 
 ## Plan
 
-Implement `runCritic` in the runner:
+Implement `runScout` in the runner:
 
-1. On each tick, scan `git log` for recent `[hive:builder]` commits not yet reviewed
-2. Get the diff for each unreviewed commit
-3. Call `Reason()` (no tools, fast, cheap — haiku) with the diff + review checklist
-4. If REVISE: create a fix task on the board, comment on the original task
-5. If PASS: comment "reviewed" on the task
-6. Track reviewed commits to avoid re-reviewing
+1. Read `state.md` from the hive repo (os.ReadFile — no LLM needed for reading)
+2. Read recent git log from the target repo (what was recently shipped)
+3. Read the current board (what tasks already exist)
+4. Call `Reason()` (haiku, fast, cheap) with: state context + git log + board summary + "what's the next concrete, implementable gap?"
+5. Parse the response for: task title, description, priority
+6. Create the task on the board via API
+7. Assign it to the hive agent
 
-The Critic uses `Reason()` (not `Operate()`) — it reads diffs and thinks, it doesn't write code. This keeps it fast and cheap (haiku model).
+The Scout runs every ~8 ticks (~2 minutes). It only creates a task if the board has fewer than 3 open tasks assigned to the agent (prevents task pile-up).
 
 ## Priority
 
-**P0** — Critic is the quality gate that turns "almost correct" into "correct."
+**P0** — This is the last piece for autonomous operation. Builder + Critic + Scout = self-sustaining development loop.

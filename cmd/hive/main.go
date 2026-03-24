@@ -123,6 +123,7 @@ func runRunner(role, space, apiBase, repoPath string, budget float64, agentID st
 		AgentID:    agentID,
 		SpaceSlug:  space,
 		RepoPath:   absRepo,
+		HiveDir:    hiveDir,
 		APIClient:  client,
 		Provider:   provider,
 		RolePrompt: rolePrompt,

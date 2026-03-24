@@ -1,50 +1,44 @@
-# Build Report — Iteration 226: Critic Role
+# Build Report — Iteration 227: Scout Role
 
 ## What This Iteration Does
 
-Implements the Critic role for the hive runtime (Phase 2, item 9 from hive-runtime-spec.md). The Critic reviews builder commits automatically, creating fix tasks when issues are found.
+Implements the Scout role for the hive runtime (Phase 2, item 8). The Scout reads project state, identifies gaps, and creates concrete tasks on the board for the Builder. This closes the autonomous loop: Scout → Builder → Critic.
 
 ## Files Changed
 
 | File | Lines | What |
 |------|-------|------|
-| `pkg/runner/critic.go` | 170 | New. Critic role: find unreviewed builder commits, review diffs via Reason(), create fix tasks on REVISE. |
-| `pkg/runner/critic_test.go` | 65 | New. 9 tests: parseVerdict, extractIssues, buildReviewPrompt. |
-| `pkg/runner/runner.go` | -5 | Removed critic stub (now in critic.go). |
+| `pkg/runner/scout.go` | 175 | New. Scout role: read state.md + git log + board → Reason() → create task. |
+| `pkg/runner/scout_test.go` | 65 | New. 4 tests: parseScoutTask, parseScoutTaskDefaults, parseScoutTaskEmpty, buildScoutPrompt. |
+| `pkg/runner/runner.go` | +2/-5 | Added HiveDir to Config. Removed scout stub. |
+| `cmd/hive/main.go` | +1 | Pass HiveDir to runner config. |
 
 ## How It Works
 
-1. **Every 4th tick** (~60s), Critic runs `git log --grep=\[hive:builder\]` for commits in the last 24h
-2. For each unreviewed commit, gets the diff via `git diff hash~1..hash`
-3. Calls `Reason()` (no tools, haiku model) with the diff + review checklist
-4. Parses `VERDICT: PASS` or `VERDICT: REVISE` from the response
-5. On REVISE: creates a fix task on the lovyou.ai board
-6. On PASS: logs and moves on
+1. **Every 8th tick** (~2 minutes), Scout checks agent's open task count
+2. If agent has < 3 tasks, proceeds with scouting
+3. Gathers context: `state.md` (os.ReadFile), `git log -20`, board summary via API
+4. Calls `Reason()` (haiku, fast, cheap) with scouting prompt
+5. Parses response for `TASK_TITLE:`, `TASK_PRIORITY:`, `TASK_DESCRIPTION:`
+6. Creates task on lovyou.ai board via API
 
-## Review Checklist (sent to LLM)
+## E2E Test Result
 
-1. **Completeness** — new constant/kind present in ALL guards and allowlists?
-2. **Identity (invariant 11)** — IDs for matching, not names?
-3. **Bounded (invariant 13)** — queries have LIMIT?
-4. **Correctness** — injection, races, nil handling?
-5. **Tests** — flagged but not REVISE-blocking (known systemic issue)
-
-## E2E Test Results
-
-**Run 1 (bug):** Unescaped regex brackets in `git --grep` matched 54 commits instead of 1. Fixed.
-
-**Run 2 (correct):**
 ```
-[critic] tick 4: found 1 unreviewed commits
-[critic] reviewing 31f3349ca8b6: [hive:builder] Add Policy entity kind to the site
-  ⏳ thinking done (1m16s)
-[critic] review done (cost=$0.1631)
-[critic] verdict: PASS
+[scout] tick 8: scouting (agent has 0/3 tasks)
+  ⏳ thinking done (38s)
+[scout] Reason done (cost=$0.0611)
+[scout] no task found in response          ← first call: unstructured output
+  ⏳ thinking done (33s)
+[scout] Reason done (cost=$0.0185)
+[scout] creating task: [high] Integrate Scout phase into hive runner Execute() path
+[scout] created task 3d77ba43
+[scout] cost summary: $0.0795 / $1.00 (calls=2)
 ```
 
-1 commit found, 1m16s review time, $0.16 cost. Correct commit identified and reviewed.
+Scout created a concrete task after 2 calls (~$0.08). First call didn't produce structured output; second did. Throttle correctly blocked when agent had 4 tasks (> 3 max).
 
 ## Build
 
 - `go build ./...` ✓
-- `go test ./...` ✓ (23 tests: 9 critic + 14 existing)
+- `go test ./...` ✓ (27 tests: 4 scout + 9 critic + 14 runner)

@@ -1974,3 +1974,15 @@ This is the foundation document for the entire company, not just the product. Wh
 **ZOOM:** Three roles now work: Builder (ships code, 2m49s), Critic (reviews code, 1m16s), and the stubs (Scout, Monitor). The pipeline cost is $0.53 (build) + $0.16 (review) = $0.69 per task. At this rate, $10/day buys ~14 tasks. The Monitor role (stale task cleanup) is the next priority — 76 stale tasks on the board need closing before the builder can work autonomously without `--agent-id` filtering.
 
 **FORMALIZE:** *54. Diff-only review catches what was added wrong, not what was omitted.* The Critic's review prompt says "check ALL guards" but the diff only shows changes. Omission errors (like a missing allowlist entry) require grep-based verification — checking every location in the codebase that references the same pattern. Reason() reviews the diff; Operate() reviews the codebase.
+
+## Iteration 227 — 2026-03-24
+
+**Built:** Scout role for the hive runtime. Reads state.md + git log + board, calls Reason() (haiku, $0.08), creates concrete tasks on the board. 175 lines + 4 tests. E2E tested: Scout created "Integrate Scout phase into hive runner Execute() path" after 2 calls. Throttle correctly blocked at 4 tasks (max 3). Closed 4 stale agent-assigned tasks to unblock testing.
+
+**COVER:** The autonomous loop is closed: Scout → Builder → Critic. All three roles work independently in one-shot mode. What's not covered: running all three concurrently as a continuous pipeline. Each role is tested in isolation but they haven't been orchestrated together. The Monitor role (Phase 2 item 10) would coordinate them — restarting crashed agents, throttling spend, cleaning stale tasks.
+
+**BLIND:** The Scout's first Reason() call failed to produce structured output. LLM output variability is a blind spot in all three roles — the builder's `ACTION:` parsing, the critic's `VERDICT:` parsing, and now the scout's `TASK_TITLE:` parsing all depend on the LLM following the exact output format. A single retry worked, but at scale this wastes money. Need either more robust parsing or few-shot examples.
+
+**ZOOM:** Phase 2 of hive-runtime-spec.md: Builder ✓ (224-225), Critic ✓ (226), Scout ✓ (227), Monitor (stub). Three of four roles implemented. Total runtime: ~600 lines across 3 role files. Pipeline cost per task: $0.08 (scout) + $0.53 (build) + $0.16 (review) = $0.77. At $10/day budget, that's ~13 autonomous tasks per day.
+
+**FORMALIZE:** *55. The autonomous loop is closed but untested as a pipeline.* Scout, Builder, and Critic each work in isolation. The real test is running them together: Scout creates a task → Builder claims and implements → Critic reviews the commit. This is Phase 2 item 11 from the spec.

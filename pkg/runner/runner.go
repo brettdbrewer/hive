@@ -46,6 +46,7 @@ type Config struct {
 	AgentID    string // lovyou.ai user ID for this agent (filters task assignment)
 	SpaceSlug  string // lovyou.ai space slug (e.g. "hive")
 	RepoPath   string // absolute path to the repo to operate on
+	HiveDir    string // path to hive repo (for state.md, role prompts)
 	APIClient  *api.Client
 	Provider   intelligence.Provider
 	RolePrompt string // loaded from agents/{role}.md
@@ -390,12 +391,7 @@ func (r *Runner) git(args ...string) error {
 
 // ─── Stub roles (Phase 2) ───────────────────────────────────────────
 
-func (r *Runner) runScout(ctx context.Context) {
-	if r.tick%4 == 0 {
-		log.Printf("[scout] tick %d: scanning (not yet implemented)", r.tick)
-	}
-}
-
+// runScout is in scout.go
 // runCritic is in critic.go
 
 func (r *Runner) runMonitor(ctx context.Context) {
