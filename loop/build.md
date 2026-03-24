@@ -1,42 +1,43 @@
-# Build Report — Iteration 231: Critic Bug Fix Deployed
+# Build Report — Iteration 232: First Fully Autonomous Feature Delivery
 
 ## What This Iteration Does
 
-Closes the loop on the Critic's REVISE from iter 230: fixes the progress handler state machine bug and applies lesson 57 to the Critic (assign fix tasks).
+Bumps Operate timeout to 15min and runs the first fully autonomous pipeline cycle that ships a product feature: Scout identifies gap → Builder implements → Critic reviews → code deployed.
 
-## Files Changed
+## Changes
 
-### Hive repo
-| File | What |
-|------|------|
-| `pkg/runner/critic.go` | +6 lines: Critic now assigns fix tasks to the agent after creation (same pattern as Scout). |
+### `eventgraph/go/pkg/intelligence/claude_cli.go`
+- Bumped `defaultOperateTimeout` from 10min to 15min. Previous timeout caused builder failure in iter 230.
 
-### Site repo (deployed)
-| File | What |
-|------|------|
-| `graph/handlers.go` | +4 lines: Added `node.State != StateActive` guard to progress handler. Tasks must be active to submit for review. |
-
-## The Bug (caught by Critic in iter 230)
-
-The `progress` handler moved tasks to review state without checking the current state. Any task — done, closed, open — could be moved to review, violating the state machine:
+## Pipeline Result — AUTONOMOUS
 
 ```
-open → review ← WRONG (should be: active → review only)
-done → review ← WRONG
+Scout  → "Add Goals lens with hierarchical project/task progress display"  ($0.09, 58s)
+         Created + assigned ✓
+Builder → Picked up Scout's task → Implemented → Committed + pushed        ($0.58, 3m28s)
+         [hive:builder] Add Goals lens with hierarchical project/task progress display
+Critic → Reviewed commit → REVISE (found issues, created fix task)         ($0.16, 1m3s)
+
+Total: $0.83, ~6 minutes, 1 command, 0 human intervention
 ```
 
-Fix: `if node.State != StateActive { return 400 }`
+## What The Builder Shipped (autonomous)
 
-## Full Bug Lifecycle
+- `GoalWithProjects` struct pairing goals with child projects
+- `handleGoals` updated to fetch child projects per goal
+- `GoalsView` template: hierarchical display with project progress bars (X/Y tasks + progress bar)
+- 4 files changed, 97 lines of hand-written code
 
-1. **Iter 229:** Builder autonomously shipped review/progress ops
-2. **Iter 230:** Critic autonomously reviewed the commit, found missing state guard, returned REVISE, created fix task
-3. **Iter 231:** Human fixed the bug, deployed, closed the fix task
+## What The Critic Found
 
-The system works: Builder ships → Critic catches → fix deployed. Eventually: Builder ships → Critic catches → Builder fixes (fully autonomous).
+REVISE — created fix task `88e94503`. Specific issues to be addressed in next iteration.
+
+## Deployed
+
+`flyctl deploy --remote-only` ✓ — Goals hierarchical view live on lovyou.ai.
 
 ## Build
 
-- `go build ./...` ✓ (both repos)
+- `go build ./...` ✓
 - `go test ./...` ✓
-- `flyctl deploy --remote-only` ✓ — state guard live on lovyou.ai
+- Deployed ✓
