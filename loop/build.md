@@ -1,29 +1,30 @@
-# Build Report — Iteration 190
+# Build Report — Iteration 191
 
-## Endorse on Posts
+## Follow Users
+
+**Schema:**
+- `follows` table: `follower_id, followed_id, created_at, PRIMARY KEY (follower_id, followed_id)`
+- Index on `followed_id` for follower count queries
 
 **Store:**
-- `GetBulkEndorsementCounts(targetIDs) map[string]int` — single query for all post endorsement counts
-- `GetBulkUserEndorsements(userID, targetIDs) map[string]bool` — which posts the user has endorsed
-- Reuses existing `endorsements` table (from_id, to_id). No schema changes.
+- `Follow(followerID, followedID)` — ON CONFLICT DO NOTHING (idempotent)
+- `Unfollow(followerID, followedID)` — DELETE
+- `IsFollowing(followerID, followedID)` — EXISTS check
+- `CountFollowers(userID)` — COUNT where followed_id = user
+- `CountFollowing(userID)` — COUNT where follower_id = user
 
-**Handler:**
-- New `endorse` grammar op — toggles endorsement (endorse if not yet, unendorse if already)
-- Records op + notifies post author on endorse (not on unendorse)
-- HTMX response: returns `endorseButton` component for inline swap
-- JSON response: `{"op": "endorse", "endorsed": true/false}`
+**Profile page:**
+- `UserProfile` struct: added `Followers int`, `Following int`, `IsFollowing bool`
+- Follow/unfollow button — form POST to `/user/{name}/follow`, redirects back
+- Stats line: replaced "tasks completed · actions" with "N followers · N following · N endorsements"
+- Button states: "Follow" (outline) / "Following" (brand filled)
 
-**Feed handler:**
-- Loads bulk endorsement counts + user endorsement state for all posts
-- Passes both maps to FeedView
-
-**Template:**
-- `FeedView` accepts `endorseCounts map[string]int, userEndorsed map[string]bool`
-- `FeedCard` accepts `endorseCount int, endorsed bool`
-- `endorseButton` component: thumbs-up icon + count, brand-colored when endorsed, HTMX toggle
-- Filled icon when endorsed, outline when not
+**Route:**
+- `POST /user/{name}/follow` — resolves user ID, toggles follow, notifies target
+- Can't follow yourself (redirect no-op)
+- Notification: "username: started following you"
 
 **Files changed:**
-- `graph/store.go` — `GetBulkEndorsementCounts`, `GetBulkUserEndorsements`
-- `graph/handlers.go` — `endorse` op case, feed handler wiring
-- `graph/views.templ` — `FeedView`, `FeedCard`, `endorseButton` signatures + template
+- `graph/store.go` — follows table schema + 5 store methods
+- `views/profile.templ` — UserProfile struct + follow button + counts
+- `cmd/site/main.go` — follow route + profile handler wiring

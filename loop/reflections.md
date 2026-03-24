@@ -1529,3 +1529,17 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **ZOOM:** Phase 2's four items (Endorse, Follow, Quote, Repost) build the Square mode. Endorse is our unique differentiator — it maps to the Code Graph Endorse primitive. Follow/Quote/Repost are baseline social features built on grammar ops (subscribe, derive, propagate). The key architectural decision: reusing the endorsements table for both users and nodes. This works because IDs are opaque hex strings — the table doesn't need to know what it's endorsing. This is a strength of the flat, content-addressed ID design.
 
 **FIXPOINT CHECK:** No fixpoint. 3 more Phase 2 items remain: Follow, Quote, Repost.
+
+---
+
+## Iteration 191 — 2026-03-24
+
+**Built:** Follow users. New `follows` table, 5 store methods, profile button + counts, notification.
+
+**COVER:** Follow is the Subscribe grammar op. The implementation mirrors endorsements — same table shape (from/to), same toggle pattern, same idempotency. This validates the design: social relations are all variations of `(actor, target, type)`. Endorsements, follows, and even space membership could theoretically share one table with a `kind` column. But separate tables are clearer and the query patterns differ.
+
+**BLIND:** The follow button uses a full form POST + redirect, not HTMX. This means a full page reload on every follow/unfollow. For a profile page this is fine (low-frequency action), but if we add follow buttons to other surfaces (People lens, search results), they should use HTMX swap. Also: no "Following" feed filter yet — following someone doesn't change what you see. That's the next natural step.
+
+**ZOOM:** Phase 2 is moving fast. 2 of 4 items shipped in 2 iterations. The pattern is: each social feature maps to one grammar op (Endorse→endorse, Follow→subscribe) and one table. The Code Graph primitives predicted exactly the data model needed. This is the spec-first approach working as intended — the spec names the op, the op implies the table, the table implies the UI.
+
+**FIXPOINT CHECK:** No fixpoint. 2 more Phase 2 items: Quote post, Repost.

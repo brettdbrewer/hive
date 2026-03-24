@@ -1,19 +1,25 @@
-# Scout Report — Iteration 190
+# Scout Report — Iteration 191
 
-## Gap: Endorse on posts (Phase 2 item 1 — first Square feature)
+## Gap: Follow users (Phase 2 item 2)
 
-**Source:** social-spec.md Phase 2, board milestone. First differentiator feature.
+**Source:** social-spec.md Phase 2, board milestone. Maps to Subscribe grammar op.
 
-**Current state:** Endorsements exist for users only (endorsements table: from_id → to_id). Profile pages show endorsement count + toggle button. No endorsement on content (posts, threads, claims, etc.).
+**Current state:** No follow system exists. Profile pages show endorsements but no follow button. No follower/following counts. No "following" feed filter.
 
 **What's needed:**
-1. `endorse` grammar op — toggles endorsement on a node (endorse/unendorse)
-2. Bulk endorsement loading — counts per node + user's endorsement state, for Feed rendering
-3. Endorsement button on FeedCard — HTMX toggle with count, brand-colored when endorsed
-4. Endorsement count on node detail
+1. `follows` table — `follower_id, followed_id, created_at, PRIMARY KEY (follower_id, followed_id)`
+2. Store methods: Follow, Unfollow, IsFollowing, CountFollowers, CountFollowing
+3. Profile page: Follow/unfollow button (HTMX toggle), follower + following counts
+4. Notification when someone follows you
 
-**Why endorse first:** It's our differentiator. Reactions (emoji) are acknowledgment. Endorsement is a quality/trust signal — "I vouch for this." No other platform has this on content. It maps directly to the Code Graph Endorse primitive.
+**Scoping:** Feed filtering ("Following" tab on Feed) is a separate iteration. This iteration establishes the follow relation and makes it visible on profiles.
 
-**Approach:** Reuse existing endorsements table (from_id, to_id). Node IDs and user IDs are in different namespaces (both random hex, but stored in different tables). `CountEndorsements(nodeID)` works as-is. Add bulk operations for Feed efficiency. Follow the reaction pattern: `GetBulkReactions` → `GetBulkEndorsementCounts` + `GetBulkUserEndorsements`.
+**Approach:** Follow the endorsement pattern — same table structure (from/to), same toggle handler, same HTMX swap. Profile page already has the endorsement button pattern to copy.
 
-**Risk:** Low. No schema changes. Existing store methods work for nodes. Just need bulk variants + handler op + template buttons.
+**From the spec:**
+```
+current_user.follows(user) → "Unfollow"
+else → "Follow"
+```
+
+**Risk:** Low. New table, store methods, profile UI. Schema migration auto-applies via `CREATE TABLE IF NOT EXISTS`.

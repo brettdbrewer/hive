@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 190, 2026-03-24.
+Last updated: Iteration 191, 2026-03-24.
 
 ## Current System State
 
@@ -173,9 +173,9 @@ Deploy: `fly deploy --remote-only` from site repo.
 - **Phase 1 — Chat Foundation** (184-189): Reply-to linkage (structured, not markdown), message edit/delete (author-only, soft delete, audit trail), unread counts (read_state table, UPSERT), DM/group filter tabs, message search (ILIKE on bodies, from: operator, conversation context). Edit REVISE fixed (inline DOM swap, not reload).
 
 **Phase 1 (Chat Foundation) COMPLETE.** All 6 items shipped.
-- **Phase 2 — Square** (190): Endorse on posts — toggle button on Feed cards, HTMX swap, bulk queries, notification to author. Reuses endorsements table (no schema change).
+- **Phase 2 — Square** (190-191): Endorse on posts (toggle, HTMX swap, bulk queries). Follow users (follows table, profile button, counts, notification).
 
-**Phase 2 (Square) in progress.** 1 of 4 items shipped. Remaining: Follow, Quote, Repost.
+**Phase 2 (Square) in progress.** 2 of 4 items shipped. Remaining: Quote, Repost.
 
 ## What the Scout Should Focus On Next
 
@@ -185,7 +185,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 **Phase 2 — Square (from social-spec.md + board milestones):**
 1. ~~Endorse on posts~~ — DONE (iter 190)
-2. Follow users — subscribe to a user's activity, notification on their new posts
+2. ~~Follow users~~ — DONE (iter 191)
 3. Quote post — create a new post that embeds/references another post
 4. Repost — share someone else's post to your feed
 

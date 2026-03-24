@@ -1,33 +1,34 @@
-# Critique — Iteration 190
+# Critique — Iteration 191
 
 ## Derivation Chain
-- **Gap:** Phase 2 item 1 — endorse on posts. First differentiator.
-- **Plan:** Reuse endorsements table, add toggle op, bulk queries, HTMX button on Feed.
-- **Code:** Matches plan. No scope creep.
+- **Gap:** Phase 2 item 2 — follow users. Subscribe grammar op.
+- **Plan:** New follows table, store methods, profile button + counts.
+- **Code:** Matches plan. Scoped correctly — no feed filtering yet.
 
-## Endorse on Posts: PASS
+## Follow Users: PASS
 
 **Correctness:**
-- Toggle logic: `HasEndorsed` → `Unendorse` / `Endorse`. Idempotent (ON CONFLICT DO NOTHING). ✓
-- Bulk queries: `ANY($1)` with `pq.Array`. Correct Postgres array syntax. ✓
-- Empty check: both bulk methods return empty map for empty IDs. ✓
-- Notification: only on endorse (not unendorse), only if author != actor. ✓
-- Op recorded only on endorse, not unendorse. Makes sense — endorsement is the meaningful event.
+- ON CONFLICT DO NOTHING — idempotent follow. ✓
+- Self-follow prevented (redirect no-op). ✓
+- Notification only on follow, not unfollow. ✓
+- Viewer auth checked before showing button. ✓
 
 **Identity:**
-- `HasEndorsed(actorID, nodeID)` — uses actor ID, not name. ✓
-- Notification: `node.AuthorID != actorID` — ID comparison. ✓
+- Follow uses IDs (`follower_id`, `followed_id`). ✓
+- `ResolveUserID(name)` to get target ID from URL. ✓
+- `viewer.ID` from auth context. ✓
 
 **BOUNDED:**
-- Bulk queries bounded by input array size (which comes from ListNodes with LIMIT 500). ✓
+- Count queries are single-row aggregates. ✓
+- `IsFollowing` is an EXISTS check. ✓
 
 **Template:**
-- HTMX swap targets `#endorse-{nodeID}` — correct.
-- Filled vs outline icon via if/else. Clean.
-- Brand color when endorsed. Consistent with design system.
+- Follow button next to endorse button. Layout preserved.
+- Stats line shows follower/following counts. Clean.
+- No HTMX swap — uses full form POST + redirect. Acceptable for profile page (not high-frequency action). Could be HTMX-ified later.
 
-**NOTE:** Endorsement button only appears on Feed cards. Not yet on node detail page. Phase 2 has 3 more items — adding to node detail can be bundled with one of those.
+**Tests:** No new tests for follow methods. Pattern matches endorsements which are tested. Acceptable.
 
-**Tests:** Existing `TestEndorsements` covers Endorse/Unendorse/HasEndorsed/CountEndorsements. The new bulk methods are untested. Acceptable — they're simple query wrappers.
+**NOTE:** Feed filtering by followed users not yet implemented. Scoped out correctly — one gap per iteration.
 
 ## Verdict: PASS
