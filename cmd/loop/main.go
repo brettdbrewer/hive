@@ -92,6 +92,17 @@ func main() {
 
 		fmt.Fprintf(os.Stderr, "%s completed (%d bytes output)\n", agent, len(output))
 
+		// Write agent output to artifact file.
+		artifactFile := agentArtifact(agent)
+		if artifactFile != "" {
+			path := filepath.Join(loopDir, artifactFile)
+			if err := os.WriteFile(path, []byte(output), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "WARNING: couldn't write %s: %v\n", path, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "  → wrote %s\n", path)
+			}
+		}
+
 		// In supervised mode, pause for human review.
 		if !*approve && i < len(s.Agents)-1 {
 			fmt.Fprintf(os.Stderr, "\nReview %s output. Continue? [Y/n] ", agent)
@@ -218,6 +229,30 @@ func buildPrompt(agent, loopDir, gap, siteRepo string) string {
 	}
 
 	return sb.String()
+}
+
+// agentArtifact maps an agent name to its output artifact file.
+func agentArtifact(agent string) string {
+	switch agent {
+	case "scout":
+		return "scout.md"
+	case "architect":
+		return "plan.md"
+	case "designer":
+		return "design.md"
+	case "builder":
+		return "build.md"
+	case "tester":
+		return "test-report.md"
+	case "critic":
+		return "critique.md"
+	case "ops":
+		return "deploy.md"
+	case "reflector":
+		return "" // Reflector writes to state.md + reflections.md itself
+	default:
+		return ""
+	}
 }
 
 // sessionFile returns the path where an agent's session ID is stored.
@@ -451,30 +486,39 @@ func runAgent(agent, prompt string, needsTools bool, siteRepo string) (string, e
 
 	var args []string
 
+	// Write the message to a temp file and pipe via stdin (avoids Windows arg length limits).
+	var message string
+
 	if sessionID != "" {
 		// Resume existing session — agent already has CONTEXT, METHOD, and role prompt.
-		// Just send the new task as a message.
-		fmt.Fprintf(os.Stderr, "  Resuming session %s for %s\n", sessionID[:8], agent)
-		if needsTools {
-			args = []string{"--resume", sessionID, "--print"}
-		} else {
-			args = []string{"--resume", sessionID, "--print"}
-		}
-		// The message is just the phase-specific context (scout report, plan, etc.)
-		// extracted from the end of the prompt.
-		args = append(args, "--message", "New iteration. Execute your role with the following context:\n\n"+extractPhaseContext(prompt))
+		fmt.Fprintf(os.Stderr, "  Resuming session for %s\n", agent)
+		args = []string{"--resume", sessionID, "--print"}
+		message = "New iteration. Execute your role with the following context:\n\n" + extractPhaseContext(prompt)
 	} else {
-		// First run — inject full context as system prompt.
+		// First run — write system prompt to temp file.
 		fmt.Fprintf(os.Stderr, "  New session for %s (first run — full context)\n", agent)
-		if needsTools {
-			args = []string{"--print", "-n", "hive-"+agent}
-		} else {
-			args = []string{"--print", "-n", "hive-"+agent}
+
+		tmpFile, err := os.CreateTemp("", "hive-prompt-"+agent+"-*.md")
+		if err != nil {
+			return "", fmt.Errorf("create temp prompt: %w", err)
 		}
-		args = append(args, "--system-prompt", prompt, "--message", "You are now initialized. Execute your role. Produce the required artifacts.")
+		tmpFile.WriteString(prompt)
+		tmpFile.Close()
+		defer os.Remove(tmpFile.Name())
+
+		args = []string{"--print", "-n", "hive-" + agent, "--system-prompt-file", tmpFile.Name()}
+		message = "You are now initialized. Execute your role. Produce the required artifacts."
 	}
 
+	// For first run, use --output-format json to capture session_id.
+	isFirstRun := sessionID == ""
+	if isFirstRun {
+		args = append(args, "--output-format", "json")
+	}
+
+	// Pass message via stdin (avoids Windows command-line length limits).
 	cmd := exec.Command("claude", args...)
+	cmd.Stdin = strings.NewReader(message)
 	if needsTools {
 		absRepo, _ := filepath.Abs(siteRepo)
 		cmd.Dir = absRepo
@@ -486,14 +530,22 @@ func runAgent(agent, prompt string, needsTools bool, siteRepo string) (string, e
 		return "", fmt.Errorf("claude CLI: %w", err)
 	}
 
-	// If this was a new session, try to capture the session ID from output.
-	// Claude CLI prints session info — we'd need to parse it or use --output-format json.
-	// For now, use the agent name as a stable session name and use --continue next time.
-	if sessionID == "" {
-		saveSessionID(agent, "hive-"+agent)
+	result := string(output)
+
+	// On first run, parse the JSON to extract session_id and the actual text response.
+	if isFirstRun {
+		var jsonResp struct {
+			SessionID string `json:"session_id"`
+			Result    string `json:"result"`
+		}
+		if json.Unmarshal(output, &jsonResp) == nil && jsonResp.SessionID != "" {
+			saveSessionID(agent, jsonResp.SessionID)
+			fmt.Fprintf(os.Stderr, "  Session created: %s\n", jsonResp.SessionID[:8])
+			result = jsonResp.Result
+		}
 	}
 
-	return string(output), nil
+	return result, nil
 }
 
 // extractPhaseContext pulls just the phase-specific context from a full prompt
