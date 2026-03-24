@@ -51,6 +51,7 @@ func run() error {
 	// Runner mode flags.
 	role := flag.String("role", "", "Agent role (builder, scout, critic, monitor). Enables runner mode.")
 	pipeline := flag.Bool("pipeline", false, "Run Scout → Builder → Critic in sequence (one full cycle)")
+	council := flag.Bool("council", false, "Convene all agents for deliberation")
 	space := flag.String("space", "hive", "lovyou.ai space slug")
 	apiBase := flag.String("api", "https://lovyou.ai", "lovyou.ai API base URL")
 	budget := flag.Float64("budget", 10.0, "Daily budget in USD")
@@ -67,6 +68,9 @@ func run() error {
 	autoApprove := flag.Bool("yes", false, "Auto-approve authority (legacy runtime mode)")
 	flag.Parse()
 
+	if *council {
+		return runCouncil(*space, *apiBase, *repo, *budget)
+	}
 	if *pipeline || *role == "pipeline" {
 		return runPipeline(*space, *apiBase, *repo, *budget, *agentID)
 	}
@@ -143,6 +147,41 @@ func runRunner(role, space, apiBase, repoPath string, budget float64, agentID st
 	log.Printf("hive agent starting: role=%s model=%s space=%s repo=%s agent-id=%s one-shot=%v",
 		role, model, space, absRepo, agentID, oneShot)
 	return r.Run(ctx)
+}
+
+// ─── Council mode ────────────────────────────────────────────────────
+
+func runCouncil(space, apiBase, repoPath string, budget float64) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	apiKey := os.Getenv("LOVYOU_API_KEY")
+	client := api.New(apiBase, apiKey) // nil-safe if no key
+
+	if repoPath == "" {
+		repoPath = "."
+	}
+	absRepo, _ := filepath.Abs(repoPath)
+	hiveDir := findHiveDir()
+
+	// Use sonnet for council deliberation — quality thinking, not cost-cutting.
+	provider, err := intelligence.New(intelligence.Config{
+		Provider:     "claude-cli",
+		Model:        "sonnet",
+		MaxBudgetUSD: budget,
+	})
+	if err != nil {
+		return fmt.Errorf("provider: %w", err)
+	}
+
+	return runner.RunCouncil(ctx, runner.Config{
+		SpaceSlug: space,
+		RepoPath:  absRepo,
+		HiveDir:   hiveDir,
+		APIClient: client,
+		Provider:  provider,
+		BudgetUSD: budget,
+	})
 }
 
 // ─── Pipeline mode ───────────────────────────────────────────────────

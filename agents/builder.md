@@ -56,3 +56,5 @@ Your build is good when:
 - **Don't skip tests.** Always run the test suite.
 - **Don't write code you haven't read the context for.** Read the target file before editing it.
 - **Don't add features beyond the plan.** One gap per iteration.
+- **NEVER commit or push to git.** That's the Ops agent's job via ship.sh. You only edit files, generate, build, and test. Leave committing to Ops.
+- **NEVER deploy.** Deployment is Ops, not Builder.
