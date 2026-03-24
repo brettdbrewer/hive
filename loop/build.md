@@ -1,21 +1,29 @@
-# Build Report — Iteration 203
+# Build Report — Iteration 205
 
-## Sidebar Refactor — Unified Modes
+## Projects — First New Entity Kind
 
-Replaced "Layers" section with Work/Social division → three mode groups:
+**Store:**
+- `KindProject = "project"` constant added
+- No new store methods — existing `ListNodes(kind=project)` and `CreateNode(kind=project)` work as-is
 
-**Before:**
-- Work (→ Board)
-- Social (expandable → Feed, Threads, Chat, People)
-- Knowledge, Governance, Build, Transparency, Settings
+**Handler:**
+- `handleProjects` — lists project nodes for a space, search support
+- `intend` op: now accepts `kind` form field. `kind=project` creates a project; defaults to task.
+- Route: `GET /app/{slug}/projects`
 
-**After:**
-- **Execute:** Board, Build
-- **Communicate:** Feed, Threads, Chat, People
-- **Govern:** Knowledge, Governance, Transparency
-- Settings
+**Template:**
+- `ProjectsView` — project list with title, description, task progress (done/total + bar), status badge
+- Create form: hidden `kind=project` input, title + description
+- `projectsIcon` — folder SVG icon
 
-Mobile nav also updated: "Work" renamed to "Board", "Transparency" renamed to "Activity", order adjusted.
+**Sidebar + Mobile:**
+- "Projects" added between Board and Feed in both desktop sidebar and mobile nav
 
-**Files changed:**
-- `graph/views.templ` — sidebar structure, mobile nav
+**The proof:** Adding a new entity kind required:
+- 1 constant (1 line)
+- 1 handler (~30 lines, copypaste of handleChangelog pattern)
+- 1 template (~80 lines)
+- 1 line in `intend` op (accept kind param)
+- 0 schema changes, 0 new store methods
+
+The grammar is genuinely kind-agnostic.

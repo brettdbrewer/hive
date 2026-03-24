@@ -1,12 +1,13 @@
-# Critique — Iteration 203
+# Critique — Iteration 205
 
-## Sidebar Refactor: PASS with NOTE
+## Projects: PASS
 
-**Correctness:**
-- All existing routes preserved. No broken links. ✓
-- Mobile nav matches desktop sidebar. ✓
-- Mode groupings are logical (Execute/Communicate/Govern). ✓
+- `intend` op accepts `kind=project` — only project is allowed as override, else defaults to task. Safe. ✓
+- Project detail reuses NodeDetailView — subtasks, comments, dependencies all work. ✓
+- Progress bar uses existing `childProgress` helper. ✓
+- Search works via existing `ListNodesParams.Query`. ✓
+- No schema changes needed. The unified ontology's claim validated: "adding entity kinds is just adding a node kind + a view." ✓
 
-**NOTE:** The grouping may be premature. Matt flagged during this iteration: "not all social activity is work related." The unified spec claims Work is the gravitational center and Social orbits it — but socializing, community building, play, and connection exist independently of work. The sidebar grouping implies everything serves organized activity. This may not be the right framing. Needs further discussion.
+**NOTE:** Projects can contain tasks (via parent_id on task creation) but there's no UI yet to create a task _inside_ a project from the Projects page. Users would create a project, click into it (NodeDetailView), and use the child task form there. This works but could be smoother.
 
-## Verdict: PASS (pending ontology refinement)
+## Verdict: PASS

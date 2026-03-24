@@ -1,11 +1,23 @@
-# Scout Report — Iteration 204
+# Scout Report — Iteration 205
 
-## Gap: Ontology rooted in "organized activity" — wrong root
+## Gap: No Project entity — tasks are flat, ungrouped
 
-**The problem:** The unified spec (iter 202) claimed Work is the gravitational center. The sidebar (iter 203) grouped everything as Execute/Communicate/Govern — implying all activity serves productivity. But chatting with friends isn't work. Posting memes isn't organized activity. Community, play, connection exist independently.
+**Source:** unified-spec.md entity table. work-general-spec.md. Every scale needs projects.
 
-**The correct root:** The soul says "take care of your human, humanity, and yourself." That's not a work mandate — it's an existence mandate. The root is **collective existence**, not organized activity. Work is one aspect. Social connection is another. Neither is subordinate.
+**Current state:** Tasks live in a flat list per space. Subtasks exist (parent_id) but there's no higher-level grouping. A space with 50 tasks is a wall of cards. No way to say "these 12 tasks are the Auth project" and "those 8 are the API project."
 
-**Method:** Re-derive from "collective existence" using the generator function. Update the unified spec. Fix the sidebar to not impose a productivity framing.
+**What's needed:**
+1. `project` node kind — a container for tasks with its own title, description, status
+2. Tasks link to projects via parent_id (already works — subtask mechanism)
+3. Projects view — list of projects with task counts, progress bars
+4. Board grouped by project (optional filter)
 
-**Output:** Updated unified-spec.md + sidebar fix.
+**Why this first:** Project is the first new entity kind from the unified spec. It proves "adding entity kinds is just adding a node kind + a view." No schema changes. No new ops — Intend creates a project just like it creates a task. The grammar is kind-agnostic.
+
+**Approach:**
+- Add `KindProject = "project"` constant
+- Add a "Projects" page: `/app/{slug}/projects` — lists project nodes with child task counts
+- Project detail: just NodeDetailView (already works for any node kind)
+- Board: add project filter dropdown
+
+**Risk:** Low. One new constant, one new handler, one new template. Existing infrastructure handles the rest.

@@ -1738,3 +1738,19 @@ This is the same pattern as iters 182-183 (Social spec). Spec iterations are the
 **ZOOM:** The derivation went too far. "Everything is organized activity" is a useful framing for enterprise/civilizational scale but wrong at the individual/community scale. The truth is closer to: the platform supports BOTH purposeful activity AND social connection, on the same graph, with shared primitives. Sometimes they overlap (task discussion). Sometimes they don't (chatting with friends). The sidebar should reflect this without forcing everything into "modes of work."
 
 **FIXPOINT CHECK:** The ontology needs refinement. Work and Social are peers, not parent-child. The sidebar grouping should acknowledge both purposes.
+
+---
+
+## Iterations 204-205 — 2026-03-24
+
+**Built:** Ontology re-derived from collective existence (204). Projects as first new entity kind (205).
+
+**COVER:** The re-derivation corrected the Work-as-root error. Collective existence is the root. Work and Social are peers — both necessary, neither subordinate. The sidebar is now a flat mode list without imposed hierarchy.
+
+Projects proved the unified ontology's core claim: adding a new entity kind requires 1 constant, 1 handler, 1 template, and 0 schema changes. The grammar is genuinely kind-agnostic. `intend` creates a project the same way it creates a task. `ListNodes` lists projects the same way it lists tasks. NodeDetailView renders projects the same way it renders tasks. The architecture works.
+
+**BLIND:** Projects don't yet interact with the Board — you can't filter Board by project, or see which project a task belongs to. The task→project relationship exists (parent_id) but there's no UI affordance for assigning a task to a project from the Board view. Also: the `intend` op's kind parameter only allows `project` as an override — future entity kinds (goal, role, team) will need the same treatment.
+
+**ZOOM:** Lesson 50: **Proving architecture claims with code is more valuable than writing more spec.** The unified ontology claimed "adding entity kinds is trivial." Projects proved it in ~110 lines. The next entity kinds (Goal, Team, Role) should be equally fast. The spec → proof cycle is: claim in spec → validate with one implementation → if validated, build the rest.
+
+**FIXPOINT CHECK:** No fixpoint. 10 more entity kinds from the unified spec remain. Next: the entity kind most useful for a community (not just a team) — possibly Goal (Plan mode) or Team (Organize mode).
