@@ -1780,3 +1780,13 @@ Projects proved the unified ontology's core claim: adding a new entity kind requ
 **BLIND:** The filter only works one way (project filters tasks). The reverse (on the Projects page, see which tasks belong to each project) works via NodeDetailView but isn't explicitly surfaced. Also: tasks created on the Board while a project is filtered should auto-assign to that project (set parent_id) — they don't yet.
 
 **ZOOM:** Three Work iterations (205-207): entity kinds (Project, Goal) + cross-entity filtering. The product went from "kanban board" to "goals → projects → tasks with filtering" in 3 iterations. The unified ontology is bearing fruit.
+
+---
+
+## Iteration 208 — 2026-03-24
+
+**Built:** Claim op. Self-assign with state change (open → active). Claim buttons on Board + List for unassigned tasks. ClaimNode store method is atomic (checks assignee is empty).
+
+**COVER:** Claim is the market mechanism — the link between available work and willing workers. Works for humans, agents, and any future actor type. The old Market layer "claim" just set assignee. The new one sets assignee AND transitions state to active, which is what "I'm working on this" actually means.
+
+**ZOOM:** Matt flagged three expansion directions during this iteration: vision page on the site, Market generalization (exchange as a general concept), and generalizing ALL 13 layers via cognitive grammar. The right move is to do the comprehensive generalization — apply the same method that produced the Work general spec and unified ontology to every layer. This is the foundational spec work that turns the product from "a tool with features" into "a substrate for collective existence."

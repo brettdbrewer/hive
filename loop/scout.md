@@ -1,16 +1,16 @@
-# Scout Report — Iteration 207
+# Scout Report — Iteration 208
 
-## Gap: Board has no project awareness
+## Gap: No claim op — can't self-assign tasks
 
-**Source:** Reflector iter 206 — "cross-entity relationships are what make entity kinds valuable."
+**Source:** work-product-spec.md — "claim: Sets assignee_id = actor. Records Op. open → active."
 
-**Current state:** Board shows all tasks in a space, flat. Projects exist but the Board doesn't know about them. A space with 50 tasks across 5 projects is a wall of undifferentiated cards.
+**Current state:** Tasks can be assigned by the creator, but there's no way for someone to say "I'll take this." You have to ask the space owner to assign you. This blocks the market mechanism, agent self-assignment, and team claim workflows.
 
 **What's needed:**
-1. Project filter dropdown on Board (and List view)
-2. When a project is selected, only show tasks that are children of that project
-3. Project name visible on task cards (when not filtering by project)
+1. `claim` grammar op — sets assignee = actor, state → active, records op
+2. "Claim" button on task cards (Board + List) for unassigned open tasks
+3. Notification to task author when someone claims their task
 
-**Why this:** It connects Execute mode with Plan mode. "I'm working on the Auth project — show me only Auth tasks" is the #1 use case for projects. Without this, Projects are just folders you have to click into.
+**Why claim:** Every scale needs it. Solo dev claims from their backlog. Team member claims from the sprint. Agent claims from the work queue. Delivery driver claims a delivery. It's the self-assignment primitive.
 
-**Approach:** Load projects for the space. Add a `project` query param filter. In the handler, filter tasks by parent_id matching the selected project. Add dropdown to Board + List filter bars.
+**Approach:** Add handler case in the op switch. Update TaskCard with a claim button (shown when task is unassigned + open + user is logged in). HTMX swap for inline state update.
