@@ -147,31 +147,84 @@ func buildPrompt(agent, loopDir, gap, siteRepo string) string {
 		sb.WriteString("\n\n")
 	}
 
+	// Load agent prompt from agents/ directory.
+	agentPrompt, err := os.ReadFile(filepath.Join("agents", agent+".md"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: can't read agents/%s.md: %v\n", agent, err)
+		return ""
+	}
+	sb.WriteString(string(agentPrompt))
+	sb.WriteString("\n\n")
+
+	// Load the method (cognitive grammar for all agents).
+	method, _ := os.ReadFile(filepath.Join("agents", "METHOD.md"))
+	if len(method) > 0 {
+		sb.WriteString("== COGNITIVE GRAMMAR METHOD ==\n")
+		sb.WriteString(string(method))
+		sb.WriteString("\n\n")
+	}
+
+	// Add phase-specific context (previous artifacts).
 	switch agent {
 	case "scout":
-		sb.WriteString(scoutPrompt(loopDir, gap))
+		if gap != "" {
+			sb.WriteString("\nThe Director has specified the gap: " + gap + "\n")
+		}
+		pm, _ := os.ReadFile(filepath.Join(loopDir, "product-map.md"))
+		if len(pm) > 0 {
+			lines := strings.Split(string(pm), "\n")
+			if len(lines) > 100 {
+				lines = lines[:100]
+			}
+			sb.WriteString("\n== PRODUCT MAP (first 100 lines) ==\n")
+			sb.WriteString(strings.Join(lines, "\n"))
+		}
 	case "architect":
-		sb.WriteString(architectPrompt(loopDir))
-	case "builder":
-		sb.WriteString(builderPrompt(loopDir, siteRepo))
-	case "tester":
-		sb.WriteString(testerPrompt(loopDir, siteRepo))
-	case "critic":
-		sb.WriteString(criticPrompt(loopDir))
-	case "ops":
-		sb.WriteString(opsPrompt(loopDir, siteRepo))
-	case "reflector":
-		sb.WriteString(reflectorPrompt(loopDir))
+		scout, _ := os.ReadFile(filepath.Join(loopDir, "scout.md"))
+		sb.WriteString("\n== SCOUT REPORT ==\n" + string(scout))
 	case "designer":
-		sb.WriteString(designerPrompt(loopDir))
-	default:
-		return ""
+		plan, _ := os.ReadFile(filepath.Join(loopDir, "plan.md"))
+		sb.WriteString("\n== PLAN ==\n" + string(plan))
+	case "builder":
+		scout, _ := os.ReadFile(filepath.Join(loopDir, "scout.md"))
+		plan, _ := os.ReadFile(filepath.Join(loopDir, "plan.md"))
+		sb.WriteString("\n== SCOUT REPORT ==\n" + string(scout))
+		sb.WriteString("\n== PLAN ==\n" + string(plan))
+		sb.WriteString("\nSite repo: " + siteRepo + "\n")
+	case "tester":
+		build, _ := os.ReadFile(filepath.Join(loopDir, "build.md"))
+		sb.WriteString("\n== BUILD REPORT ==\n" + string(build))
+		sb.WriteString("\nSite repo: " + siteRepo + "\n")
+	case "critic":
+		scout, _ := os.ReadFile(filepath.Join(loopDir, "scout.md"))
+		build, _ := os.ReadFile(filepath.Join(loopDir, "build.md"))
+		sb.WriteString("\n== SCOUT REPORT ==\n" + string(scout))
+		sb.WriteString("\n== BUILD REPORT ==\n" + string(build))
+	case "ops":
+		sb.WriteString("\nSite repo: " + siteRepo + "\n")
+	case "reflector":
+		scout, _ := os.ReadFile(filepath.Join(loopDir, "scout.md"))
+		build, _ := os.ReadFile(filepath.Join(loopDir, "build.md"))
+		critique, _ := os.ReadFile(filepath.Join(loopDir, "critique.md"))
+		sb.WriteString("\n== SCOUT REPORT ==\n" + string(scout))
+		sb.WriteString("\n== BUILD REPORT ==\n" + string(build))
+		sb.WriteString("\n== CRITIQUE ==\n" + string(critique))
 	}
 
 	return sb.String()
 }
 
-func scoutPrompt(loopDir, gap string) string {
+// runAgent calls Claude CLI with the given prompt.
+//
+// Pipeline agents (scout, architect, builder, etc.) are COLD-START:
+// each phase is a fresh CLI invocation with no state from prior phases
+// except via artifact files. This is intentional — stateless, reproducible.
+//
+// Background agents (guardian, librarian) would be LONG-RUNNING:
+// a persistent process that watches events. Not implemented yet.
+func _legacyRemoved() {} // placeholder — delete with legacy functions below
+
+func _legacyScoutPrompt(loopDir, gap string) string {
 	var sb strings.Builder
 	sb.WriteString(`== ROLE: SCOUT ==
 You identify the single highest-value gap to address next.
