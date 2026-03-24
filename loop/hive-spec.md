@@ -298,22 +298,97 @@ Throughout:
 
 ---
 
-## Part 6: Where It Runs
+## Part 6: Runtime Architecture
+
+### How Agents Actually Run
+
+Each agent is a **Claude CLI invocation** with a specific system prompt, scoped file access, and structured output. Not a long-running daemon. Triggered by the pipeline orchestrator.
+
+```
+cmd/loop (pipeline orchestrator)
+  │
+  ├── Reads board for next task
+  ├── PM prompt → Claude CLI → decides shape + priority
+  ├── Scout prompt → Claude CLI → writes scout.md
+  ├── Architect prompt → Claude CLI → writes plan.md
+  ├── Builder prompt → Claude CLI (with --allowedTools) → edits code, runs tests
+  ├── Tester prompt → Claude CLI (with --allowedTools) → writes/runs tests
+  ├── Critic prompt → Claude CLI → writes critique.md
+  ├── Ops prompt → Claude CLI (with --allowedTools) → runs ship.sh
+  ├── Reflector prompt → Claude CLI → updates state.md, reflections.md
+  │
+  └── Posts summary to lovyou.ai via API
+```
+
+**Each pipeline step is:**
+1. Assemble the prompt (system prompt + context from previous steps)
+2. Call `claude` CLI with the prompt and allowed tools
+3. Parse the output (artifacts written to files)
+4. Post to the relevant lovyou.ai channel via API
+5. Trigger the next step
+
+### The Three Execution Modes
+
+| Mode | What | Where | When |
+|------|------|-------|------|
+| **Manual** | Human (Matt + Claude) runs the loop in conversation | Local terminal | Now. How we've done 216 iterations. |
+| **Supervised** | `cmd/loop` runs the pipeline, human approves each step | Local or Fly.io | Next. Human reviews artifacts before proceeding. |
+| **Autonomous** | `cmd/loop` runs continuously, human reviews async | Fly.io machine | Future. Human gets notifications, intervenes when needed. |
+
+### cmd/loop — The Pipeline Orchestrator
+
+New binary. The bridge from manual to autonomous.
+
+```go
+// cmd/loop/main.go
+//
+// Runs one iteration of the core loop:
+// 1. Reads board for highest-priority unassigned task (or uses --task flag)
+// 2. Determines pipeline shape from task metadata
+// 3. Executes each pipeline agent in sequence via Claude CLI
+// 4. Each agent reads prior artifacts and produces its own
+// 5. Posts iteration summary to lovyou.ai
+// 6. Commits artifacts to git
+//
+// Flags:
+//   --task ID     Run a specific task (skip PM step)
+//   --shape NAME  Override pipeline shape (quick, standard, designed, full, spec, test)
+//   --approve     Auto-approve all steps (skip human review)
+//   --dry-run     Show what would happen without executing
+//   --repo PATH   Path to site repo for Builder/Tester operations
+```
+
+### What Each Agent Gets
+
+| Agent | Claude CLI flags | File access | API access |
+|-------|-----------------|-------------|------------|
+| PM | `--print` (no tools) | Read: state.md, product-map.md, board API | lovyou.ai API (read board) |
+| Researcher | `--print` (no tools) | Read: specs, docs | Web search |
+| Scout | `--print` (no tools) | Read: state.md, specs, codebase (grep/read) | — |
+| Architect | `--print` (no tools) | Read: scout.md, specs, codebase | — |
+| Designer | `--print` (no tools) | Read: plan.md, views.templ, static/ | — |
+| Builder | Full tool access | Read/write: all code files | Git, templ, go build |
+| Tester | Full tool access | Read/write: *_test.go files | go test |
+| Critic | `--print` (no tools) | Read: all artifacts + code diff | — |
+| Ops | Full tool access | Read: ship.sh | Fly.io deploy |
+| Reflector | Limited write | Write: state.md, reflections.md | lovyou.ai API (post) |
+
+**Key insight:** Most agents are read-only. Only Builder, Tester, and Ops get write access. This is the authority model enforced at the tool level, not just in the prompt.
 
 ### Infrastructure
 
 | Component | Where | What |
 |-----------|-------|------|
-| Agent runtime | Fly.io machine (or local) | `cmd/hive` — the process that runs agents |
-| Event graph | Neon Postgres | Shared with lovyou.ai |
-| Agent communication | lovyou.ai channels | Conversations in the hive space |
-| Code operations | Claude CLI (via Operate) | Agents read/write code, run tests, git |
-| Deployment | Fly.io (`ship.sh`) | Builder triggers deploys |
-| Knowledge | Git + lovyou.ai Knowledge lens | Specs, lessons, reflections |
+| `cmd/loop` | Local (now) → Fly.io (later) | Pipeline orchestrator |
+| Claude CLI | On the machine running cmd/loop | Inference engine (Max plan, OAuth) |
+| lovyou.ai API | Fly.io (production) | Board, channels, feed, knowledge |
+| Git repos | Local clones on the machine | Code access for Builder/Tester |
+| `ship.sh` | In site repo | Deploy pipeline (templ + build + test + deploy + commit + push) |
+| Artifacts | `hive/loop/` directory | scout.md, build.md, critique.md, reflections.md, state.md |
 
 ### The Hive Space on lovyou.ai
 
-The hive already has a space: `lovyou.ai/app/hive`. Currently used for posting iteration summaries. Should become the hive's full operating environment:
+The hive already has a space: `lovyou.ai/app/hive`. Currently used for posting iteration summaries. Becomes the full operating environment:
 
 - **Board** — the hive's task backlog (from the product map)
 - **Feed** — iteration summaries (already exists via cmd/post)
@@ -322,6 +397,24 @@ The hive already has a space: `lovyou.ai/app/hive`. Currently used for posting i
 - **Governance** — invariants, authority levels, trust decisions
 - **Activity** — full audit trail of all agent ops
 - **People** — agent roster with roles, trust levels, capabilities
+
+### Token Economics
+
+| Agent | Estimated tokens/iteration | Model | Cost |
+|-------|---------------------------|-------|------|
+| PM | ~5K in, ~2K out | Opus | ~$0.12 |
+| Scout | ~30K in, ~3K out | Opus | ~$0.60 |
+| Architect | ~20K in, ~5K out | Opus | ~$0.50 |
+| Builder | ~40K in, ~10K out | Opus | ~$1.00 |
+| Tester | ~20K in, ~5K out | Opus | ~$0.50 |
+| Critic | ~20K in, ~3K out | Opus | ~$0.40 |
+| Reflector | ~15K in, ~3K out | Opus | ~$0.30 |
+| **Standard iteration** | **~150K in, ~31K out** | | **~$3.40** |
+| **Quick fix** | **~60K in, ~10K out** | | **~$1.30** |
+
+At Max plan (flat rate), this is effectively free. At API rates, ~$3-4 per iteration. 50 iterations/day = ~$150/day. Sustainable with revenue.
+
+Background agents (Guardian, Librarian, etc.) use Sonnet/Haiku for lower cost on routine tasks.
 
 ---
 

@@ -1,11 +1,11 @@
-# Scout Report — Iteration 214
+# Scout Report — Iteration 217
 
-## Gap: The hive has no detailed operational spec
+## Gap: Agent runtime architecture undefined, no prompts written
 
-We know WHAT the hive is (the meta-product that builds products). We don't know HOW it operates in detail. What agents? How do they communicate? What does the UI look like? How do they track resources? What docs do they need? How do they apply techniques like cognitive grammar?
+The hive spec defines 22 roles but doesn't specify:
+1. How agents physically run (processes, machines, triggers)
+2. What tools agents have access to (CLI, API, filesystem)
+3. How the pipeline orchestrator works
+4. The actual system prompts
 
-**This is the most important spec we'll write.** The hive is both the builder and the first customer of everything we build.
-
-**Method:** Apply cognitive grammar to "a self-organizing agent civilization that builds products." Derive the roles, communication, coordination, knowledge management, and resource tracking.
-
-**Output:** `hive/loop/hive-spec.md`
+**This iteration:** Define the runtime architecture, then start writing prompts for the core pipeline agents.
