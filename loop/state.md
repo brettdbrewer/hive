@@ -262,27 +262,34 @@ Deploy: `fly deploy --remote-only` from site repo.
 46. **Three layers of spec, each converged independently.** Primitives (vocabulary), Product (meaning), Compositions (appearance). Missing any layer leaves gaps.
 47. **REVISE before new work.** Iteration 189 fixed the iter 186 REVISE (edit reload hack) before starting new work. Outstanding REVISE flags should be resolved at the start of the next iteration, not deferred.
 
-## Vision Notes
+## Vision
 
-- Agents should acquire skills dynamically (like OpenClaw).
-- Auth gate is open — Google OAuth in production mode, anyone can sign in.
-- Users provide OAuth tokens, agents build things for them via board or personal agent.
-- Social product: humans and agents build MySpace-like personal pages.
-- Business use: companies use the platform to build products.
-- Agents and humans are peers on the social graph.
-- Visual identity: "Ember Minimalism" — dark, warm, intentional, alive. lovyou2 as ancestor.
+**The product is a substrate for collective existence.** Not a task tracker. Not a social network. A platform where any group — friend group, dev team, company, charity, city, civilization — can organize their existence using the same graph, grammar, and agents.
+
+- **Root:** Collective existence (the soul: "take care of your human, humanity, and yourself")
+- **Architecture:** Event graph, grammar ops, signed causal chains. Kind-agnostic — a Node is a Node whether it's a task, a policy, or a friendship.
+- **Modes:** 10 currently (Board, Projects, Goals, Feed, Chat, Threads, People, Knowledge, Governance, Build, Activity). More emerge as entity kinds are added.
+- **Entity kinds:** 10 currently (task, post, thread, comment, conversation, claim, proposal, project, goal). 8+ more from the unified spec (role, team, department, policy, process, decision, resource, document, organization).
+- **Scale:** Same primitives serve solo dev through civilizational. Modes emerge from content, not from feature gates.
+- **Agents:** Peers on the graph. Many hives, many apps. Each space can have its own agents with their own roles and capabilities.
+- **Revenue:** Charge corporations, free for individuals. Hosted persistence.
+- **Visual identity:** "Ember Minimalism" — dark, warm, intentional, alive.
+
+**Specs:**
+- `unified-spec.md` — structural ontology (collective existence, derivation order, 10 modes, 18 entities)
+- `work-general-spec.md` — Work expanded to 6 modes, 12 entity types
+- `social-spec.md` — Social 4 modes (Chat, Rooms, Square, Forum) as compositions
+- `work-product-spec.md` — Execute mode depth (12 ops, state machine, decomposition)
+- `social-product-spec.md` — Social product positioning
 
 ## What the Scout Should Focus On Next
 
-**LOVYOU_API_KEY:** `lv_b7fb22cde43a8a65289f77ee6dc9aa195184bf6129160f62691e59d8d6ccc8dd` — authenticates as the "Hive" agent user.
+**LOVYOU_API_KEY:** `lv_b7fb22cde43a8a65289f77ee6dc9aa195184bf6129160f62691e59d8d6ccc8dd`
 
-**Mind conversation tools:**
-- `cmd/reply` — one-shot command that fetches conversations, invokes Mind, posts responses
-- Identity resolved from API key (no hardcoded names)
-- Run: `LOVYOU_API_KEY=lv_... ANTHROPIC_API_KEY=... go run ./cmd/reply/`
+**Mind tools:**
+- `cmd/reply` — one-shot, identity from API key
+- `cmd/post` — publishes iteration summaries
 
-**The test debt question:** 6+ features shipped without tests. Invariant 12 is violated. The Reflector has flagged this as the largest systemic risk and a structural loop failure. The Scout should decide: is the next iteration a test iteration (write tests for endorsements, reports, resolve, dashboard, search, knowledge), or does product breadth still take priority? If breadth: 4 layers remain (Build(5), Meaning(11), Evolution(12), Being(13)). If tests: one iteration could cover the 6 untested features. Either choice is defensible, but the choice must be explicit — not deferred again.
+**The entity kind pipeline is proven.** Each new kind = 1 constant, 1 handler, 1 template. Priority order for remaining kinds: Team, Role (Organize mode) → Policy, Decision (Govern mode) → Document (Learn mode) → Resource (Allocate mode) → Organization (meta-container).
 
-**If continuing breadth:** Layer 5 (Build) is next in sequence and the most concrete of the remaining four. Meaning(11), Evolution(12), and Being(13) are progressively more abstract.
-
-**If deepening:** Knowledge(6) has the most room — verify/retract ops, evidence linking, search integration. Market(2) needs exchange. Bond(9) needs connections/DMs.
+**Cross-entity depth is more valuable than more kinds.** Board project filter (207) shows the pattern: entities filtering and contextualizing each other. Next: Goal progress dashboard (aggregated Goal → Project → Task view), task auto-assign to filtered project.
