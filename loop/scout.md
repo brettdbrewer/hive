@@ -1,11 +1,15 @@
-# Scout Report — Iteration 210
+# Scout Report — Iteration 211
 
-## Gap: Three unresolved spec questions blocking fixpoint
+## Gap: No product map — we have layers, not products
 
-1. **Organization ↔ Space** — Spaces contain Nodes. Organizations should contain Spaces. Current model can't express this.
-2. **Thin kinds** — ~half of the 54 proposed entity kinds fail the lifecycle test. Need to filter.
-3. **Market exchange flow** — entity kinds listed but the multi-step exchange mechanism isn't designed.
+**The insight:** Successful products do ONE thing well. We have 13 layers, each containing potentially dozens of focused products. The architecture supports all of them, but we haven't mapped what they are, what shared infrastructure they need, or how users navigate between them.
 
-**Method:** Address all three in one pass. Apply the thin-kinds test (distinct lifecycle, create form, list view). Resolve Organization ↔ Space architecturally. Design the Market exchange flow at grammar-op level.
+**The framing shift:** Not "one product with 20 entity kinds" but "an ecosystem of focused products sharing common infrastructure on one graph."
 
-**Output:** Updates to unified-spec.md and layers-general-spec.md. Fixpoint or honest admission of remaining gaps.
+**What's needed:**
+1. Product catalog: what specific products exist in each layer family?
+2. Shared infrastructure: what cross-cutting components does every product need?
+3. Navigation: how do users move between products? (13-layer main menu → product family → specific product)
+4. Product boundaries: where does one product end and another begin?
+
+**Output:** `hive/loop/product-map.md`

@@ -1,15 +1,21 @@
-# Build Report — Iteration 210
+# Build Report — Iteration 211
 
-## Fixpoint Pass
+## Product Map
 
-Three questions resolved:
+**Output:** `hive/loop/product-map.md`
 
-**1. Organization ↔ Space:** Spaces nest via `parent_id`. Organization is a Space with kind=organization that contains child Spaces. One column: `ALTER TABLE spaces ADD COLUMN parent_id TEXT REFERENCES spaces(id)`. Team and Department are Spaces, not Nodes. Role, Policy, Decision remain Nodes.
+**Key findings:**
 
-**2. Thin-kinds filter: 54 → 20.** Applied the lifecycle test (distinct lifecycle + distinct create form + distinct list view). 34 proposed kinds failed — they're metadata on existing kinds (tags, ops, profile fields), not distinct entities. Honest count: 20 kinds total, 10 exist, 10 to build.
+1. **~56 distinct products** across 13 layer families. Each does one thing well. All share infrastructure.
 
-**3. Market exchange flow:** Maps entirely to existing grammar ops: Intend → Respond → Consent → Claim → Complete → Review. No new ops. The exchange mechanism is a composition.
+2. **14 shared infrastructure components** that every product uses: auth, identity, DMs, notifications, search, reactions, endorsements, follows, command palette, activity feed, file attachments, @mentions, keyboard shortcuts, markdown.
 
-**Fixpoint reached.** Applying the method again refines details but doesn't change architecture or entity list.
+3. **A product is a space configuration** — which entity kinds are active, which modes are visible, what the focused view looks like. NOT a separate codebase.
 
-This iteration produced spec refinements, not code.
+4. **Navigation model:** 13-layer main menu → product family → specific product. Users drill into what they need.
+
+5. **Cross-cutting features (DMs, search, endorsements) are built once.** Every product gets them. This is the platform advantage — each product starts 60% done.
+
+6. **Build strategy:** First product per layer → second product per layer → open platform for hives to build more.
+
+This iteration produced spec, not code.

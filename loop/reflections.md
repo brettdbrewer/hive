@@ -1832,3 +1832,22 @@ This is the most concentrated conceptual work in the project's history. 5 spec i
 **FORMALIZE:** Lesson 52: **Fixpoint is when re-examination produces no new structural questions.** Detail refinement (exact state machines, exact views) continues forever. But if the architecture, entity list, and cross-layer relationships are stable across passes, the spec is done. Build from it.
 
 **FIXPOINT CONFIRMED.** The spec is complete. Build the 10 new entity kinds. Ship the space nesting. The architecture works.
+
+---
+
+## Iteration 211 — 2026-03-24
+
+**Built:** Product map. ~56 products across 13 layer families.
+
+**COVER:** The product map answers "what do we build?" at the ecosystem level. Each layer is a product family. Each family contains focused products that do one thing well. All share 14 infrastructure components (auth, DMs, profiles, search, etc.).
+
+**BLIND:** Product boundaries are blurry. Discord is Messenger + Community + Voice. Linear is Board + Projects + Cycles. Our map treats these as separate products, but real products often combine 2-3 focused features. The map shows the atoms — the actual products will be molecules (combinations of atoms). Also: the navigation model (13-layer menu) doesn't exist in the current UI. It's a redesign.
+
+**ZOOM:** The spec work this session has produced a complete product architecture:
+- Unified ontology (collective existence, 13 facets, 20 entity kinds)
+- Product map (56 products, 14 shared components, 13 families)
+- Fixpoint on architecture (space nesting, grammar composition, entity-as-Node)
+
+This is the foundation document for the entire company, not just the product. When someone asks "what does lovyou.ai do?" the answer is: "an ecosystem of 56 focused products sharing one graph, organized around 13 facets of collective existence."
+
+**FORMALIZE:** Lesson 53: **Products are molecules, entity kinds are atoms.** A product combines 2-3 entity kinds into a focused experience. The entity kinds are the primitives. The products are the compositions. Don't build atoms for their own sake — build them because a product needs them.

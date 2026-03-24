@@ -1,28 +1,22 @@
-# Critique — Iteration 210
+# Critique — Iteration 211
 
-## Fixpoint Pass: PASS
+## Product Map: PASS
 
-**Organization ↔ Space:**
-- Space nesting via parent_id is architecturally clean — mirrors Node nesting. ✓
-- Team/Department as Spaces (not Nodes) is correct — they need membership, content, sidebar. ✓
-- One schema change. Backwards compatible (parent_id defaults to NULL). ✓
+**Completeness:** All 13 layers have product families. ~56 products identified. Each has a comparable product, key entities, and a "does one thing" description. ✓
 
-**Thin-kinds filter:**
-- 54 → 20 is a significant reduction. Each surviving kind has a clear lifecycle, form, and view. ✓
-- The failed kinds have clear reasons (metadata, computed, op variant). ✓
-- 10 new kinds to build. At proven rate (1 iter per kind), ~10 iterations. Manageable. ✓
+**Shared infrastructure:** 14 components identified. DMs as cross-cutting example is well-illustrated. ✓
 
-**Market exchange:**
-- 6-step flow maps to 6 existing ops. No new ops needed. ✓
-- Resource entity kind tracks what's exchanged. ✓
-- The flow is a composition, not a mechanism. Consistent with the grammar principle. ✓
+**Product-as-space-config principle:** Clean. A product is a view, not a codebase. ✓
 
-**Fixpoint claim:**
-- Root (collective existence): stable across 4 passes. ✓
-- Architecture (Nodes, Ops, Spaces): stable, one extension (parent_id). ✓
-- Entity list: reduced from aspirational to tested. ✓
-- Cross-layer relationships: unchanged by this pass. ✓
+**Risks / Open questions:**
+- 56 products is the CATALOG, not the roadmap. We build ~5 deep before opening the platform.
+- The navigation model (13-layer menu → family → product) is conceptual. The current site has one sidebar, not a layer menu. Implementing the nav model is a significant UI redesign.
+- Some products in the catalog are very thin — "Glossary" is just documents with a tag. "Recognition" is just endorsements with a body. The thin-kinds filter from iter 210 applies to products too.
+- The product boundaries are blurry. Is "Projects + OKRs" one product or two? Is "Messenger + Community" one product (Discord does both) or two?
 
-**Fixpoint confirmed.** The spec is self-consistent and no new structural questions emerge from re-examination.
+**What this spec does well:**
+- Makes the ecosystem visible. We can point to the map and say "here are 56 products we could build."
+- Identifies shared infrastructure explicitly — this is the build priority.
+- Shows the platform advantage: each product starts 60% done because of shared components.
 
-## Verdict: PASS — FIXPOINT
+## Verdict: PASS
