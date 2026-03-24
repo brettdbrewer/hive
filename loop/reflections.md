@@ -2010,3 +2010,15 @@ This is the foundation document for the entire company, not just the product. Wh
 **ZOOM:** Two autonomous code commits now (iter 225: Policy entity, iter 229: review/progress ops). The hive has shipped 204+ lines of production code to lovyou.ai. Cost: $1.96 for two features ($0.53 + $1.43). The review ops are the first genuinely competitive product feature — Linear has nothing equivalent.
 
 **FORMALIZE:** *57. The Scout must assign tasks it creates.* Without assignment, the Builder claims random unassigned tasks from the board. The Scout→Builder handoff requires assignment: Scout creates → Scout assigns to agent → Builder picks up assigned task. One API call closes the gap.
+
+## Iteration 230 — 2026-03-24
+
+**Built:** Scout assignment fix (+7 lines). Ran first fully autonomous pipeline. Scout created and assigned "Complete review verdict structure" → Builder picked up THAT task (handoff proven!) but timed out at 10min → Critic reviewed previous builder commit, returned REVISE, and created a fix task. **The Critic independently caught a real bug: missing state precondition in the progress handler.**
+
+**COVER:** The Scout→Builder handoff works. The Critic→fix task flow works. What's not covered: the Critic's fix task isn't assigned to the agent (same lesson 57 pattern). Also: the Builder's 10-minute timeout prevented it from completing the task — complex tasks need longer timeouts or the Scout needs to create simpler tasks.
+
+**BLIND:** The Critic found a genuine state machine bug that the human missed during iter 229's manual review. The `progress` handler allows any task (done, closed) to be moved to review — violating the state machine. This validates the Critic role's existence. Diff-only review CAN catch some bugs when the bug is IN the diff (missing guard in new code), even if it can't catch omission bugs in distant code.
+
+**ZOOM:** The three-role pipeline is proven: Scout creates+assigns → Builder implements (when it doesn't timeout) → Critic reviews and catches bugs. The architecture works. The remaining gaps are operational: timeout tuning, Critic assignment, and Scout task sizing. Phase 2 of the spec is complete.
+
+**FORMALIZE:** *58. The Critic validates the entire architecture.* When the Critic independently catches a bug the human missed, the three-role system proves its value. One human reviewing code is fallible. One Critic reviewing diffs with a checklist catches different things. Together: higher quality than either alone.

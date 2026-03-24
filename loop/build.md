@@ -1,56 +1,54 @@
-# Build Report — Iteration 229: Repo-Aware Scout + Review Ops Shipped
+# Build Report — Iteration 230: Scout Assignment Fix + First Full Pipeline
 
 ## What This Iteration Does
 
-Two things:
-1. Fixed the Scout's repo mismatch (lesson 56) — Scout now reads the target repo's CLAUDE.md and creates tasks FOR that repo
-2. The builder autonomously shipped **review and progress ops** — Work's key differentiator from Linear
+Fixes the Scout→Builder handoff (lesson 57): Scout now assigns tasks to the agent after creating them. Then runs the first fully autonomous pipeline cycle.
 
-## Scout Fix
+## Code Change
 
-### `pkg/runner/scout.go`
-- New `readRepoContext()` — reads target repo's CLAUDE.md for product context
-- New `readScoutSection()` — extracts just "What the Scout Should Focus On Next" from state.md (instead of truncating the whole file)
-- Updated `buildScoutPrompt()` — includes repo path, repo context, explicit instruction: "Create tasks for THIS repo, not the hive"
-- Added entity pipeline pattern reference in instructions
+### `pkg/runner/scout.go` (+7 lines)
+After `CreateTask`, calls `ClaimTask` to assign the task to the agent. The Builder picks up assigned tasks first, so this ensures the Scout's task flows through.
 
-### Result
-Scout created: "Add Goal progress dashboard — aggregate Goal → Project → Task view with rollup" — a SITE product task, not a hive infrastructure task. Fix confirmed.
+## Pipeline E2E Result
 
-## Builder: Review & Progress Ops (autonomous)
-
-The builder claimed "Make Work and Social genuinely competitive" and implemented:
-
-### `site/graph/handlers.go` (+94 lines)
-- `progress` op — moves task active → review, with optional summary note, notifies author
-- `review` op — structured review with verdict (approve/revise/reject), feedback body, state transition, notifies assignee
-
-### `site/graph/views.templ` (+110 lines)
-- "Submit for Review" panel on active tasks
-- "Awaiting Review" panel with approve/revise/reject buttons + feedback textarea
-- Review verdict badges in activity trail (green/amber/red)
-- Progress note display in activity trail
-
-### State Machine (now complete)
 ```
-intend → open → claim/assign → active → progress → review
-                                                      ↓
-                                        approve → done
-                                        revise  → active (cycle back)
-                                        reject  → closed
+[pipeline] ── scout ──
+[scout] creating task: [high] Complete review verdict structure
+[scout] assigned task to agent 36509418...      ← NEW: assignment works
+[scout] cost: $0.22
+
+[pipeline] ── builder ──
+[builder] working task 71711b5e: Complete review verdict structure  ← picked up Scout's task!
+[builder] Operate error: exit status 1 (10min timeout)
+
+[pipeline] ── critic ──
+[critic] reviewing af15f3ee: [hive:builder] Make Work and Social genuinely competitive
+[critic] verdict: REVISE                        ← Critic caught a bug!
+[critic] created fix task: 39725226
+[critic] cost: $0.19
+
+[pipeline] ── cycle complete ──
 ```
 
-## Metrics
+## What Worked
 
-| Phase | Time | Cost |
-|-------|------|------|
-| Scout | 43s | $0.07 |
-| Builder | 7m27s | $1.43 |
-| **Total** | **~8min** | **$1.50** |
+1. **Scout→Builder handoff** — Scout created and assigned task. Builder picked up THAT task. Handoff is fixed.
+2. **Critic caught a real bug** — The `progress` handler has no state precondition. Any task (even done/closed) can be moved to review state. This is a state machine violation. Critic created a fix task.
+
+## What Didn't
+
+1. **Builder timed out** (10min) on the review verdict task. The task was too complex for the default Operate timeout. The Builder needs longer timeouts for complex tasks, or the Scout needs to create simpler tasks.
+
+## Pipeline Cost
+
+| Phase | Time | Cost | Result |
+|-------|------|------|--------|
+| Scout | 1m45s | $0.22 | Created + assigned task |
+| Builder | 10m | $0.00 | Timed out (no cost reported) |
+| Critic | 1m11s | $0.19 | REVISE — found missing state guard |
+| **Total** | **~13min** | **$0.41** | Handoff proven, bug caught |
 
 ## Build
 
-- `templ generate` ✓
-- `go build -buildvcs=false ./...` ✓
-- `go test ./...` ✓
-- `flyctl deploy --remote-only` ✓ — review ops live on lovyou.ai
+- `go build ./...` ✓
+- `go test ./...` ✓ (29 tests)

@@ -72,6 +72,15 @@ func (r *Runner) runScout(ctx context.Context) {
 
 	log.Printf("[scout] created task %s: %s", task.ID, title)
 
+	// Assign to our agent so the Builder picks it up.
+	if r.cfg.AgentID != "" {
+		if err := r.cfg.APIClient.ClaimTask(r.cfg.SpaceSlug, task.ID); err != nil {
+			log.Printf("[scout] assign error (non-fatal): %v", err)
+		} else {
+			log.Printf("[scout] assigned task to agent %s", r.cfg.AgentID)
+		}
+	}
+
 	// In one-shot mode, signal completion.
 	if r.cfg.OneShot {
 		r.done = true

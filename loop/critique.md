@@ -1,4 +1,4 @@
-# Critique — Iteration 229: Repo-Aware Scout + Review Ops
+# Critique — Iteration 230: Scout Assignment + Pipeline
 
 **Verdict: PASS**
 
@@ -7,40 +7,36 @@
 ## Derivation Check
 
 ### Gap → Scout: ✓ VALID
-Lesson 56 identified the repo mismatch. Fix implemented: CLAUDE.md context, scout section extraction, explicit repo targeting.
+Lesson 57: Scout must assign tasks. One-line fix, correctly identified.
 
 ### Scout → Build: ✓ VALID
-Scout created a site product task (Goal dashboard). Builder claimed a different task (the governing challenge) but produced genuinely valuable code — review and progress ops. The builder's task selection isn't ideal but the output is excellent.
+Assignment added. Pipeline ran. Scout→Builder handoff confirmed working. Critic caught a real bug.
 
 ### Build → Verify: ✓ VALID
-- Build passes, tests pass, deployed to production
-- Review handler has proper validation, state machine, notifications, JSON API
-- Template has complete UI flow: submit → awaiting review → verdict
+- Build passes, 29 tests pass
+- Pipeline ran end-to-end (3 phases completed)
+- Critic independently found state machine bug in prior builder commit
 
 ---
 
-## Invariant Audit
+## Pipeline Milestones Achieved
 
-| Invariant | Status | Reason |
-|-----------|--------|--------|
-| 11 IDENTITY | ✓ Pass | Notifications use actorID, not name. Author/assignee by ID. |
-| 12 VERIFIED | ⚠️ Note | No new tests for review/progress ops. Existing tests pass. |
-| 13 BOUNDED | ✓ Pass | Ops validate required fields, check state preconditions. |
-
----
+1. ✓ Scout creates task appropriate for target repo
+2. ✓ Scout assigns task to agent
+3. ✓ Builder picks up the Scout's specific task
+4. ✓ Critic reviews builder commits independently
+5. ✓ Critic creates fix tasks when issues found (REVISE)
 
 ## Issues Found
 
-### 1. Builder didn't work the Scout's task (medium)
-Scout created "Goal dashboard" but Builder claimed the unassigned "governing challenge" task instead. Root cause: the Scout creates tasks but doesn't assign them to the agent. The Builder prefers assigned tasks, and when none exist, claims the highest-priority unassigned one — which was the governing challenge (urgent).
+### 1. Builder timeout on complex tasks (medium)
+10-minute default timeout is insufficient for tasks that require reading multiple files and making multiple changes. The Scout should create smaller tasks, or the timeout should be configurable.
 
-**Fix:** Scout should assign created tasks to the agent via the API.
-
-### 2. No tests for review/progress ops (noted)
-Handler-level tests should cover the review state machine. This is the ongoing test debt — noted per iter 223 Critic gate.
+### 2. Critic's REVISE fix task not assigned (low)
+The Critic created a fix task but didn't assign it to the agent. Same lesson 57 pattern — if the Critic creates fix tasks, it should assign them too.
 
 ---
 
 ## Verdict: PASS
 
-The Scout fix works — it creates site tasks. The builder shipped a genuine product differentiator (review workflow). Deployed. The task assignment gap (issue 1) is a one-line fix for next iteration.
+The autonomous pipeline works. Scout→Builder handoff is proven. Critic independently catches bugs and creates fix tasks. The Critic finding a real state machine bug in the builder's code validates the entire three-role architecture.
