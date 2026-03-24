@@ -1,31 +1,34 @@
-# Build Report — Iteration 192
+# Build Report — Iteration 193
 
-## Quote Post (Derive Grammar Op)
+## Repost (Propagate Grammar Op)
 
 **Schema:**
-- `ALTER TABLE nodes ADD COLUMN IF NOT EXISTS quote_of_id TEXT NOT NULL DEFAULT ''`
-
-**Node struct:**
-- Added `QuoteOfID`, `QuoteOfAuthor`, `QuoteOfTitle`, `QuoteOfBody` fields
-- Resolved at query time via correlated subqueries (same pattern as reply_to)
+- `reposts` table: `user_id, node_id, created_at, PRIMARY KEY (user_id, node_id)`
+- Index on `node_id` for count queries
 
 **Store:**
-- `CreateNodeParams`: added `QuoteOfID` field
-- `CreateNode` INSERT: added `quote_of_id` column ($17)
-- `GetNode`: added 4 correlated subqueries for quote resolution (author, title, body)
-- `ListNodes`: same 4 correlated subqueries added
+- `Repost(userID, nodeID)` — ON CONFLICT DO NOTHING (idempotent)
+- `Unrepost(userID, nodeID)` — DELETE
+- `HasReposted(userID, nodeID)` — EXISTS check
+- `GetBulkRepostCounts(nodeIDs) map[string]int` — counts per node
+- `GetBulkUserReposts(userID, nodeIDs) map[string]bool` — which nodes user reposted
 
 **Handler:**
-- `express` op: reads optional `quote_of_id` from form, passes to CreateNodeParams
-- Feed handler: reads `?quote={id}` query param, loads quoted post for compose preview
+- `repost` grammar op: toggle (repost/unrepost), records op, notifies post author
+- HTMX response: returns `repostButton` component for inline swap
+- JSON response: `{"op": "repost", "reposted": true/false}`
+
+**Feed handler:**
+- Loads bulk repost counts + user repost state alongside endorsement data
+- Passes both maps to FeedView
 
 **Template:**
-- `FeedView`: accepts `quotePost *Node`, shows quote preview in compose form when present
-- `FeedCard`: renders inline quote preview (bordered card with author + title + body) when `QuoteOfID` is set
-- "quote" link in engagement bar → `/app/{slug}/feed?quote={id}`
-- Compose form: hidden `quote_of_id` input, brand-bordered preview, "Add your thoughts..." placeholder
+- `FeedView`: accepts repost maps
+- `FeedCard`: accepts `repostCount int, reposted bool`
+- `repostButton`: ↻ icon (arrows), emerald color when reposted, HTMX toggle
+- Engagement bar order: replies → repost → quote → endorse
 
 **Files changed:**
-- `graph/store.go` — schema migration, Node struct, CreateNodeParams, GetNode, ListNodes queries
-- `graph/handlers.go` — express op wiring, feed handler quote param
-- `graph/views.templ` — FeedView, FeedCard, compose form, quotePostPlaceholder helper
+- `graph/store.go` — reposts table + 5 store methods
+- `graph/handlers.go` — repost op + feed handler wiring
+- `graph/views.templ` — FeedView, FeedCard, repostButton

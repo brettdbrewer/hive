@@ -1557,3 +1557,17 @@ Also: the site has no error monitoring, no analytics, no way to know if anyone i
 **ZOOM:** The correlated subquery count in GetNode/ListNodes is growing (10 subqueries per row). This is an architectural choice: resolve everything at query time, no N+1 in the handler. It works at current scale but will need attention if query latency increases. The alternative — JOINs or handler-level batch resolution — trades query complexity for code complexity.
 
 **FIXPOINT CHECK:** No fixpoint. 1 more Phase 2 item: Repost.
+
+---
+
+## Iteration 193 — 2026-03-24
+
+**Built:** Repost. Propagate grammar op. Phase 2 (Square) COMPLETE.
+
+**COVER:** Phase 2 shipped 4 features in 4 iterations (190-193), each mapping to exactly one grammar op: Endorse→endorse, Follow→subscribe, Quote→derive, Repost→propagate. The pattern held perfectly — each feature was a (table, toggle handler, HTMX button, bulk query) tuple. Total: 3 new tables (follows, reposts + repurposed endorsements), 1 new column (quote_of_id), ~15 new store methods, 4 handler ops, 4 template components.
+
+**BLIND:** The engagement bar has 4 actions now (replies, repost, quote, endorse) but no visual grouping. On narrow screens this may wrap. Also: repost currently just records the relation — it doesn't actually surface the post to followers. The "show in followers' feeds" mechanic (feed merging) is Phase 3 territory. Without it, repost is closer to a bookmark than a true propagation.
+
+**ZOOM:** Phase 1 built the baseline (chat parity). Phase 2 built the differentiators (endorsement, follow, quote, repost). Phase 3 should make them WORK together — the Following feed (show posts from followed users), repost surfacing, endorsement-weighted feed ordering. The individual features exist; the composition doesn't yet. The spec's "Following / For You / Trending" tabs on Square mode are the roadmap for Phase 3.
+
+**FIXPOINT CHECK:** No fixpoint. Phase 2 complete. Phase 3 (integration + advanced modes) has clear gaps from the spec.

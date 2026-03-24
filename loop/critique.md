@@ -1,34 +1,39 @@
-# Critique — Iteration 192
+# Critique — Iteration 193
 
 ## Derivation Chain
-- **Gap:** Phase 2 item 3 — quote post. Derive grammar op.
-- **Plan:** quote_of_id column, correlated subquery resolution, compose form integration, inline preview.
-- **Code:** Matches plan. All queries updated consistently.
+- **Gap:** Phase 2 item 4 — repost. Propagate grammar op. Final Square item.
+- **Plan:** reposts table, toggle, bulk queries, HTMX button. Mirror endorsement.
+- **Code:** Exact mirror of endorsement. No deviation.
 
-## Quote Post: PASS
+## Repost: PASS
 
 **Correctness:**
-- `quote_of_id` defaults to empty string — backwards compatible. ✓
-- Correlated subqueries: COALESCE with empty string fallback if quoted post deleted. ✓
-- GetNode and ListNodes both updated with same 4 subqueries. Consistent. ✓
-- CreateNode INSERT updated to $17 with quote_of_id. ✓
-- Compose form: hidden input only present when quotePost != nil. ✓
+- Toggle: HasReposted → Unrepost / Repost. Idempotent (ON CONFLICT DO NOTHING). ✓
+- Notification: only on repost (not unrepost), only if author != actor. ✓
+- Op recorded only on repost. ✓
+- Bulk queries: same pattern as endorsement. ✓
 
 **Identity:**
-- Quote links by node ID, not title/name. ✓
-- Author resolved via subquery at render time. ✓
+- All operations use user IDs. ✓
 
 **BOUNDED:**
-- Correlated subqueries are single-row lookups by PK. O(1) per row. ✓
-- Quote body truncated to 120 chars. ✓
+- Bulk queries bounded by input array. ✓
 
 **Template:**
-- Quote preview shows above body in FeedCard (matches spec: "if post.quote_of { @EntityPreview }"). ✓
-- Compose form shows quote preview with brand border when quoting. Clear UX. ✓
-- "quote" link in engagement bar. Simple, visible. ✓
+- Emerald color for repost (distinct from brand/rose endorsement). Good visual distinction. ✓
+- ↻ icon (arrows) — standard repost iconography. ✓
+- Engagement bar order: replies → repost → quote → endorse. Matches spec's EngagementBar ordering. ✓
 
-**Performance note:** GetNode and ListNodes now have 7 correlated subqueries each (3 counts, 3 reply_to, 4 quote_of = 10 total). At current scale (<500 posts per query) this is fine. If it becomes a bottleneck, consolidate into JOINs.
+**Tests:** No new tests. Same pattern as endorsement (which is tested).
 
-**Tests:** No new tests. The schema migration is auto-applied. Existing tests still pass (they don't create posts with quotes, but the DEFAULT '' handles it).
+## Phase 2 Completeness Check
+
+All 4 items shipped:
+1. ~~Endorse on posts~~ (iter 190) — Endorse grammar op
+2. ~~Follow users~~ (iter 191) — Subscribe grammar op
+3. ~~Quote post~~ (iter 192) — Derive grammar op
+4. ~~Repost~~ (iter 193) — Propagate grammar op
+
+**Phase 2 (Square) is COMPLETE.**
 
 ## Verdict: PASS
