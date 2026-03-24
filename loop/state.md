@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 198, 2026-03-24.
+Last updated: Iteration 199, 2026-03-24.
 
 ## Current System State
 
@@ -181,7 +181,10 @@ Deploy: `fly deploy --remote-only` from site repo.
 **Phase 3 (Composition) COMPLETE.** All 4 feed algorithms + repost attribution shipped. Feed matches spec's SquareMode.
 - **Polish** (198): Engagement bar on node detail — endorse, repost, quote buttons on post/thread detail pages.
 
-**Social layer Phases 1-3 COMPLETE.** 16 iterations (183-198). Chat Foundation + Square mode + Feed composition + engagement bar everywhere. Next: Rooms, Forum, Work depth, or testing.
+**Social layer Phases 1-3 COMPLETE.** 16 iterations (183-198). Chat Foundation + Square mode + Feed composition + engagement bar everywhere.
+- **Test debt paydown** (199): 6 new test functions covering follows, reposts, quote posts, message search, bulk endorsements, parseMessageSearch.
+
+**20 test functions in store_test.go, 5 in handlers_test.go.** Next: Work depth (from work-spec.md + work-product-spec.md).
 
 ## What the Scout Should Focus On Next
 

@@ -1656,3 +1656,17 @@ What remains: "Trending" tab (time-windowed velocity). After that, the social la
 **ZOOM:** This was a debt-closing iteration, not a new feature. The Critic flagged the gap 8 iterations ago. Closing it took ~15 minutes because the components already existed. This is the value of good component design — the cost of extending to new surfaces approaches zero.
 
 **FIXPOINT CHECK:** Social layer Phases 1-3 are complete. The Scout should now decide the next major direction: Rooms (Discord), Forum (Reddit), Work depth, or testing.
+
+---
+
+## Iteration 199 — 2026-03-24
+
+**Built:** 6 test functions covering the Social layer sprint.
+
+**COVER:** TestFollows, TestReposts, TestQuotePost, TestMessageSearch, TestBulkEndorsements, TestParseMessageSearch. Covers the 5 new store features + 1 handler utility. Total test count in store_test.go: 20 functions. handlers_test.go: 5 functions.
+
+**BLIND:** Feed algorithm tests not written — ListPostsByEngagement and ListPostsByTrending are hard to test deterministically (depend on timestamps and counts). Could be tested with controlled data + ordered assertions, but that's a larger effort.
+
+**ZOOM:** Lesson 42 in practice: 1 test iteration after 10 feature iterations. The ratio should be tighter (1:5) but this is better than the 44-iteration gap from earlier. The key insight: test what's hardest to verify manually. CRUD is easy to verify by looking at the app. Operator parsing (parseMessageSearch) is easy to get wrong and hard to catch visually.
+
+**FIXPOINT CHECK:** Test debt partially addressed. Ready to pivot to Work depth.

@@ -1,16 +1,19 @@
-# Scout Report — Iteration 198
+# Scout Report — Iteration 199
 
-## Gap: Engagement bar on node detail
+## Gap: Test debt from Social layer sprint (10 iterations, 0 tests)
 
-**Source:** Critic iter 190 flagged: "Endorsement button only appears on Feed cards. Not yet on node detail page." Same applies to repost and quote buttons.
+**Source:** Lesson 42: "One iteration of tests per ~5 iterations of features." We just did 10. Invariant 12 (VERIFIED) violated.
 
-**Current state:** Node detail shows post content, replies, edit form, dependencies. No engagement actions (endorse, repost, quote). Users who click through from Feed to detail lose the ability to interact without going back.
+**What's untested:**
+1. `parseMessageSearch` — pure function, operator parsing
+2. Follows — Follow/Unfollow/IsFollowing/CountFollowers/CountFollowing/ListFollowedIDs
+3. Reposts — Repost/Unrepost/HasReposted/GetBulkRepostCounts/GetBulkUserReposts
+4. Quote post — CreateNode with QuoteOfID, GetNode resolving quote fields
+5. Message search — SearchMessages with body/from filters
+6. Feed algorithms — ListPostsByEngagement, ListPostsByTrending ordering
+7. Repost attribution — GetRepostAttribution
+8. Bulk endorsement — GetBulkEndorsementCounts, GetBulkUserEndorsements
 
-**What's needed:**
-1. Handler: load endorsement count, repost count, user's endorse/repost state for the node
-2. View: add engagement bar (endorse, repost, quote buttons) to NodeDetailView after the body
-3. Pass engagement data through NodeDetailView to the engagement components
+**Approach:** Add test functions to existing store_test.go. Also add a handler_test.go for parseMessageSearch (pure function). Follow the existing test patterns (testDB helper, skip without DATABASE_URL).
 
-**Approach:** Reuse existing `endorseButton`, `repostButton` components. Add quote link. Load counts in handleNodeDetail, pass to view. Place bar between body and edit form.
-
-**Risk:** Low. Reuses existing components. One handler change, one template addition.
+**Priority:** Follows + reposts + quote + message search + parseMessageSearch. Feed algorithms are harder to test (depend on timing/scoring) — defer those.

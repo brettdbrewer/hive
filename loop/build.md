@@ -1,18 +1,20 @@
-# Build Report — Iteration 198
+# Build Report — Iteration 199
 
-## Engagement Bar on Node Detail
+## Test Debt Paydown
 
-**Handler:**
-- `handleNodeDetail`: loads endorsement count, endorsed state, repost count, reposted state for the node
-- Uses existing `CountEndorsements`, `HasEndorsed`, `GetBulkRepostCounts`, `HasReposted`
+**6 new test functions** covering the Social layer sprint (iters 189-198):
 
-**Template:**
-- `NodeDetailView`: accepts 4 new params: `endorseCount int, endorsed bool, repostCount int, reposted bool`
-- Engagement bar: replies count + repost button + quote link + endorse button
-- Only shows for posts and threads (not tasks, comments, conversations)
-- Reuses existing `endorseButton` and `repostButton` components (same HTMX swap behavior)
-- Placed between body and edit form
+| Test | What | Type |
+|------|------|------|
+| `TestFollows` | Follow/Unfollow/IsFollowing/CountFollowers/CountFollowing/ListFollowedIDs | Store (DB) |
+| `TestReposts` | Repost/Unrepost/HasReposted/GetBulkRepostCounts/GetBulkUserReposts | Store (DB) |
+| `TestQuotePost` | CreateNode with QuoteOfID, GetNode resolves quote_of_author/title/body | Store (DB) |
+| `TestMessageSearch` | SearchMessages body filter, from: filter, no-match case | Store (DB) |
+| `TestBulkEndorsements` | GetBulkEndorsementCounts, GetBulkUserEndorsements on posts (not users) | Store (DB) |
+| `TestParseMessageSearch` | Pure function: operator parsing, 6 cases | Handler (no DB) |
+
+**Coverage:** Follows the lesson 42 ratio (1 test iter per ~5 feature iters). Covers the 5 most critical new features. Feed algorithm tests deferred (timing-dependent scoring is hard to assert deterministically).
 
 **Files changed:**
-- `graph/handlers.go` — handleNodeDetail engagement data loading
-- `graph/views.templ` — NodeDetailView signature + engagement bar
+- `graph/store_test.go` — 5 new test functions (~200 lines)
+- `graph/handlers_test.go` — `TestParseMessageSearch` (~25 lines)
