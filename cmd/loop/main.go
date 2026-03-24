@@ -147,6 +147,13 @@ func buildPrompt(agent, loopDir, gap, siteRepo string) string {
 		sb.WriteString("\n\n")
 	}
 
+	// Load shared context (product overview, architecture, key files).
+	context, _ := os.ReadFile(filepath.Join("agents", "CONTEXT.md"))
+	if len(context) > 0 {
+		sb.WriteString(string(context))
+		sb.WriteString("\n\n")
+	}
+
 	// Load agent prompt from agents/ directory.
 	agentPrompt, err := os.ReadFile(filepath.Join("agents", agent+".md"))
 	if err != nil {
@@ -156,10 +163,9 @@ func buildPrompt(agent, loopDir, gap, siteRepo string) string {
 	sb.WriteString(string(agentPrompt))
 	sb.WriteString("\n\n")
 
-	// Load the method (cognitive grammar for all agents).
+	// Load the method (cognitive grammar — HOW to think).
 	method, _ := os.ReadFile(filepath.Join("agents", "METHOD.md"))
 	if len(method) > 0 {
-		sb.WriteString("== COGNITIVE GRAMMAR METHOD ==\n")
 		sb.WriteString(string(method))
 		sb.WriteString("\n\n")
 	}

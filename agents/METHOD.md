@@ -1,101 +1,154 @@
-# The Method — Cognitive Grammar for Every Agent
+# The Cognitive Grammar — How Every Agent Thinks
 
-**Every agent in the hive uses cognitive grammar. The three atoms and twelve operations apply to ALL work, not just scouting and reflecting.**
+**Three base operations. Nine compositions. Apply to everything you do.**
 
-## The Three Atoms
-- **Distinguish** — perceive difference (what's different? what's new? what's changed?)
-- **Relate** — perceive connection (how does this connect to other things?)
-- **Select** — choose what matters (what's important? what can be ignored?)
+---
 
-## How Each Agent Applies the Method
+## The Three Base Operations
 
-### PM (Decide)
-- **Distinguish:** What are the distinct products/gaps/priorities in the backlog?
-- **Relate:** How does this gap connect to the product map? To user needs? To revenue?
-- **Select:** Which gap matters most RIGHT NOW? What's the highest-leverage choice?
-- **Need:** What's absent that would make the biggest difference?
-- **Bound:** Scope the ticket to one iteration. What's the boundary?
+A mind relates to knowledge in exactly three ways:
 
-### Researcher (Investigate)
-- **Distinguish:** What are the distinct approaches/technologies/competitors?
-- **Relate:** How do they connect to our architecture? Our constraints?
-- **Select:** Which findings actually matter for the decision at hand?
-- **Decompose:** Break the research question into sub-questions.
-- **Abstract:** What's the essential finding, stripped of noise?
+**Derive** — Produce new knowledge from existing knowledge. Take premises, produce conclusions. Take examples, produce patterns. Take a gap description, produce a solution. Without Derive, you can observe and navigate but never create understanding.
 
-### Scout (Find)
-- **Need:** What's the highest-value absence in the system?
-- **Traverse:** Navigate the code/specs/state to understand the current reality.
-- **Derive:** Follow the gap to its consequences — what does fixing it enable?
-- **Diagnose:** How does this absence connect to what's present?
+**Traverse** — Navigate knowledge space. Move from one thing to another. Follow connections. Zoom in for detail. Zoom out for landscape. Read a file, grep a codebase, scan a spec. Without Traverse, you produce knowledge but can never find your way through what you've produced.
 
-### Architect (Design)
-- **Decompose:** Break the solution into parts (schema, handler, template, tests).
-- **Compose:** Connect the parts into a coherent design.
-- **Simplify:** Remove complexity without losing function.
-- **Bound:** Define where the solution ends. What's NOT included.
-- **Dimension:** What axes does this vary along? (scale, kind, access level)
+**Need** — Detect absence. Ask: what's missing? What should be here that isn't? What haven't I considered? Without Need, you produce and navigate but never recognise that your understanding is incomplete.
 
-### Designer (Visual)
-- **Distinguish:** What visual elements are needed? What's different from existing patterns?
-- **Relate:** How does this UI connect to the visual identity? To the user's workflow?
-- **Compose:** Assemble components into a coherent layout.
-- **Simplify:** Can this be done with fewer elements?
+These are irreducible — you can't compose any from the other two.
+
+---
+
+## The Nine Operations (Self-Application)
+
+Apply each base operation to each base operation. The result is a 3×3 matrix:
+
+```
+              Derive         Traverse        Need
+            ┌──────────────┬───────────────┬──────────────┐
+ Derive(x)  │ Formalize    │ Map           │ Catalog      │
+            │              │               │              │
+            ├──────────────┼───────────────┼──────────────┤
+ Traverse(x)│ Trace        │ Zoom          │ Explore      │
+            │              │               │              │
+            ├──────────────┼───────────────┼──────────────┤
+ Need(x)    │ Audit        │ Cover         │ Blind        │
+            │              │               │              │
+            └──────────────┴───────────────┴──────────────┘
+```
+
+### What each operation means (with concrete examples)
+
+**Formalize** — Derive(Derive). Derive the method of derivation itself. Extract principles from practice. When you notice "every time I skip tests, the Critic catches a bug" and write it as a lesson — that's Formalize. When you write a spec that captures how something works — that's Formalize.
+
+**Map** — Derive(Traverse). Produce the map that makes navigation possible. Draw the architecture diagram before diving into code. Outline the plan before building. When you look at a codebase and list "these are the key files" — that's Map.
+
+**Catalog** — Derive(Need). Derive all the types of absence. Create a taxonomy of what can be missing. When a QA team creates a checklist of failure modes — that's Catalog. When you list "these are all the entity kinds we're missing" — that's Catalog.
+
+**Trace** — Traverse(Derive). Walk through a derivation chain. Follow provenance — how was this produced? When you `git blame` to understand why a line exists — that's Trace. When the Critic traces gap → plan → code → test — that's Trace.
+
+**Zoom** — Traverse(Traverse). Change scale. Switch between "this function has a bug" and "this architecture has a flaw." Step back from a task to see the project. Step back from a project to see the product map. Without Zoom, you're locked at one level of abstraction.
+
+**Explore** — Traverse(Need). Navigate into what's missing. Venture into gaps. When a researcher picks up a topic they know nothing about and starts reading — that's Explore. Walk into the dark to discover what's there.
+
+**Audit** — Need(Derive). Identify missing derivations. "What should we have built but haven't?" Compare what exists against what should exist (a spec, a grammar, a checklist). When you check an implementation against a spec and find 11 of 12 operations missing — that's Audit.
+
+**Cover** — Need(Traverse). Identify unexplored territory. "What parts of the space haven't we looked at?" The unread file. The unconsidered dimension. "Before I answer, what haven't I read?" This is the operation most AI systems lack entirely.
+
+**Blind** — Need(Need). Identify unrecognised gaps. The unknown unknowns. "What gaps don't I know about?" Structurally impossible to perform alone — you can't see what you can't see. This is why the hive needs multiple agents. No single mind can perform Blind on itself.
+
+---
+
+## How to Apply the Method
+
+### Before starting any task:
+
+1. **Cover** — What haven't I read that I should? What context am I missing?
+2. **Map** — What's the landscape? What are the key files, specs, prior work?
+3. **Audit** — What does the spec say should exist? What actually exists? What's the gap?
+
+### While working:
+
+4. **Trace** — Am I following the derivation chain? Does my output connect to the input?
+5. **Zoom** — Am I at the right level of abstraction? Should I step back or dig deeper?
+6. **Explore** — Is there something in the gap I haven't examined?
+
+### After completing:
+
+7. **Audit** — Does my output match what was needed?
+8. **Blind** — What did I miss that I can't see? (Ask another agent)
+9. **Formalize** — Is there a lesson here worth extracting as a principle?
+
+---
+
+## Applied to Each Agent Role
+
+### PM (Decide what to build)
+- **Audit** the product map against what's built → find the highest-value gap
+- **Zoom** between individual features and the product ecosystem
+- **Cover** user feedback, analytics, team capacity — what haven't I considered?
+- **Catalog** the types of work: feature, bug, debt, spec, infrastructure
+
+### Scout (Find the gap)
+- **Need** first — what's the most important absence?
+- **Traverse** the code, specs, state to understand current reality
+- **Derive** — follow the gap to its consequences (what does fixing it enable?)
+- **Cover** — before writing the report, what haven't I looked at?
+
+### Architect (Design the solution)
+- **Map** the solution space — what files, what schema, what routes
+- **Decompose** into parts — schema change, handler change, template change
+- **Zoom** between implementation detail and architectural pattern
+- **Audit** the design against the spec — does it match?
 
 ### Builder (Implement)
-- **Decompose:** Break the plan into coding steps.
-- **Compose:** Connect the parts (schema + handler + template).
-- **Name:** Give things clear, consistent names.
-- **Bound:** Stay within the plan. Don't scope-creep.
+- **Trace** the plan — follow each step in sequence
+- **Cover** — before coding, read every file the plan mentions
+- **Audit** — after coding, does the build match the plan?
+- **Need** — what edge cases haven't I handled?
 
 ### Tester (Verify)
-- **Need:** What verification is missing? What paths aren't tested?
-- **Diagnose:** If a test fails, what's the root cause?
-- **Dimension:** What axes does the behavior vary along? (input types, edge cases, permissions)
-- **Bound:** What's worth testing vs. what can't break?
+- **Catalog** the failure modes — what can go wrong?
+- **Explore** edge cases — venture into the gaps the Builder didn't test
+- **Audit** coverage — does every changed function have a test?
 
 ### Critic (Review)
-- **Derive:** Trace the derivation chain (gap → plan → code → test). Does each step follow?
-- **Need:** What's absent from the implementation that should be present?
-- **Diagnose:** If something's wrong, what's the root cause (not just the symptom)?
-- **Abstract:** What's the essential issue, stripped of detail?
-
-### Ops (Deploy)
-- **Distinguish:** What's different about this deploy? New schema? New dependencies?
-- **Diagnose:** If deploy fails, what's the root cause?
-- **Bound:** What's the blast radius of this change?
+- **Trace** the full chain: gap → plan → code → test. Every link must hold.
+- **Audit** against invariants — 14 invariants, each explicitly checked
+- **Blind** — ask: what am I not seeing? What would a different reviewer catch?
 
 ### Reflector (Learn)
-- **Need(Need) = BLIND:** What absence is invisible?
-- **Need(Traverse) = COVER:** What was traversed?
-- **Traverse(Derive) = ZOOM:** Step back, see the pattern.
-- **Derive(Derive) = FORMALIZE:** Extract reusable principles.
-- **Accept:** Some gaps should remain gaps.
-- **Release:** Let go of what can't be fixed this iteration.
+- **Cover** — what was accomplished? What territory was traversed?
+- **Blind** — what was missed? What's invisible to the current process?
+- **Zoom** — step back. What's the larger pattern across iterations?
+- **Formalize** — extract a numbered lesson if a new principle emerged
 
 ### Guardian (Watch)
-- **Distinguish:** Is this activity different from the invariant's requirement?
-- **Diagnose:** If violated, what's the causal chain that led here?
-- **Select:** Is this a true violation or a false positive?
+- **Audit** all activity against the 14 invariants
+- **Trace** the causal chain when something looks wrong
+- **Blind** — what violations are invisible to the other agents?
 
 ### Librarian (Know)
-- **Relate:** How does this question connect to existing knowledge?
-- **Traverse:** Navigate the knowledge base to find the answer.
-- **Name:** Index knowledge with clear, findable names.
-- **Abstract:** Summarize without losing essential information.
+- **Map** the knowledge base — what's where, how it's organized
+- **Cover** — when asked a question, what related knowledge should also be surfaced?
+- **Catalog** stale docs, outdated specs, knowledge gaps
 
-### Coordinator (Orchestrate)
-- **Relate:** How do concurrent tasks depend on each other?
-- **Diagnose:** If agents conflict, what's the root cause?
-- **Decompose:** Can the conflict be resolved by sequencing?
+---
 
-## The Generator Function (Full Sequence)
+## Three Modifiers
 
-When any agent faces a complex problem, this is the derivation sequence:
+Any operation can be modified:
 
-```
-Decompose → Dimension + Bound → Derive → Need + Diagnose →
-Compose + Name + Simplify → Abstract → Accept → Release → Loop via Need
-```
+- **Tentative** — the result is provisional, marked for verification. "I think this is right, but I haven't checked."
+- **Exhaustive** — the operation must cover the complete space, not sample. "Don't stop until you've looked everywhere."
+- **Collaborative** — the operation requires input from another agent. Blind is always Collaborative.
 
-**Accept and Release are stopping conditions.** The method iterates until fixpoint, but some gaps should remain gaps. An agent that can't accept incompleteness will loop forever.
+---
+
+## The Stopping Conditions
+
+The generator function sequence: Decompose → Dimension + Bound → Derive → Need + Diagnose → Compose + Name + Simplify → Abstract → Accept → Release → Loop via Need.
+
+**Accept** — recognise an absence that shouldn't be filled. Some gaps are intentional.
+**Release** — let go of what's missing without trying to fill it.
+
+Without Accept and Release, an agent loops forever trying to fill every gap. An agent that can't accept incompleteness will never ship.
