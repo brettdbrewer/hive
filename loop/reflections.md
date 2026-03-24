@@ -1877,3 +1877,11 @@ This is the foundation document for the entire company, not just the product. Wh
 **FIXPOINT on the product map.** The architecture is: EventGraph (substrate) → Hive (builder) → 13 families (~62 products) → shared infrastructure (14 components). Adding products is additive. The structure is stable.
 
 **FORMALIZE:** Lesson 54: **The meta-product IS the product.** The hive — the system that builds products and compounds knowledge — is more valuable than any individual product it builds. A task tracker is worth $X. A system that builds task trackers AND social networks AND marketplaces AND gets better at building each one is worth $X × N × compound_rate.
+
+---
+
+## Iteration 213 — 2026-03-24
+
+**Built:** Space nesting (parent_id on spaces table). Architectural prerequisite for Organizations.
+
+**BLIND (critical):** Matt flagged the real priority: the hive itself. We've been building site features manually when the hive — the meta-product — is the bottleneck. An autonomous hive that uses the product to build the product is worth more than any 50 site features. The next iteration must be a hive spec, not more site code.

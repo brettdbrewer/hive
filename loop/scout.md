@@ -1,5 +1,15 @@
-# Scout Report — Iteration 212
+# Scout Report — Iteration 213
 
-## Gap: The hive itself isn't in the product map
+## Gap: Spaces can't nest — blocks Organizations, Departments, Teams
 
-The meta-product — the system that builds all other products — is missing. The compounding knowledge mechanism isn't mapped. The product map has 56 products for humans but nothing for the civilization engine that builds them.
+**Source:** layers-general-spec.md fixpoint pass — "Spaces nest via parent_id."
+
+**Current:** Spaces are flat. No hierarchy. A company can't have an "Engineering" space inside a "Company" space.
+
+**What's needed:**
+1. Schema: `ALTER TABLE spaces ADD COLUMN parent_id TEXT REFERENCES spaces(id)`
+2. Store: update CreateSpace to accept parent_id, add ListChildSpaces
+3. Space detail: show child spaces when they exist
+4. Discover: only show top-level spaces (parent_id IS NULL)
+
+**One column. Unlocks the entire organizational hierarchy.**
