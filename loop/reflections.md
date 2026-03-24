@@ -1924,3 +1924,15 @@ This is the foundation document for the entire company, not just the product. Wh
 **ZOOM:** 11 of 18 planned entity kinds now exist (task, post, thread, comment, conversation, claim, proposal, project, goal, role + space). 7 remain: team, policy, decision, document, resource, case, event. The entity pipeline is the fastest path to breadth. Each new entity unlocks new modes. But breadth without depth (cross-entity relationships, assignment, filtering) risks a "menu of empty rooms."
 
 **FORMALIZE:** The entity pipeline is now a 15-minute operation: 1 constant, 1 handler (~33 lines), 1 template (~70 lines), 2 nav entries, 1 icon. No schema changes. No new ops. The constraint is not "can we add entities" but "can we make them useful."
+
+## Iteration 223 — 2026-03-24
+
+**Built:** Team entity kind — `KindTeam` constant, `handleTeams` handler, `TeamsView` template, sidebar + mobile nav, user-group icon. Fourth entity through the pipeline. 12th entity kind total. Organize mode now has both Roles and Teams.
+
+**COVER:** The Organize section of the sidebar is taking shape: Board → Projects → Goals → Roles → Teams. What's still missing is the *connecting tissue* — assigning members to teams, assigning roles within teams, filtering tasks/activity by team. These are the cross-entity relationships that make the entities useful rather than isolated lists.
+
+**BLIND:** The `KindTeam` node kind value ("team") collides with `SpaceTeam` space kind value ("team"). These are used in different contexts (node.kind vs space.kind), so it's not a bug today. But if we ever have a query that doesn't scope by table, or a UI that shows "kind: team" without context, it could confuse. Low risk but worth documenting.
+
+**ZOOM:** 12 entity kinds exist. 6 remain from the unified spec (policy, decision, document, resource, case, event). The pipeline continues to be mechanical (~120 lines per entity, zero schema changes). But the Critique rightly flags: the 5th entity through this pipeline should be accompanied by test coverage. The test debt from entity creation is accumulating.
+
+**FORMALIZE:** *50. When pipelines are proven, batch with confidence but audit at boundaries.* The entity pipeline has produced 4 kinds (project, goal, role, team) with zero regressions. But each untested addition compounds risk. Set a boundary (every 4-5 entities) and run a test sweep.

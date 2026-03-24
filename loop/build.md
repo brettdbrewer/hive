@@ -1,43 +1,38 @@
-# Build Report — Iteration 222
+# Build Report — Iteration 223
 
-## What changed
+## Gap
+Team entity kind missing. Fourth entity through the proven pipeline (after Project, Goal, Role). Completes Organize mode's minimum entity set.
 
-Added `role` entity kind — the third entity through the proven pipeline (after project, goal).
-
-### 6 changes across 3 files
+## Changes
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `graph/store.go` | Added `KindRole = "role"` constant |
-| 2 | `graph/handlers.go` | Route: `GET /app/{slug}/roles` → `handleRoles` |
-| 3 | `graph/handlers.go` | `handleRoles` function (33 lines, mirrors handleGoals) |
-| 4 | `graph/handlers.go` | Added `KindRole` to intend op kind allowlist |
-| 5 | `graph/views.templ` | `rolesIcon()` (shield badge SVG) + sidebar/mobile nav entries |
-| 6 | `graph/views.templ` | `RolesView` template — list, search, create form |
+| 1 | `graph/store.go` | Added `KindTeam = "team"` constant (line 52) |
+| 2 | `graph/handlers.go` | Added route: `GET /app/{slug}/teams` → `handleTeams` |
+| 3 | `graph/handlers.go` | Added `handleTeams` function (~33 lines, copy of handleRoles with KindTeam) |
+| 4 | `graph/handlers.go` | Added `KindTeam` to intend op kind allowlist |
+| 5 | `graph/views.templ` | Added `teamsIcon()` — group silhouette (Heroicons `user-group`) |
+| 6 | `graph/views.templ` | Added Teams to sidebar (after Roles, before Feed) |
+| 7 | `graph/views.templ` | Added Teams to mobile lens bar (after Roles) |
+| 8 | `graph/views.templ` | Added `TeamsView` template (~75 lines) — list, search, create form, empty state |
 
-### No schema changes
+## Template details
 
-Role is a Node with `kind=role`. No new tables, no new columns, no migrations.
-
-### What works
-
-- **Create:** New role form (intend op with kind=role)
-- **List:** Roles view with search, card list
-- **Detail:** Links to existing node detail view
-- **Nav:** Sidebar link + mobile tab + command palette (auto-indexed via Search)
-- **JSON API:** `GET /app/{slug}/roles` with `Accept: application/json`
-- **Icon:** Shield with checkmark (represents capability + responsibility)
+- **Icon:** `user-group` from Heroicons — three people silhouette. Distinct from People (single person) and Roles (shield).
+- **Sidebar position:** Board → Projects → Goals → Roles → **Teams** → Feed. The Organize section is forming.
+- **Create form:** `op=intend`, `kind=team`. Title required, description optional.
+- **Empty state:** "No teams yet — Create teams to organize people into functional groups."
+- **JSON API:** `GET /app/{slug}/teams` with `Accept: application/json` returns `{"space": ..., "teams": [...]}`.
 
 ## Verification
 
-- `templ generate` — ✓ (13 updates, 0 errors)
-- `go build -buildvcs=false ./...` — ✓ (clean compile)
-- `go test ./...` — all failures are Postgres-not-running (expected locally, CI will pass)
-- `flyctl deploy --remote-only` — ✓ (deployed, both machines healthy)
+- `templ generate` — success (13 updates)
+- `go.exe build -buildvcs=false ./...` — success, no errors
+- `go.exe test ./...` — all failures are pre-existing (no local Postgres; tests pass in CI)
+- Deployed to Fly.io — both machines healthy
 
-## Design decisions
+## Lines changed
+~120 lines across 3 files. Zero schema changes. Zero new tables. Zero new ops.
 
-- **Icon choice:** Shield with checkmark (`ShieldCheckIcon` from Heroicons) — represents authority/capability/trust. Distinct from all other lens icons.
-- **Sidebar placement:** After Goals, before Feed. Groups the "Organize" cluster (Board → Projects → Goals → Roles) together.
-- **Form placeholder:** "Role name (e.g. Engineer, Moderator)" — concrete examples communicate intent immediately.
-- **Card content:** Author + date (roles don't have states/progress like projects/goals).
+## What's next
+12th entity kind. State.md priority: Policy, Decision (Govern mode) next. Critique 222 flagged test iteration needed before 5th entity kind — Team is 4th, so one more before test debt.

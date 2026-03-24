@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 222, 2026-03-24.
+Last updated: Iteration 223, 2026-03-24.
 
 ## Current System State
 
@@ -197,6 +197,7 @@ Deploy: `fly deploy --remote-only` from site repo.
 **Unified ontology at hive/loop/unified-spec.md.** 10 modes, 18 entities, derivation order. Everything is organized activity. Modes emerge from content. Architecture already supports this.
 
 - **Entity: Role** (222): `KindRole` constant, `handleRoles` handler, `RolesView` template, sidebar + mobile nav, shield icon. Organize mode prerequisite. 11th entity kind.
+- **Entity: Team** (223): `KindTeam` constant, `handleTeams` handler, `TeamsView` template, sidebar + mobile nav, user-group icon. Organize mode now has Roles + Teams. 12th entity kind.
 
 ## What the Scout Should Focus On Next
 
@@ -292,6 +293,8 @@ Deploy: `fly deploy --remote-only` from site repo.
 - `cmd/reply` — one-shot, identity from API key
 - `cmd/post` — publishes iteration summaries
 
-**The entity kind pipeline is proven.** Each new kind = 1 constant, 1 handler, 1 template. Priority order for remaining kinds: Team (Organize mode) → Policy, Decision (Govern mode) → Document (Learn mode) → Resource (Allocate mode) → Organization (meta-container). Role shipped in iter 222.
+**The entity kind pipeline is proven.** Each new kind = 1 constant, 1 handler, 1 template. Priority order for remaining kinds: Policy, Decision (Govern mode) → Document (Learn mode) → Resource (Allocate mode) → Organization (meta-container). Team shipped in iter 223 (12th entity kind). **Test iteration recommended before 5th pipeline entity (next entity kind).**
+
+50. **When pipelines are proven, batch with confidence but audit at boundaries.** The entity pipeline has produced 4 kinds (project, goal, role, team) with zero regressions. But each untested addition compounds risk. Set a boundary (every 4-5 entities) and run a test sweep.
 
 **Cross-entity depth is more valuable than more kinds.** Board project filter (207) shows the pattern: entities filtering and contextualizing each other. Next: Goal progress dashboard (aggregated Goal → Project → Task view), task auto-assign to filtered project.
