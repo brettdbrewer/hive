@@ -52,8 +52,9 @@ type Config struct {
 	Provider   intelligence.Provider
 	RolePrompt string // loaded from agents/{role}.md
 	Interval   time.Duration
-	BudgetUSD  float64 // daily budget, 0 = $10 default
-	OneShot    bool    // if true, work one task then exit (for testing)
+	BudgetUSD     float64 // daily budget, 0 = $10 default
+	OneShot       bool    // if true, work one task then exit (for testing)
+	CouncilTopic  string  // optional: focus the council on a specific question
 }
 
 // CostTracker records per-call spending.

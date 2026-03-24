@@ -52,7 +52,7 @@ func RunCouncil(ctx context.Context, cfg Config) error {
 		go func(m *councilMember) {
 			defer wg.Done()
 
-			prompt := buildCouncilPrompt(m.role, m.prompt, sharedContext)
+			prompt := buildCouncilPrompt(m.role, m.prompt, sharedContext, cfg.CouncilTopic)
 
 			resp, err := cfg.Provider.Reason(ctx, prompt, nil)
 			if err != nil {
@@ -150,13 +150,24 @@ func loadCouncilContext(hiveDir, repoPath string) string {
 		}
 	}
 
-	// Recent reflections (last 500 chars).
+	// Recent reflections (last 2000 chars for rich context).
 	if data, err := os.ReadFile(filepath.Join(hiveDir, "loop", "reflections.md")); err == nil {
 		s := string(data)
-		if len(s) > 500 {
-			s = s[len(s)-500:]
+		if len(s) > 2000 {
+			s = s[len(s)-2000:]
 		}
 		parts = append(parts, "## Recent Reflections\n"+s)
+	}
+
+	// The full list of agents in the civilization.
+	if entries, err := os.ReadDir(filepath.Join(hiveDir, "agents")); err == nil {
+		var roles []string
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".md") && e.Name() != "CONTEXT.md" && e.Name() != "METHOD.md" {
+				roles = append(roles, strings.TrimSuffix(e.Name(), ".md"))
+			}
+		}
+		parts = append(parts, fmt.Sprintf("## Current Civilization\n%d agents: %s", len(roles), strings.Join(roles, ", ")))
 	}
 
 	return strings.Join(parts, "\n\n---\n\n")
@@ -202,7 +213,19 @@ func memberNames(members []councilMember) string {
 	return strings.Join(names, ", ")
 }
 
-func buildCouncilPrompt(role, rolePrompt, sharedContext string) string {
+func buildCouncilPrompt(role, rolePrompt, sharedContext, topic string) string {
+	question := `Speak from your role's perspective. In 5-10 lines, address:
+
+1. **What I see:** From my role's vantage point, what's the most important thing right now?
+2. **What worries me:** What risk or gap is invisible to other agents but visible to me?
+3. **What I'd change:** If I could direct the next 5 iterations, what would I prioritize?
+
+Be specific. Name files, features, patterns. Don't repeat what others would say — contribute what ONLY your role can see.`
+
+	if topic != "" {
+		question = fmt.Sprintf("The Director has focused this council on a specific question:\n\n**%s**\n\nSpeak from your role's perspective. Be deep, be honest, be specific. This is not a status update — it is a deliberation. Think before you speak. Disagree with other roles if you must. Name what's missing, what's wrong, what's invisible. 10-20 lines.", topic)
+	}
+
 	return fmt.Sprintf(`You are the %s, attending a council meeting of the hive.
 
 ## Your Role
@@ -213,13 +236,7 @@ func buildCouncilPrompt(role, rolePrompt, sharedContext string) string {
 
 ## Your Task
 
-Speak from your role's perspective. In 5-10 lines, address:
-
-1. **What I see:** From my role's vantage point, what's the most important thing right now?
-2. **What worries me:** What risk or gap is invisible to other agents but visible to me?
-3. **What I'd change:** If I could direct the next 5 iterations, what would I prioritize?
-
-Be specific. Name files, features, patterns. Don't repeat what others would say — contribute what ONLY your role can see.`, role, rolePrompt, sharedContext)
+%s`, role, rolePrompt, sharedContext, question)
 }
 
 func synthesizeCouncil(members []councilMember) string {
