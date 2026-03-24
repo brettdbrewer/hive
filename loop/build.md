@@ -1,25 +1,21 @@
-# Build Report — Iteration 200
+# Build Report — Iteration 201
 
-## Task List View (Work Depth)
+## Work General Specification
 
-**Handler:**
-- Board handler: reads `?view=list` query param, branches to list rendering
-- `sortTasks(tasks, sortBy)` — sorts by priority/due/created/state/assignee
-- `priorityRank()` and `stateRank()` helpers for sort ordering
-- Default sort: priority then created (urgent first, newest within same priority)
+**Output:** `hive/loop/work-general-spec.md`
 
-**Template:**
-- `ListView` — full table view with sortable column headers
-- Columns: State (badge), Priority (dot), Title (link), Assignee (avatar + name), Due (red if overdue), Subtasks (done/total)
-- Column headers link to `?view=list&sort=X` for server-side sorting
-- Board/List toggle pills at top of both views
-- Search + filter preserved via hidden `view=list` input
+**Method:** Applied cognitive grammar (Distinguish → Relate → Select → Compose) to "organized activity toward outcomes" across all scales: solo dev → small team → mid-size company → enterprise → civilizational.
 
-**View toggle:**
-- Board view: shows "Board (active) | List" pills
-- List view: shows "Board | List (active)" pills
-- Both use same URL base (`/app/{slug}/board`) with `?view=list` differentiator
+**Key findings:**
 
-**Files changed:**
-- `graph/handlers.go` — list branch, sortTasks, priorityRank, stateRank (added `sort` import)
-- `graph/views.templ` — ListView template, Board/List toggle on BoardView
+1. **12 entity types** (not just tasks): Task, Project, Goal, Role, Team, Department, Policy, Process, Decision, Resource, Document, Organization. All are Nodes with different kinds. No new tables needed.
+
+2. **6 modes of work** (not just Execute): Execute (do it), Organize (structure it), Govern (control it), Plan (direct it), Learn (improve it), Allocate (resource it). Scale determines which modes you use.
+
+3. **Grammar ops are universal.** Intend creates a task OR a policy OR a goal. Review approves work OR audits compliance. Consent votes on proposals OR approves budgets. The mechanism is the same; the mode determines semantics.
+
+4. **Architecture already supports this.** No new schema. Every entity is a Node. Every mutation is an Op. The work is in UI modes and entity kinds, not foundations.
+
+5. **Convergence at pass 2.** Existing foothold: Governance lens (Govern), Knowledge lens (Learn), Dashboard (Plan), Membership (Organize). The architecture was designed for this — we just hadn't composed it yet.
+
+**This iteration produced spec, not code.**

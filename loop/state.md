@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 200, 2026-03-24.
+Last updated: Iteration 201, 2026-03-24.
 
 ## Current System State
 
@@ -187,7 +187,11 @@ Deploy: `fly deploy --remote-only` from site repo.
 **20 test functions in store_test.go, 5 in handlers_test.go.**
 - **Work Depth** (200): Task List view — sortable table with Board/List toggle. Priority/state/due/assignee/created sort. Compact rows for power users.
 
-**Work depth in progress.** Board + List views. 6 of 12 ops. Remaining ops: claim, prioritize, block, unblock, handoff, review. Missing views: Triage, Timeline.
+- **Work General Spec** (201): Cognitive grammar applied to "organized activity." 12 entity types, 6 modes (Execute, Organize, Govern, Plan, Learn, Allocate). Architecture supports full domain without modification. Spec at hive/loop/work-general-spec.md.
+
+**Work re-scoped.** Not "kanban competitor" but "organized activity at every scale." 6 modes serve solo dev through civilizational. Build order: Execute depth → Organize → Govern → Plan → Learn → Allocate.
+
+48. **When the director questions the framing, stop and re-derive.** "Work isn't just a kanban board" is a structural correction, not a feature request. Stop building. Apply the method. The cost of one spec iteration saves 10+ iterations of building the wrong thing.
 
 ## What the Scout Should Focus On Next
 

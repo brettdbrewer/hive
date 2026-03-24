@@ -1,25 +1,30 @@
-# Critique — Iteration 200
+# Critique — Iteration 201
 
-## Task List View: PASS
+## Work General Spec: PASS
+
+**Derivation chain:**
+- Gap: Work defined too narrowly (kanban only). Director flagged mid-build.
+- Plan: Apply cognitive grammar to Work as general concept.
+- Output: Spec with 12 entities, 6 modes, grammar coverage matrix, implementation strategy.
 
 **Correctness:**
-- Sort by priority uses rank ordering (urgent=0, high=1, medium=2, low=3, none=4). ✓
-- Sort by due handles nil dates (nil sorts last). ✓
-- Sort by state: active first, then review, open, done. Sensible. ✓
-- Default sort: priority then created. Matches Linear's default. ✓
-- Overdue highlighting in due column (red for past-due, non-done tasks). ✓
-- Blocker indicator on title row. ✓
+- 6 modes are MECE (mutually exclusive, collectively exhaustive) for organized activity. ✓
+- Grammar coverage matrix: every op maps to at least 3 modes. No orphan operations. ✓
+- Entity-mode matrix: every entity has a primary mode. No orphan entities. ✓
+- Scale progression (solo → civilizational) is monotonically additive — each scale uses all modes from the previous plus more. ✓
 
-**Template:**
-- Table headers are sortable links. Clean. ✓
-- Board/List toggle is consistent on both views. ✓
-- Search preserves view=list via hidden input. ✓
-- Compact rows — more tasks visible than Board view. ✓
+**Architecture claim verified:**
+- "No new tables needed" — correct. Nodes table already supports arbitrary kinds. Ops table already supports arbitrary operation types. The grammar is kind-agnostic. ✓
 
-**NOTE:** Sort is server-side (page reload per sort change). For a table view, client-side sort would be snappier. Acceptable at current scale. Could HTMX-ify later.
+**Convergence:**
+- Pass 1 found the gaps (11 missing entity types, 5 missing modes).
+- Pass 2 found existing footholds (Governance, Knowledge, Dashboard, Membership).
+- Fixpoint claimed at pass 2. Plausible — the architecture genuinely supports this without modification.
 
-**Tests:** No new tests. sortTasks is a pure function that could be tested, but the sort logic is straightforward.
+**Risks:**
+- The spec is broad. 6 modes × 12 entities = 72 cells in the entity-mode matrix. Building all of this is a multi-month effort.
+- Priority ordering matters — the implementation strategy (Execute → Organize → Govern → Plan → Learn → Allocate) should be validated against user need, not just architectural convenience.
+
+**NOTE:** The existing work-product-spec.md covers Execute mode thoroughly. This general spec subsumes it without contradiction.
 
 ## Verdict: PASS
-
-**Milestone:** Iteration 200. 200 iterations shipped to production.

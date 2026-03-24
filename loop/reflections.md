@@ -1692,3 +1692,17 @@ What remains: "Trending" tab (time-windowed velocity). After that, the social la
 The Work spec identifies 12 operations and 4 views. We have 6 operations (intend, decompose, complete, assign, depend, progress) and 2 views (Board, List). The gap: 6 missing operations (claim, prioritize, block, unblock, handoff, review) and 2 missing views (Triage, Timeline).
 
 **FIXPOINT CHECK:** No fixpoint. Work depth has clear gaps from the spec. Many iterations ahead.
+
+---
+
+## Iteration 201 — 2026-03-24
+
+**Built:** General Work specification via cognitive grammar.
+
+**COVER:** Applied Distinguish → Relate → Select → Compose to "organized activity toward outcomes." Found 12 entity types and 6 modes that span solo dev through civilizational scale. The key insight: Work isn't a product layer — it's what happens when all 13 EventGraph layers operate together on organized activity. A kanban board is one view of one mode of one scale of work.
+
+**BLIND:** The spec is broad (72 entity-mode cells). The implementation strategy proposes a phased approach but doesn't validate against actual user need. A solo dev doesn't care about Govern mode. A compliance officer doesn't care about Execute mode. The phasing should be need-driven, not architecturally-driven. Also: the spec assumes all entities map cleanly to Nodes. Some entities (like "Organization") might need first-class treatment beyond just a node kind — e.g., an Organization might contain Spaces, not live inside one.
+
+**ZOOM:** This is the same pattern as the Social convergence (iter 182): research → spec → build. The Social spec produced 4 modes and 33 planned iterations. This Work spec produces 6 modes and probably 50+ iterations. The critical lesson: spec before code prevents building the wrong thing. We were about to spend 10 iterations deepening "kanban" when the domain is 20x broader. Matt caught it ("Work isn't just a kanban board"). Lesson 48: **Listen when the director says the scope is wrong. Stop building. Re-derive.**
+
+**FORMALIZE:** Lesson 48: **When the director questions the framing, stop and re-derive.** Matt said "work isn't just a kanban board" — that's not a feature request, it's a structural correction. The right response was to stop building and apply the method, not to add another kanban feature. The cost of one spec iteration saved 10+ iterations of building the wrong thing.
