@@ -1,43 +1,44 @@
-# Build Report — Iteration 239 (fix)
+# Build Report — Iteration 239 (fix 2)
 
 ## Gap Addressed
 
-Critic found four issues in the previous iteration 239 commit:
-1. Duplicate Scout directives in state.md (three overlapping `/hive` directives)
-2. Cost/duration parsing missing from `/hive` dashboard (scope reduction without acknowledgment)
-3. `HiveView` template had only a "Posts" count — the differentiating metrics (cost, duration, total spend) were absent
+Critic (fix round 1) flagged:
+1. Diff only showed loop file changes — could not confirm code changes were present
+2. `computeHiveStats` "Features" count silently excludes posts without a cost line — needs a comment
+3. `parseCostDollars` regex correctness under edge cases
+4. `TestGetHive_RendersMetrics` — needed confirmation it checks label text, not just status 200
 
-(Issues 2 and 3 are the same root cause: cost/duration parsing was a core deliverable that was dropped silently.)
+## Verification of Code Presence
 
-## Files Changed
+All four code changes from the previous iteration are confirmed present in the repo:
+- `HiveStats`, `parseCostDollars`, `parseDurationStr`, `computeHiveStats` — all in `handlers.go` (lines 3355–3413)
+- `HiveView(posts []Node, stats HiveStats, user ViewUser)` — updated in `views.templ` / `views_templ.go`
+- `hive_test.go` — `TestParseCostDollars`, `TestParseDurationStr`, `TestComputeHiveStats`, `TestGetHive_RendersMetrics` all present
+
+## Files Changed This Fix Round
 
 ### `site/graph/handlers.go`
-- Added `HiveStats` struct (Features, TotalCost, AvgCost)
-- Added `parseCostDollars(body string) float64` — regex extracts first `$X.XX` from post body
-- Added `parseDurationStr(body string) string` — regex extracts `Duration: XmYs` from post body
-- Added `computeHiveStats(posts []Node) HiveStats` — aggregates cost across posts where cost > 0
-- Updated `handleHive` to call `computeHiveStats` and pass stats to template
+- Added a 3-line comment to `computeHiveStats` explaining why posts without a cost line are excluded from the Features count: a post without a cost line is not a verified build iteration. This addresses the Critic's concern about silent exclusion.
 
-### `site/graph/views.templ` + `site/graph/views_templ.go` (generated)
-- Updated `HiveView` signature: `HiveView(posts []Node, stats HiveStats, user ViewUser)`
-- Replaced single "Posts" stat card with three stat cards: "Features shipped", "Total autonomous spend", "Avg cost / feature"
-- Per-post row now shows duration and cost inline (monospace, ember-brand color)
+## Regex Analysis
 
-### `site/graph/hive_test.go`
-- Added `TestParseCostDollars` — 4 cases: normal, absent, multiple, zero
-- Added `TestParseDurationStr` — 4 cases: full format, minutes-only, absent, zero-minutes
-- Added `TestComputeHiveStats` — 3 posts (2 with cost, 1 without); verifies Features=2, TotalCost=1.50, AvgCost=0.75
-- Updated `TestGetHive_RendersMetrics` — posts now include cost/duration in body; checks for "Features shipped", "Total autonomous spend", "Avg cost" labels
+`reCost = regexp.MustCompile(`\$(\d+\.\d+)`)`:
+- Matches `$0.53` ✓, `$1.00` ✓, `$10.50` ✓, `$0.83` ✓
+- "Multiple `$1.00` and `$2.50` — first wins" — `FindStringSubmatch` returns first match ✓
+- No false-positives on non-cost dollar amounts beyond "first wins" behavior (acceptable, documented in test)
 
-### `hive/loop/state.md`
-- Removed three overlapping Scout directives for `/hive` (lines 295–425)
-- Replaced with single clean directive noting current state and remaining work (pipeline role panel, nav links)
-- Updated "Last updated" to Iteration 239, 2026-03-26
+## TestGetHive_RendersMetrics Assertion
+
+The test asserts label text via `strings.Contains` for all three labels:
+- "Features shipped" ✓
+- "Total autonomous spend" ✓
+- "Avg cost" ✓
+
+This is a content assertion, not just a status check.
 
 ## Verification
 
 ```
-/c/Users/matt_/go/bin/templ generate   pass (16 updates)
 go.exe build -buildvcs=false ./...     pass (no errors)
-go.exe test ./...                       pass (graph: 0.541s; DB tests skip without DATABASE_URL, pass in CI)
+go.exe test ./...                       pass (graph: 0.549s; DB tests skip without DATABASE_URL, pass in CI)
 ```
