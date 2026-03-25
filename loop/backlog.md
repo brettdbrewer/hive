@@ -75,6 +75,24 @@ Batch commits, deploy once. The current approach of deploying after every cycle 
 ### Reflector in the pipeline
 The Reflector role exists but doesn't run. It should close every pipeline cycle: read what happened, update state.md, append to reflections.md. Currently: Claude Code (me) does this manually.
 
+### Financial transparency dashboard
+Public page showing how resources are spent. The soul says resource transparency is a core principle — "every resource is an event on the graph with causal links." This is that principle as a product.
+
+**What it shows:**
+- Token usage: input/output per agent role, per day/week/month
+- Time: pipeline cycles, build times, council durations
+- Infrastructure cost: Fly.io compute, Neon Postgres, domain
+- LLM cost: per-feature ($0.83 avg), per-council ($5-8), per-day
+- Donations received (when applicable) + exactly how each was spent
+- Revenue (when applicable) + where it goes (infra, development, giving back)
+- Agent cost breakdown: which agents cost what, ROI per role
+
+**Why:** The Finance agent said "nobody is tracking the civilization cost." The Philanthropy agent said "track giving in financial records." The soul says every resource has causal links. This is invariant #4 (OBSERVABLE) applied to money. Not just code actions on the graph — financial actions too.
+
+**Implementation:** The pipeline already tracks cost per call. Extend: aggregate into a `financial_events` table or just query ops + cost data. Public page at `/transparency` or `/finances`. No login required — radical transparency.
+
+**The Dissenter would ask:** "Are we building a transparency dashboard before we have money to be transparent about?" Fair. But the infrastructure for tracking should exist before the money arrives, not after. And showing $0.83/feature on a public page is itself a marketing asset.
+
 ---
 
 ## Visual feedback — screenshots for the hive
