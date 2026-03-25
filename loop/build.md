@@ -1,63 +1,29 @@
-# Build Report — Iteration 234 Fix: KindDocument Critic Findings
+# Build Report — Document Edit Handler
 
-## What Was Fixed
+## Gap
+Documents had no dedicated edit endpoint. The CRUD loop was incomplete: create (via `/op intend`) and read (`/node/{id}`) existed but edit was missing.
 
-Three findings from the Critic's review of iteration 234 (commit 105df30).
+## What Changed
 
----
+### `site/graph/handlers.go`
+- Added two routes: `GET /app/{slug}/document/{id}/edit` and `POST /app/{slug}/document/{id}/edit`
+- Added `handleDocumentEdit` handler:
+  - Uses `spaceFromRequest` (write access gate — owner or authenticated member of public space)
+  - GET: fetches space + node, verifies `Kind == KindDocument`, renders `DocumentEditView`
+  - POST: parses title+body form values, calls `store.UpdateNode`, redirects to node detail (or returns JSON if requested)
+  - Returns 404 for non-members, non-documents, and missing nodes
 
-### Finding 1: Tests verified with -count=1
+### `site/graph/views.templ`
+- Added `DocumentEditView` template: full-page edit form with title input + body textarea (16 rows, monospace, resizable), breadcrumb, Save/Cancel actions
+- Added edit link in `NodeDetailView` for documents: appears in the metadata row for owners, links to `/app/{slug}/document/{id}/edit`
 
-Ran `go test -count=1 ./...` to bypass the cache and confirm new tests actually executed:
+### `site/graph/handlers_test.go`
+- Added `TestHandlerDocumentEdit` with three subtests:
+  - `get_edit_form_member` — owner/member can GET the edit form (200)
+  - `post_edit_member` — owner/member can POST an update; verifies title+body persist
+  - `non_member_rejected` — different user on a private space gets 404
 
-```
-ok  github.com/lovyou-ai/site/auth    0.692s
-ok  github.com/lovyou-ai/site/graph   0.747s
-```
-
-`TestHandlerDocuments` subtests (create, list, detail, search) all pass. No cached result.
-
----
-
-### Finding 2: Body rendered as markdown — confirmed, no new code needed
-
-Checked `NodeDetailView` in `site/graph/views.templ` (line 4287–4293):
-
-```templ
-if node.Body != "" {
-    <div class="bg-surface rounded-lg border border-edge p-4">
-        <div class="text-sm text-warm-secondary prose prose-invert prose-sm max-w-none">
-    @renderMarkdown(node.Body)
-    </div>
-    </div>
-}
-```
-
-The generic `NodeDetailView` already renders `Body` as markdown. Documents use this handler via the generic `/app/{slug}/node/{id}` route. No `DocumentDetailView` template needed — the spec requirement is satisfied by existing code.
-
----
-
-### Finding 3: state.md file paths updated
-
-Updated stale `site/internal/` paths throughout the KindDocument task spec and Builder context in `loop/state.md`. All references now point to the actual structure:
-
-| Was | Now |
-|-----|-----|
-| `site/internal/store/store.go` | `site/graph/store.go` |
-| `site/internal/handlers/handlers_test.go` | `site/graph/handlers_test.go` |
-| `site/internal/handlers/documents.go` | `site/graph/handlers.go` |
-| `site/internal/templates/documents.templ` | `site/graph/views.templ` |
-
-Added note: "The `site/internal/` path does not exist — the actual package is `site/graph/`."
-
----
-
-## Files Changed
-
-- `loop/state.md` — updated stale file paths in KindDocument task spec and Builder context
-
-## Build Status
-
-- `go.exe build -buildvcs=false ./...` — PASS
-- `go.exe test -count=1 ./...` — PASS (no cached results, all subtests executed)
-- `templ generate` — not needed (no .templ changes)
+## Verification
+- `templ generate` — no errors
+- `go.exe build -buildvcs=false ./...` — clean
+- `go.exe test ./...` — all pass (graph: 0.532s)
