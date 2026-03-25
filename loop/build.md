@@ -1,38 +1,39 @@
-# Build Report — Agent Personas Infrastructure Phase 1
+# Build Report — Agent Discovery Page + Chat Creation Flow
 
-## Gap
-Create `agent_personas` table, seed 8 starter personas at startup, and update `buildSystemPrompt()` in `mind.go` to use persona prompts when a `role:<name>` tag is present on the conversation.
+## What Was Built
 
-## Status: ALREADY COMPLETE
+Phase 2 of agent-chat-spec: the `/agents` discovery page and `POST /agents/{name}/chat` conversation creation flow.
 
-All three components were implemented in a prior iteration. Task verified, no changes required.
+## Findings
 
-### 1. `agent_personas` table — `site/graph/store.go:381`
-```sql
-CREATE TABLE IF NOT EXISTS agent_personas (
-    id TEXT PRIMARY KEY, name TEXT UNIQUE, display TEXT,
-    description TEXT, category TEXT, prompt TEXT,
-    model TEXT, active BOOLEAN, created_at TIMESTAMPTZ
-);
-```
-Supporting `agent_memories` table with `kind`, `source_id`, `importance` columns also present (lines 393–406).
+The core implementation was already complete from Phase 1 infrastructure work:
+- `GET /agents` route — lists active personas grouped by category via `views.AgentsPage`
+- `GET /agents/{name}` route — individual agent profile page
+- `POST /agents/{name}/chat` route — creates a conversation with `role:{name}` tag
+- `views.AgentCategoryGroup` + `views.AgentPersonaItem` types in `agents_templ.go`
+- Persona cards with name, description, category badge, Profile + Chat buttons
 
-### 2. Startup seeding — `site/cmd/site/main.go:215`
-`graphStore.SeedAgentPersonas(context.Background())` is called at startup.
-`SeedAgentPersonas` in `site/graph/personas.go` reads 50+ embedded `personas/*.md` files and upserts all of them with category/model/active metadata.
+**The one gap:** the POST handler was routing conversations into the **demo space** (`graph.DemoSpaceSlug`) instead of the dedicated **agents space** (`graph.AgentsSpaceSlug`). The spec explicitly calls for `lovyou.ai/app/agents` as the home for all agent conversations.
 
-### 3. `buildSystemPrompt()` routing — `site/graph/mind.go:404`
-Checks for `role:` tag → calls `s.GetAgentPersona(ctx, role)` → uses `persona.Prompt` instead of `mindSoul`. Also injects persona memories and saves new memories per conversation.
+## Changes Made
 
-### Store methods verified present
-- `UpsertAgentPersona`, `GetAgentPersona`, `GetAgentPersonaForConversation`
-- `GetAgentPersonasForConversations` (batch, avoids N+1)
-- `ListAgentPersonas` (active only, ordered by category/display)
-- `RememberForPersona` / `RecallForPersona` (per-persona memory)
+### `site/cmd/site/main.go`
+- Updated `POST /agents/{name}/chat` handler to use `graph.AgentsSpaceSlug` instead of `graph.DemoSpaceSlug`
+- Updated error message from "demo space not available" to "agents space not available"
+- Renamed local variable `demoSpace` → `agentsSpace` for clarity
+- The `agents` space is guaranteed to exist: `graphStore.EnsureAgentsSpace()` runs at startup (line 214)
 
 ## Verification
-- `go build -buildvcs=false ./...` — exit 0
-- `go test ./...` — all pass (graph, auth)
 
-## Files Changed
-None — infrastructure was already complete.
+```
+go.exe build -buildvcs=false ./...   → exit 0
+go.exe test ./...                    → all pass (auth, graph packages)
+```
+
+## Route Summary
+
+| Route | Auth | Effect |
+|-------|------|--------|
+| `GET /agents` | optional | Shows all active personas grouped by category |
+| `GET /agents/{name}` | optional | Shows agent profile with full prompt rendered as HTML |
+| `POST /agents/{name}/chat` | required | Creates conversation in `/app/agents` space with `role:{name}` tag, redirects to chat |
