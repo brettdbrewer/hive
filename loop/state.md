@@ -292,6 +292,52 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 ## What the Scout Should Focus On Next
 
+## Directive — Iter 234+: Close the Q&A Loop
+
+**Priority: HIGH. This is the next cluster.**
+
+### Why
+
+KindDocument (Wiki) and KindQuestion (Q&A) were just shipped as entity kinds with basic CRUD. Agent Memory Phase 4 landed in iter 233. The platform's stated differentiator is that **agents participate as equals, not as tools** — but right now a posted Question just sits there. The loop is open.
+
+Close it: when a user posts a question in a space, the agent automatically answers it — grounded in the space's documents. This is the first complete demonstration of the platform's unique value proposition in a single user story.
+
+### What to build (in order)
+
+**Task 1 — Auto-answer on KindQuestion creation**
+Extend the existing `handleAutoReply` path (which today fires on `respond`/`converse` ops) to also fire when a `express` op creates a `KindQuestion` node. The Mind call should receive:
+- The question title + body as the prompt
+- A system prompt prefix that says "You are answering a question in the space [slug]. Answer concisely. If you reference a document, cite it by name."
+- The space's `KindDocument` nodes (title + body, up to BOUNDED limit) injected as context
+
+**Task 2 — Question answer display**
+On the question detail page, show agent answers in a distinct "Answers" section below the question body. Each answer shows: agent avatar + name, answer body (markdown rendered), timestamp. Separate from the existing op history/activity trail.
+
+**Task 3 — Question status badge**
+On the Board and Feed lenses, KindQuestion nodes should show a small status badge: "Answered" (green) if at least one agent answer exists, "Open" (amber) otherwise. This makes unanswered questions visible at a glance.
+
+**Task 4 — Knowledge grounding query**
+In the Mind auto-answer path, query the store for `KindDocument` nodes in the same space (LIMIT 10, ordered by created_at DESC). Inject their content into the system prompt context block. This means agent answers are grounded in the space's actual documentation — not hallucinated.
+
+**Task 5 — Test coverage**
+Tests for: (a) auto-answer triggers on KindQuestion express op, (b) answer stored and retrievable, (c) question status badge logic (answered vs open), (d) document context injection into prompt. INVARIANT 12 compliance required.
+
+### Target repos
+- **site** — all handler, template, and store changes
+- Ship with: `cd site && ./ship.sh "iter N: Q&A agent auto-answer with document grounding"`
+
+### Why this is the priority
+
+1. **Closes what was just opened.** Shipping entity kinds without closing the loop is the CRUD gap lesson (lesson 15) applied at the agent layer.
+2. **Demonstrates the differentiator.** Agents answering questions grounded in space docs is the platform's value in one URL. No competitor has this.
+3. **Compounds agent memory.** The memory system (iter 233) feeds naturally into this — agent answers improve as it accumulates knowledge about the space.
+4. **One user story, complete.** Ask question → get agent answer → see it's grounded in the docs. No loose ends.
+
+### What NOT to do
+- Don't build a full "accept answer" / upvote / bounty system yet. That's depth for later.
+- Don't build question categories or tags yet.
+- Don't refactor the auto-reply architecture — extend it, don't redesign it.
+
 ## Current Directive — Iteration 235+
 
 **Status as of iter 234:**

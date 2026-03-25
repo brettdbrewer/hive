@@ -1,37 +1,33 @@
-# Build Report — Fix: KindQuestion Route + state.md Duplicate Header
+# Build Report — Iteration 233: Auto-answer KindQuestion with document grounding
 
-## What Changed
+## Gap
+Q&A loop was incomplete: questions were created but agents never answered them. The loop closes by having the Mind auto-answer any KindQuestion on creation, grounded in the space's KindDocument nodes.
 
-### 1. state.md — Removed duplicate `## Current Directive` block
-**File:** `hive/loop/state.md`
+## Changes
 
-The builder had inserted the new Q&A directive above the existing document-edit directive instead of replacing it. Result: two identical `## Current Directive — Iteration 235+` H2 headers. Removed the old document-edit directive block (the second one), keeping only the current Q&A directive.
+### `site/graph/store.go`
+- Added `ListDocumentContext(ctx, spaceID) ([]Node, error)` — queries KindDocument nodes in a space, LIMIT 10 (BOUNDED invariant).
 
-### 2. handlers.go — Fixed singular route to plural
-**File:** `site/graph/handlers.go`
+### `site/graph/mind.go`
+- Added `OnQuestionAsked(spaceID, spaceSlug string, question *Node)` — async handler. Finds first agent, queries document context, builds grounded prompt, calls Claude, creates KindComment answer attributed to the agent.
+- Added `buildQuestionAnswerPrompt(question *Node, docs []Node) string` — builds SOUL + ROLE + SPACE DOCUMENTS (up to 10 docs, 1000 chars each) + QUESTION prompt.
 
-Changed `GET /app/{slug}/question/{id}` to `GET /app/{slug}/questions/{id}` — consistent with the list route and the KindDocument pattern (`/documents/{id}`).
+### `site/graph/handlers.go`
+- Extended `express` case to support `kind=question`: creates KindQuestion, triggers `go h.mind.OnQuestionAsked(...)`, redirects to question detail. Standard `express` (no kind) unchanged.
 
-### 3. views.templ — Fixed detail link to plural
-**File:** `site/graph/views.templ`
+### `site/graph/views.templ` + `views_templ.go` (generated)
+- **QuestionsView form**: changed `op=intend` → `op=express`, `name=description` → `name=body`.
+- **QuestionDetailView**: agent answers styled with violet badge (`bg-violet-950/20`, "agent" pill with dot). Human answers use standard surface card. Section header: "Answers (N)".
+- Bug fix: answer form used `node_id` but `respond` handler expects `parent_id`. Fixed.
 
-Changed `/app/%s/question/%s` to `/app/%s/questions/%s` in the QuestionsView list item link so it points to the corrected route.
+### `site/graph/handlers_test.go`
+- Added `TestHandlerExpressQuestion`: two sub-tests verifying express+kind=question creates KindQuestion, and bare express still creates KindPost.
 
-### 4. handlers_test.go — Updated test URL to plural
-**File:** `site/graph/handlers_test.go`
-
-Changed test URL from `/app/handler-qa-test/question/` to `/app/handler-qa-test/questions/` in the `question_detail` subtest.
-
-### 5. views_templ.go — Regenerated
-Ran `templ generate` after the views.templ change. 15 updates processed.
-
-## Critic Issue 3 (answer count) — Not a bug
-`QuestionsView` uses `q.ChildCount` (populated by the store from `child_count` DB column). Answers are stored as child nodes (parent_id = question ID), so `ChildCount` correctly reflects the answer count. No fix needed.
+### `site/graph/mind_test.go`
+- Added `TestBuildQuestionAnswerPrompt`: verifies doc context injection in prompt (with/without docs).
+- Added `TestMindOnQuestionAsked_NoAgent`: verifies graceful no-op when no agent exists.
 
 ## Verification
-
-```
-templ generate           → 15 updates, no errors
-go.exe build ./...       → clean
-go.exe test ./...        → ok
-```
+- `templ generate` ✓ (15 updates)
+- `go.exe build -buildvcs=false ./...` ✓
+- `go.exe test ./...` ✓ (graph: 0.546s, all pass)
