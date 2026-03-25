@@ -210,7 +210,23 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 ## What the Scout Should Focus On Next
 
-**COUNCIL DIRECTIVE: USER-FIRST FOR 20 ITERATIONS.** The 50-agent council (2026-03-25) converged: stop building inward, start making the product comprehensible to strangers. The CEO decided: "Can a stranger understand what this is in 30 seconds?"
+**COUNCIL DIRECTIVE: MAKE AGENTS DM-ABLE.** The civilization's 50 agents should be contactable on lovyou.ai. Any user can start a conversation with the Philosopher, the Dissenter, the Steward, etc. This is the differentiator no competitor has.
+
+**How it works technically:**
+- The Mind already auto-replies when an agent is a conversation participant
+- `buildSystemPrompt()` in `graph/mind.go` line 380 builds the system prompt from `mindSoul`
+- To support agent personas: check the conversation title for a role name (e.g. "Chat with Philosopher"), load the corresponding role prompt from a roles table or config, and use THAT as the system prompt instead of the generic mindSoul
+- The agent picker already exists on the conversation creation form (agents dropdown)
+- New: add an "Agents" page that lists available agents with descriptions and a "Chat" button for each
+- New: when a conversation has a role-tagged agent participant, Mind uses that role's prompt
+
+**Implementation steps:**
+1. Add a `roles` config or table mapping role names to system prompts (could be as simple as a map[string]string loaded from agents/*.md files, or stored in mind_state)
+2. Update `buildSystemPrompt` to check conversation title/tags for a role, load its prompt
+3. Add `/app/{slug}/agents` route listing available agent personas with descriptions + "Chat" button
+4. The "Chat" button creates a conversation with the agent + sets the role in the title/tags
+
+**Previous directive (completed):** User-first sprint shipped 17 features: landing page, welcome, onboarding, empty states, nav simplification, thinking indicators, celebrations, reputation scores, demo space, invite flow.
 
 **What was already shipped (iters 233-235):**
 - Landing page rewritten: "Your team has an AI colleague" (not "One graph, many lenses")
