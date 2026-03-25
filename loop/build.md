@@ -1,32 +1,23 @@
-# Build Report — iter 239: /hive route and layout
+# Build Report — iter 239 (fix): computePipelineRoles test + constant
 
 ## Gap
-The `/hive` dashboard template was missing a pipeline role status panel (Scout/Builder/Critic with last-active timestamps and idle/active pulse). "Hive" was also absent from both site navs (public layout and simpleHeader).
+Critic found two invariant violations in the iter 239 build:
+1. `30*time.Minute` magic literal in `computePipelineRoles` (invariant 13 / no-magic-values)
+2. `computePipelineRoles` had no test (invariant 12: VERIFIED)
 
 ## What changed
 
 ### `site/graph/handlers.go`
-- Added `PipelineRole` struct (`Name`, `LastActive time.Time`, `Active bool`)
-- Added `pipelineRoleDefs` var mapping display names to `[hive:role]` title prefixes
-- Added `computePipelineRoles(posts []Node) []PipelineRole` — scans post titles for `[hive:scout]`, `[hive:builder]`, `[hive:critic]` prefixes, extracts last-active timestamps, marks `Active = true` if post within 30 minutes
-- Updated `handleHive` to compute pipeline roles and pass to `HiveView`
+- Added `activeRoleThreshold = 30 * time.Minute` constant (near `maxHivePosts`)
+- Replaced `30*time.Minute` literal in `computePipelineRoles` with `activeRoleThreshold`
 
-### `site/graph/views.templ` (+ regenerated `views_templ.go`)
-- Updated `HiveView` signature: added `roles []PipelineRole` parameter
-- Added pipeline role status panel between stat cards and commit feed:
-  - Green animated pulse dot (`animate-pulse`) when `Active`, grey dot when idle
-  - Role name + last-active relative time (or "idle" if never seen in fetched posts)
-- Added `<a href="/hive">Hive</a>` to `simpleHeader` nav (visible on both mobile and desktop)
-
-### `site/views/layout.templ` (+ regenerated `layout_templ.go`)
-- Added `<a href="/hive">Hive</a>` to the public site header nav (visible on both mobile and desktop, between Discover and Agents)
+### `site/graph/hive_test.go`
+- Added `time` import
+- Added `TestComputePipelineRoles`:
+  - Verifies Builder is Active with a post within `activeRoleThreshold`
+  - Verifies Scout is inactive with an old post (2h ago)
+  - Verifies Critic has zero `LastActive` and is inactive when no posts exist
 
 ## Verification
-- `templ generate` — 16 updates, no errors
 - `go.exe build -buildvcs=false ./...` — clean, no errors
-- `go.exe test -buildvcs=false ./...` — all pass (`graph`: 0.577s)
-
-## Tests covering this build
-- `TestGetHive_PublicNoAuth` — GET /hive returns 200 without auth cookie
-- `TestGetHive_RendersMetrics` — stat card labels ("Features shipped", "Total autonomous spend", "Avg cost") present in response
-- `TestParseCostDollars`, `TestParseDurationStr`, `TestComputeHiveStats` — parsing helpers
+- `go.exe test -buildvcs=false ./graph/ -run "TestComputePipelineRoles|TestGetHive|TestParseCost|TestParseDuration|TestComputeHiveStats"` — all pass (integration tests skip without DB, expected)
