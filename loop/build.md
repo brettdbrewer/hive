@@ -1,32 +1,40 @@
-# Build Report — cmd/mcp-graph MCP Server
+# Build Report — Fix cmd/mcp-graph: security hardening + VERIFIED invariant
 
-## Task
-Build `cmd/mcp-graph` — MCP server exposing 5 lovyou.ai graph tools over stdio JSON-RPC 2.0.
+## Gap
+Critic identified 5 issues in `cmd/mcp-graph/main.go` from commit 3fe5dc3:
+1. URL injection in `toolSearch` — raw query param concatenation
+2. Path injection in `toolGetNode` — raw nodeID in URL path
+3. No HTTP client timeout — violates BOUNDED (invariant 13)
+4. Unbounded `io.ReadAll` — no response body size cap
+5. No tests — violates VERIFIED (invariant 12)
 
-## Status
-COMPLETE — file already existed and was fully implemented. Verified build and tests pass.
+## Changes
 
-## Tools Implemented
+### `cmd/mcp-graph/main.go`
+- Added `net/url` and `time` imports
+- Added `maxResponseBytes = 1 MiB` constant (BOUNDED)
+- Added `client *http.Client` field to `server` struct; `newServer()` sets `Timeout: 30s` (BOUNDED)
+- All `apiPost` calls use `url.PathEscape(space)` for path segment
+- `toolSearch`: query param uses `url.QueryEscape(query)` — fixes URL injection
+- `toolGetNode`: validates nodeID against `/?#` chars; uses `url.PathEscape` — fixes path injection
+- `toolGetBoard`: uses `url.PathEscape(space)`
+- `apiGet` / `apiPost`: replaced `http.DefaultClient` with `s.client`; replaced bare `io.ReadAll` with `io.ReadAll(io.LimitReader(..., maxResponseBytes))`
 
-| Tool | Method | Endpoint |
-|------|--------|----------|
-| `graph.intend` | POST | `/app/{space}/op` with `op=intend` |
-| `graph.respond` | POST | `/app/{space}/op` with `op=respond` |
-| `graph.search` | GET | `/app/{space}/board?q={query}` |
-| `graph.getBoard` | GET | `/app/{space}/board` |
-| `graph.getNode` | GET | `/app/{space}/node/{node_id}` |
-
-## Protocol
-- JSON-RPC 2.0 over stdio (newline-delimited)
-- MCP protocol version `2024-11-05`
-- Handles: `initialize`, `tools/list`, `tools/call`
-- Auth: `LOVYOU_API_KEY` env var as Bearer token
-- Config: `LOVYOU_BASE_URL` (default `https://lovyou.ai`), `LOVYOU_SPACE` (default `hive`)
+### `cmd/mcp-graph/main_test.go` (new — 18 tests)
+- `spaceFor` default/override
+- `toolIntend` missing-title validation, correct POST body
+- `toolRespond` missing-field validation, correct POST body
+- `toolSearch` missing-query validation, URL encoding of special chars
+- `toolGetBoard` happy path
+- `toolGetNode` missing-ID, path-traversal rejection, correct path encoding
+- `apiGet` auth header, 4xx error, bounded read (2 MiB server → ≤1 MiB read)
+- `apiPost` content-type header
+- `okResult` / `errResult` helpers
 
 ## Build Results
 ```
-go.exe build -buildvcs=false ./...   ✓ clean
-go.exe test ./...                    ✓ all pass
+go.exe build -buildvcs=false ./...         ✓ clean
+go.exe test ./cmd/mcp-graph/... -v         ✓ 18/18 pass
 ```
 
 ---

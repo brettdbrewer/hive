@@ -30,8 +30,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -97,10 +99,14 @@ type toolContent struct {
 // Server config
 // ────────────────────────────────────────────────────────────────────────────
 
+// maxResponseBytes caps API response body reads to prevent unbounded memory use (invariant 13: BOUNDED).
+const maxResponseBytes = 1 << 20 // 1 MiB
+
 type server struct {
 	apiKey   string
 	baseURL  string
 	defSpace string
+	client   *http.Client
 }
 
 func newServer() *server {
@@ -113,7 +119,12 @@ func newServer() *server {
 	if defSpace == "" {
 		defSpace = "hive"
 	}
-	return &server{apiKey: apiKey, baseURL: baseURL, defSpace: defSpace}
+	return &server{
+		apiKey:   apiKey,
+		baseURL:  baseURL,
+		defSpace: defSpace,
+		client:   &http.Client{Timeout: 30 * time.Second},
+	}
 }
 
 func (s *server) spaceFor(args map[string]any) string {
@@ -234,7 +245,7 @@ func (s *server) toolIntend(args map[string]any) toolResult {
 	}
 
 	body, _ := json.Marshal(payload)
-	resp, err := s.apiPost("/app/"+space+"/op", body)
+	resp, err := s.apiPost("/app/"+url.PathEscape(space)+"/op", body)
 	if err != nil {
 		return errResult(err.Error())
 	}
@@ -254,7 +265,7 @@ func (s *server) toolRespond(args map[string]any) toolResult {
 		"parent_id": parentID,
 		"body":      msgBody,
 	})
-	resp, err := s.apiPost("/app/"+space+"/op", payload)
+	resp, err := s.apiPost("/app/"+url.PathEscape(space)+"/op", payload)
 	if err != nil {
 		return errResult(err.Error())
 	}
@@ -267,7 +278,7 @@ func (s *server) toolSearch(args map[string]any) toolResult {
 	if query == "" {
 		return errResult("query is required")
 	}
-	resp, err := s.apiGet("/app/" + space + "/board?q=" + query)
+	resp, err := s.apiGet("/app/" + url.PathEscape(space) + "/board?q=" + url.QueryEscape(query))
 	if err != nil {
 		return errResult(err.Error())
 	}
@@ -276,7 +287,7 @@ func (s *server) toolSearch(args map[string]any) toolResult {
 
 func (s *server) toolGetBoard(args map[string]any) toolResult {
 	space := s.spaceFor(args)
-	resp, err := s.apiGet("/app/" + space + "/board")
+	resp, err := s.apiGet("/app/" + url.PathEscape(space) + "/board")
 	if err != nil {
 		return errResult(err.Error())
 	}
@@ -289,7 +300,10 @@ func (s *server) toolGetNode(args map[string]any) toolResult {
 	if nodeID == "" {
 		return errResult("node_id is required")
 	}
-	resp, err := s.apiGet("/app/" + space + "/node/" + nodeID)
+	if strings.ContainsAny(nodeID, "/?#") {
+		return errResult("node_id contains invalid characters")
+	}
+	resp, err := s.apiGet("/app/" + url.PathEscape(space) + "/node/" + url.PathEscape(nodeID))
 	if err != nil {
 		return errResult(err.Error())
 	}
@@ -310,13 +324,16 @@ func (s *server) apiGet(path string) (string, error) {
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	b, _ := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return "", fmt.Errorf("reading response: %w", err)
+	}
 	if resp.StatusCode >= 400 {
 		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
 	}
@@ -334,13 +351,16 @@ func (s *server) apiPost(path string, body []byte) (string, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	b, _ := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return "", fmt.Errorf("reading response: %w", err)
+	}
 	if resp.StatusCode >= 400 {
 		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
 	}
