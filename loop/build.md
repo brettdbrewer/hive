@@ -1,43 +1,38 @@
-# Build Report — Iteration 232: First Fully Autonomous Feature Delivery
+# Build Report — Agent Personas Infrastructure Phase 1
 
-## What This Iteration Does
+## Gap
+Create `agent_personas` table, seed 8 starter personas at startup, and update `buildSystemPrompt()` in `mind.go` to use persona prompts when a `role:<name>` tag is present on the conversation.
 
-Bumps Operate timeout to 15min and runs the first fully autonomous pipeline cycle that ships a product feature: Scout identifies gap → Builder implements → Critic reviews → code deployed.
+## Status: ALREADY COMPLETE
 
-## Changes
+All three components were implemented in a prior iteration. Task verified, no changes required.
 
-### `eventgraph/go/pkg/intelligence/claude_cli.go`
-- Bumped `defaultOperateTimeout` from 10min to 15min. Previous timeout caused builder failure in iter 230.
-
-## Pipeline Result — AUTONOMOUS
-
+### 1. `agent_personas` table — `site/graph/store.go:381`
+```sql
+CREATE TABLE IF NOT EXISTS agent_personas (
+    id TEXT PRIMARY KEY, name TEXT UNIQUE, display TEXT,
+    description TEXT, category TEXT, prompt TEXT,
+    model TEXT, active BOOLEAN, created_at TIMESTAMPTZ
+);
 ```
-Scout  → "Add Goals lens with hierarchical project/task progress display"  ($0.09, 58s)
-         Created + assigned ✓
-Builder → Picked up Scout's task → Implemented → Committed + pushed        ($0.58, 3m28s)
-         [hive:builder] Add Goals lens with hierarchical project/task progress display
-Critic → Reviewed commit → REVISE (found issues, created fix task)         ($0.16, 1m3s)
+Supporting `agent_memories` table with `kind`, `source_id`, `importance` columns also present (lines 393–406).
 
-Total: $0.83, ~6 minutes, 1 command, 0 human intervention
-```
+### 2. Startup seeding — `site/cmd/site/main.go:215`
+`graphStore.SeedAgentPersonas(context.Background())` is called at startup.
+`SeedAgentPersonas` in `site/graph/personas.go` reads 50+ embedded `personas/*.md` files and upserts all of them with category/model/active metadata.
 
-## What The Builder Shipped (autonomous)
+### 3. `buildSystemPrompt()` routing — `site/graph/mind.go:404`
+Checks for `role:` tag → calls `s.GetAgentPersona(ctx, role)` → uses `persona.Prompt` instead of `mindSoul`. Also injects persona memories and saves new memories per conversation.
 
-- `GoalWithProjects` struct pairing goals with child projects
-- `handleGoals` updated to fetch child projects per goal
-- `GoalsView` template: hierarchical display with project progress bars (X/Y tasks + progress bar)
-- 4 files changed, 97 lines of hand-written code
+### Store methods verified present
+- `UpsertAgentPersona`, `GetAgentPersona`, `GetAgentPersonaForConversation`
+- `GetAgentPersonasForConversations` (batch, avoids N+1)
+- `ListAgentPersonas` (active only, ordered by category/display)
+- `RememberForPersona` / `RecallForPersona` (per-persona memory)
 
-## What The Critic Found
+## Verification
+- `go build -buildvcs=false ./...` — exit 0
+- `go test ./...` — all pass (graph, auth)
 
-REVISE — created fix task `88e94503`. Specific issues to be addressed in next iteration.
-
-## Deployed
-
-`flyctl deploy --remote-only` ✓ — Goals hierarchical view live on lovyou.ai.
-
-## Build
-
-- `go build ./...` ✓
-- `go test ./...` ✓
-- Deployed ✓
+## Files Changed
+None — infrastructure was already complete.

@@ -9,12 +9,25 @@
 //	cd /c/src/matt/lovyou3/hive
 //	go run ./cmd/mind/
 //
+// With MCP graph tools:
+//
+//	go run ./cmd/mind/ --mcp-config loop/mcp-graph.json
+//
+// Where mcp-graph.json looks like:
+//
+//	{
+//	  "command": "/c/src/matt/lovyou3/hive/mcp-graph.exe",
+//	  "args": [],
+//	  "env": {"LOVYOU_API_KEY": "lv_...", "LOVYOU_SPACE": "hive"}
+//	}
+//
 // Requires ANTHROPIC_API_KEY in the environment.
 package main
 
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -68,6 +81,18 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Parse --mcp-config flag.
+	mcpConfigPath := ""
+	args := os.Args[1:]
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--mcp-config" && i+1 < len(args) {
+			mcpConfigPath = args[i+1]
+			i++
+		} else if strings.HasPrefix(args[i], "--mcp-config=") {
+			mcpConfigPath = strings.TrimPrefix(args[i], "--mcp-config=")
+		}
+	}
+
 	// Read current state for context.
 	stateCtx := readFileOrEmpty("loop/state.md")
 
@@ -79,9 +104,36 @@ func run() error {
 
 	client := anthropic.NewClient() // reads ANTHROPIC_API_KEY from env
 
+	// Start MCP client if config provided.
+	var mcpClient *mcpClient
+	if mcpConfigPath != "" {
+		var cfg mcpConfig
+		data, err := os.ReadFile(mcpConfigPath)
+		if err != nil {
+			return fmt.Errorf("read mcp-config: %w", err)
+		}
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return fmt.Errorf("parse mcp-config: %w", err)
+		}
+		mc, err := startMCPClient(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("start mcp client: %w", err)
+		}
+		defer mc.close()
+		mcpClient = mc
+		fmt.Fprintf(os.Stderr, "mcp: loaded %d tools from %s\n", len(mc.tools), mcpConfigPath)
+	}
+
 	var messages []anthropic.MessageParam
 
 	fmt.Fprintln(os.Stderr, "mind — the hive's consciousness")
+	if mcpClient != nil {
+		names := make([]string, len(mcpClient.tools))
+		for i, t := range mcpClient.tools {
+			names[i] = t.Name
+		}
+		fmt.Fprintf(os.Stderr, "tools: %s\n", strings.Join(names, ", "))
+	}
 	fmt.Fprintln(os.Stderr, "type your message. ctrl+c to exit.")
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -100,9 +152,9 @@ func run() error {
 		// Append user message.
 		messages = append(messages, anthropic.NewUserMessage(anthropic.NewTextBlock(input)))
 
-		// Stream response.
+		// Stream response (with tool loop if MCP enabled).
 		fmt.Fprintln(os.Stderr)
-		response, err := streamResponse(ctx, client, system, messages)
+		response, updatedMessages, err := conversationTurn(ctx, client, system, messages, mcpClient)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "\nerror: %v\n\n", err)
 			// Remove the failed user message so conversation stays clean.
@@ -110,42 +162,116 @@ func run() error {
 			continue
 		}
 
-		// Append assistant response to history.
-		messages = append(messages, anthropic.NewAssistantMessage(anthropic.NewTextBlock(response)))
+		messages = updatedMessages
+		_ = response
 		fmt.Fprintf(os.Stderr, "\n\n")
 	}
 
 	return nil
 }
 
-func streamResponse(ctx context.Context, client anthropic.Client, system string, messages []anthropic.MessageParam) (string, error) {
-	stream := client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.ModelClaudeOpus4_6,
-		MaxTokens: 8192,
-		Messages:  messages,
-		System: []anthropic.TextBlockParam{
-			{Text: system},
-		},
-	})
-
-	var full strings.Builder
-	for stream.Next() {
-		event := stream.Current()
-		switch ev := event.AsAny().(type) {
-		case anthropic.ContentBlockDeltaEvent:
-			switch delta := ev.Delta.AsAny().(type) {
-			case anthropic.TextDelta:
-				fmt.Fprint(os.Stderr, delta.Text)
-				full.WriteString(delta.Text)
+// conversationTurn handles one user turn, including any tool calls.
+// Returns the final text response and updated message history.
+func conversationTurn(ctx context.Context, client anthropic.Client, system string, messages []anthropic.MessageParam, mc *mcpClient) (string, []anthropic.MessageParam, error) {
+	// Convert MCP tools to Anthropic ToolUnionParam.
+	var anthropicTools []anthropic.ToolUnionParam
+	if mc != nil {
+		for _, t := range mc.tools {
+			tool := anthropic.ToolUnionParamOfTool(
+				anthropic.ToolInputSchemaParam{Properties: t.InputSchema},
+				t.Name,
+			)
+			// Set description via the OfTool field.
+			if tool.OfTool != nil {
+				tool.OfTool.Description = anthropic.String(t.Description)
 			}
+			anthropicTools = append(anthropicTools, tool)
 		}
 	}
 
-	if err := stream.Err(); err != nil {
-		return "", err
-	}
+	for {
+		params := anthropic.MessageNewParams{
+			Model:     anthropic.ModelClaudeOpus4_6,
+			MaxTokens: 8192,
+			Messages:  messages,
+			System: []anthropic.TextBlockParam{
+				{Text: system},
+			},
+		}
+		if len(anthropicTools) > 0 {
+			params.Tools = anthropicTools
+		}
 
-	return full.String(), nil
+		// Stream the response, accumulating the full message.
+		stream := client.Messages.NewStreaming(ctx, params)
+
+		var full strings.Builder
+		var accumulated anthropic.Message
+
+		for stream.Next() {
+			event := stream.Current()
+			accumulated.Accumulate(event)
+			switch ev := event.AsAny().(type) {
+			case anthropic.ContentBlockDeltaEvent:
+				switch delta := ev.Delta.AsAny().(type) {
+				case anthropic.TextDelta:
+					fmt.Fprint(os.Stderr, delta.Text)
+					full.WriteString(delta.Text)
+				}
+			}
+		}
+		if err := stream.Err(); err != nil {
+			return "", messages, err
+		}
+
+		// Append assistant message using the accumulated message.
+		messages = append(messages, accumulated.ToParam())
+
+		// Collect tool uses from accumulated content.
+		var toolUses []anthropic.ToolUseBlock
+		for _, block := range accumulated.Content {
+			if tu, ok := block.AsAny().(anthropic.ToolUseBlock); ok {
+				toolUses = append(toolUses, tu)
+			}
+		}
+
+		// If no tool calls, we're done.
+		if len(toolUses) == 0 || mc == nil {
+			return full.String(), messages, nil
+		}
+
+		// Execute tool calls and append results.
+		var toolResults []anthropic.ContentBlockParamUnion
+		for _, tu := range toolUses {
+			fmt.Fprintf(os.Stderr, "\n[tool: %s]\n", tu.Name)
+			var toolArgs map[string]any
+			if err := json.Unmarshal(tu.Input, &toolArgs); err != nil {
+				toolResults = append(toolResults, anthropic.NewToolResultBlock(tu.ID, fmt.Sprintf("error: %v", err), true))
+				continue
+			}
+			result, err := mc.callTool(ctx, tu.Name, toolArgs)
+			if err != nil {
+				toolResults = append(toolResults, anthropic.NewToolResultBlock(tu.ID, fmt.Sprintf("error: %v", err), true))
+				continue
+			}
+			resultText := ""
+			for _, c := range result.Content {
+				resultText += c.Text
+			}
+			fmt.Fprintf(os.Stderr, "[result: %s]\n", truncate(resultText, 200))
+			toolResults = append(toolResults, anthropic.NewToolResultBlock(tu.ID, resultText, result.IsError))
+		}
+
+		// Append tool results and loop for Claude's next response.
+		messages = append(messages, anthropic.NewUserMessage(toolResults...))
+	}
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
 
 func readFileOrEmpty(path string) string {
