@@ -96,6 +96,49 @@ The Finance agent's concern: zero revenue. Agent conversations could be the firs
 
 ---
 
+## Urgent
+
+### Dogfooding — the hive uses its own product
+The civilization doesn't live in its own product. Tasks are in state.md, not on the board. Specs are markdown files, not Knowledge claims. Conversations happen in Claude Code sessions, not in Chat. The Inhabitant would notice.
+
+**What changes:**
+- Hive tasks go on the lovyou.ai board (already partially true — the pipeline creates tasks there)
+- Specs become Knowledge claims (assert/challenge/verify lifecycle)
+- Council reports posted to feed (already done) AND stored as Knowledge nodes
+- Agent conversations happen on lovyou.ai Chat, not just in terminal sessions
+- Lessons from state.md become Knowledge claims with verification status
+- The backlog becomes a project on the board, not a markdown file
+
+**Why it matters:** "Take care of yourself" means the hive lives in the infrastructure it builds. If it's not good enough for the hive, it's not good enough for Lovatts. Every friction the hive hits using its own product is a friction real users will hit too. And it proves the product works at the scale of a real organization (50 agents, multiple workflows, continuous operation).
+
+### Bus factor — the hive runs without Matt
+The HR agent: "The single point of failure in this civilization isn't technical. It's biological." Currently: Matt types `next` or `--pipeline` to trigger each cycle. If Matt can't work for a week, the hive stops.
+
+**What's needed:**
+- Continuous runner mode: `--daemon` flag that runs the pipeline on a schedule (every 30 minutes, or when the board has unworked tasks)
+- Runs on a VM (Fly machine, or a dedicated server) — not Matt's laptop
+- Automatic deploy after successful builds (with Critic PASS gate)
+- Budget ceiling per day ($10-20) to prevent runaway spend
+- Alerting: if the hive encounters errors, send a notification (email, Telegram, or lovyou.ai notification to Matt)
+- The Guardian monitors: if the hive has been idle for 24 hours, flag it
+- Graceful degradation: if the API is down, or Fly is having a bad day, the hive waits and retries — doesn't crash
+
+**The test:** Matt goes offline for 48 hours. The hive continues: scouting gaps, building features, reviewing commits, deploying. When Matt returns, the board shows what was done, the feed shows progress, the cost dashboard shows spend. The civilization survived without its Director.
+
+### Legal prerequisites
+The Legal agent flagged: no privacy policy, no terms of service. Google OAuth collects data with no notice. Before Lovatts or any external user, these must exist.
+
+**Minimum viable legal:**
+- Privacy policy at /privacy — what data is collected (Google profile, email, actions on the graph), how it's stored (Neon Postgres, encrypted at rest), who has access (no third parties except infra providers), how to delete your account
+- Terms of service at /terms — the soul as a terms document. "Take care of your human" means: your data is yours, agents identify themselves, we don't sell your information, free for individuals
+- Cookie notice (if applicable — currently no tracking cookies, but Google OAuth may set them)
+- GDPR compliance basics — right to export, right to delete, data portability
+- For Lovatts specifically: a data processing agreement (DPA) since the hive handles client code and potentially client data
+
+**The soul IS the terms.** "Take care of your human" translates directly to: we protect your data, we're transparent about what we do, we don't exploit you. The terms just make it legally binding.
+
+---
+
 ## Process ideas
 
 ### Automated council schedule
