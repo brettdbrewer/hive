@@ -54,6 +54,7 @@ type Config struct {
 	Interval   time.Duration
 	BudgetUSD     float64 // daily budget, 0 = $10 default
 	OneShot       bool    // if true, work one task then exit (for testing)
+	NoPush        bool    // if true, commit but don't push (pipeline pushes after Critic PASS)
 	CouncilTopic  string  // optional: focus the council on a specific question
 }
 
@@ -167,7 +168,8 @@ func (r *Runner) runBuilder(ctx context.Context) {
 		return
 	}
 
-	// Filter to open/active tasks.
+	// Filter to open/active tasks. Fix tasks (REVISE) get priority.
+	var fixTasks []api.Node
 	var myTasks []api.Node
 	var unassigned []api.Node
 	for _, t := range tasks {
@@ -178,13 +180,22 @@ func (r *Runner) runBuilder(ctx context.Context) {
 			continue
 		}
 		if t.AssigneeID != "" {
-			// Only pick up tasks assigned to us (by agent user ID).
 			if r.cfg.AgentID != "" && t.AssigneeID == r.cfg.AgentID {
-				myTasks = append(myTasks, t)
+				if strings.HasPrefix(t.Title, "Fix:") {
+					fixTasks = append(fixTasks, t)
+				} else {
+					myTasks = append(myTasks, t)
+				}
 			}
 		} else {
 			unassigned = append(unassigned, t)
 		}
+	}
+
+	// REVISE GATE: fix tasks before new work (lesson 47, council directive).
+	if len(fixTasks) > 0 {
+		log.Printf("[builder] tick %d: %d fix tasks — working fixes before new work", r.tick, len(fixTasks))
+		myTasks = fixTasks
 	}
 
 	// 2. If none assigned to us, claim the highest priority unassigned task.
@@ -381,13 +392,23 @@ func (r *Runner) commitAndPush(t api.Node) error {
 		return fmt.Errorf("git commit: %w", err)
 	}
 
-	// Push.
+	// Push (unless NoPush — pipeline pushes after Critic PASS).
+	if r.cfg.NoPush {
+		log.Printf("[builder] committed (no push — waiting for Critic): %s", msg)
+		return nil
+	}
+
 	if err := r.git("push"); err != nil {
 		return fmt.Errorf("git push: %w", err)
 	}
 
 	log.Printf("[builder] committed and pushed: %s", msg)
 	return nil
+}
+
+// Push pushes the current branch. Called by the pipeline after Critic PASS.
+func (r *Runner) Push() error {
+	return r.git("push")
 }
 
 func (r *Runner) git(args ...string) error {

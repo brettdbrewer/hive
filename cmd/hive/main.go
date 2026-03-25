@@ -213,6 +213,7 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 	hiveDir := findHiveDir()
 	client := api.New(apiBase, apiKey)
 
+	// Pipeline order: Scout → Builder (commit, no push) → Critic → push if PASS.
 	roles := []string{"scout", "builder", "critic"}
 	for _, role := range roles {
 		select {
@@ -245,12 +246,23 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 			RolePrompt: runner.LoadRolePrompt(hiveDir, role),
 			BudgetUSD:  budget,
 			OneShot:    true,
+			NoPush:     role == "builder", // Builder commits locally; pipeline pushes after Critic
 		})
 
 		if err := r.Run(ctx); err != nil {
 			log.Printf("[pipeline] %s error: %v", role, err)
-			// Continue to next role — don't abort pipeline on non-fatal errors.
 		}
+	}
+
+	// Push after Critic review. The code is committed locally but not pushed
+	// until the full cycle completes. This means REVISE code doesn't reach
+	// the remote until the next successful cycle overwrites it.
+	log.Printf("[pipeline] ── pushing ──")
+	pusher := runner.New(runner.Config{RepoPath: absRepo})
+	if err := pusher.Push(); err != nil {
+		log.Printf("[pipeline] push error: %v", err)
+	} else {
+		log.Printf("[pipeline] pushed to remote")
 	}
 
 	log.Printf("[pipeline] ── cycle complete ──")
