@@ -210,6 +210,20 @@ Deploy: `fly deploy --remote-only` from site repo.
 
 ## What the Scout Should Focus On Next
 
+**PRIORITY: COMPLETE THE CORE LOOP.** The pipeline has 4 of 8 roles. The full loop from CLAUDE.md is PM → Scout → Architect → Builder → Tester → Critic → Ops → Reflector. Missing roles:
+
+1. **Architect** (pkg/runner/architect.go) — runs after Scout, before Builder. Reads the Scout's task, reads the codebase, writes a plan (which files to change, how). The Builder follows the plan. Prevents the Builder from making architectural decisions inside Operate.
+
+2. **Tester** (pkg/runner/tester.go) — runs after Builder, before Critic. Writes tests for what the Builder built. Uses Operate() to read changed files and write test functions. Enforces invariant 12 (VERIFIED).
+
+3. **Ops** (pkg/runner/ops.go) — runs after Critic PASS. Deploys to production. Runs health checks. Currently deploy is manual or batched.
+
+4. **Reflector** (pkg/runner/reflector.go) — runs at the end of each cycle. Reads what happened, appends to reflections.md, updates state.md iteration number, extracts lessons. Currently done manually.
+
+Also: 72 stale tasks on the board need cleaning. The Monitor role should triage and close them.
+
+**Implement these in pkg/runner/ following the existing pattern (scout.go, critic.go, pm.go). Each role: tick dispatch in runner.go, prompt in agents/{role}.md, one-shot support, Reason() or Operate() as appropriate.**
+
 **PHILOSOPHY: CLEAN AS YOU GO.** If something is broken, fix it before building new things. REVISE tasks take priority over new features. Repeated errors (like wrong-repo tasks) should be fixed immediately, not repeated. The hive should leave things better than it found them.
 
 **REPO AWARENESS: The Builder operates on whichever repo `--repo` points to for THIS pipeline run. Currently targeting the site repo. Tasks that require changes to other repos (hive, eventgraph, agent, work) should be tagged with the target repo so they can be routed to a separate pipeline run. Do NOT create tasks the current pipeline run can't implement — if the current target is `site/`, create site tasks. Hive infrastructure tasks are valid work but need a hive-targeted run.**
