@@ -29,6 +29,20 @@ Per-persona memories stored on the graph. Agents remember you. Selective, interp
 ### Hive status in the UI
 The board already shows tasks. Add a "Hive" view that shows: what the pipeline is working on right now, recent autonomous commits, cost dashboard, council history. Real-time if possible.
 
+### Company in a box — hive as a service
+The hive runs on a VM. Client provides: repo URL, deploy target (Fly/Vercel/AWS), credentials. The hive clones the repo, runs the pipeline (Scout → Builder → Critic), deploys. Per-project repo management. The client sees: a board of tasks, a chat with agents, commits landing, deploys going out. They direct; the hive builds. Pricing: subscription per project, or per-commit, or seat-based. This is the CEO's "first revenue signal" — the hive's labour IS the product. The pipeline already ships at $1/feature. Charge $50/feature to a client. 50x margin.
+
+**Infrastructure needed:**
+- VM orchestration (one hive instance per client project)
+- Repo management (clone, branch, PR workflow — not just push to main)
+- Deploy targets (Fly, Vercel, Render, AWS — client chooses)
+- Credential management (client provides API keys, deploy tokens — stored encrypted)
+- Project dashboard (client sees board, commits, deploys, cost)
+- Isolation (client repos don't see each other)
+- The council per project (agents learn the client's codebase, accumulate memory)
+
+**The wedge:** Small dev teams who want an AI colleague but don't want to set up the infrastructure. "Give us your repo. We'll build your features while you sleep." The Growth agent's suggestion: one team, one space, one agent. This scales it.
+
 ---
 
 ## Architectural ideas
