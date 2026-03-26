@@ -168,3 +168,22 @@ func TestPipelineTreeFixTaskerCalledOnDirectError(t *testing.T) {
 		t.Errorf("CreateTask title = %q, want %q", stub.calls[0], wantTitle)
 	}
 }
+
+// TestNewPipelineTreeHasFivePhases verifies that NewPipelineTree wires exactly
+// five phases: scout, architect, builder, critic, reflector — in that order.
+func TestNewPipelineTreeHasFivePhases(t *testing.T) {
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+	r := New(Config{HiveDir: hiveDir})
+
+	pt := NewPipelineTree(r)
+
+	want := []string{"scout", "architect", "builder", "critic", "reflector"}
+	if len(pt.phases) != len(want) {
+		t.Fatalf("phase count: got %d, want %d", len(pt.phases), len(want))
+	}
+	for i, name := range want {
+		if pt.phases[i].Name != name {
+			t.Errorf("phase[%d]: got %q, want %q", i, pt.phases[i].Name, name)
+		}
+	}
+}

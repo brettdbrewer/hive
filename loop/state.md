@@ -547,43 +547,59 @@ The landing page says "Watch it build →" and links to `/hive`. That page curre
 **Ship as:** `iter 295: /hive live dashboard — pipeline activity visible to all`
 
 
+
 ## What the Scout Should Focus On Next
 
-**Priority: Pipeline Phase 2 — failure detection and fix-task creation**
+## What the Scout Should Focus On Next
+
+**Priority: Pipeline Phase 3 — close the loop (Critic writes critique.md + Reflector in PipelineTree)**
 
 **Target repo:** hive
 
-**Why now:** Phase 1 is complete (PipelineTree exists, phases wired, diagnostics.jsonl written on failure, PM reads failures). But `PipelineTree.Execute` always succeeds — the phase wrappers return `nil` unconditionally. The comment in `pipeline_tree.go` says this explicitly: "Real failure detection is Phase 2 work once the phase methods propagate errors up." Without detection, the pipeline silently swallows failures and keeps running. The feedback loop is broken at the last mile.
+**Why now:** PipelineTree has 4 phases with full failure detection (Phase 2 complete). But the loop never closes. After every Critic PASS, no reflection is written, state.md iteration counter stays frozen, and the PM operates with stale context. The pipeline ships features but can't learn from them — Reflector reads `critique.md` and `build.md` to extract lessons, but Critic never writes `critique.md`. Two small fixes close the loop for good.
 
 **What exists (do NOT rebuild):**
-- `pkg/runner/pipeline_tree.go` — PipelineTree.Execute, Phase struct. Phases return nil.
-- `pkg/runner/diagnostic.go` — appendDiagnostic(), PhaseEvent. Already called from workTask and runArchitect on failure.
-- `pkg/runner/diagnostic_test.go` — covers appendDiagnostic.
-- `pkg/runner/pipeline_tree_test.go` — tests tree failure path.
-- `pkg/api/client.go` — APIClient with CreateTask, CommentTask etc.
+- `pkg/runner/pipeline_tree.go` — 4-phase PipelineTree with failure detection
+- `pkg/runner/reflector.go` — full Reflector: reads scout/build/critique artifacts, calls LLM, appends to `reflections.md`, advances iteration counter in `state.md`
+- `pkg/runner/reflector_test.go` — covers parse, format, increment
+- `pkg/runner/critic.go` — reviews commits, creates fix tasks on REVISE, returns verdict
 
-**What the gap is:** The phase wrappers in `NewPipelineTree` all look like `func(ctx context.Context) error { r.runScout(ctx); return nil }`. They never return an error. So even when runBuilder calls `r.appendDiagnostic(PhaseEvent{...})` internally, Execute doesn't know.
+**What's missing:**
+1. **Critic doesn't write `loop/critique.md`.** It creates tasks and logs, but `reflector.go:buildReflectorPrompt` reads `critique.md` and gets empty string every time. All reflections are running on no critique data.
+2. **Reflector is not in PipelineTree.** After Critic PASS, the loop halts. `state.md` iteration counter never advances autonomously.
+3. **Reflector has a tick gate** (`r.tick%4 != 0`) that would block it in pipeline mode. Pipeline must bypass this.
 
 **What to build (3 focused changes):**
 
-1. **`pkg/runner/diagnostic.go`** — add `countDiagnostics(hiveDir string) int` that returns the current line count of `loop/diagnostics.jsonl`. Returns 0 if file doesn't exist. This is the failure signal.
+1. **`pkg/runner/critic.go`** — add `writeCritiqueArtifact(hiveDir, verdict, summary string) error` that writes `loop/critique.md`. Call it at the end of `reviewCommit` after the verdict is determined. Format:
+   ```
+   # Critique: <commit subject>
+   **Verdict:** PASS | REVISE
+   **Summary:** <findings>
+   ```
+   Returns error if write fails; caller logs but doesn't halt.
 
-2. **`pkg/runner/pipeline_tree.go`** — update `Execute` to detect failures:
-   - Before each phase: snapshot `countDiagnostics(pt.cfg.HiveDir)`
-   - Call `phase.Run(ctx)` as before
-   - After: if `phase.Run` returned error OR diagnostic count increased → failure detected
-   - On failure: call `pt.cfg.APIClient.CreateTask(pt.cfg.SpaceSlug, api.CreateTaskRequest{Title: "Fix: " + phase.Name + " phase failed", Priority: "high"})` to create a fix task on the board, then return the error
-   - (Keep the existing appendDiagnostic call in Execute for tree-level failures)
+2. **`pkg/runner/pipeline_tree.go`** — add Reflector as phase 5 in `NewPipelineTree`:
+   ```go
+   {Name: "reflector", Run: func(ctx context.Context) error {
+       saved := r.cfg.OneShot
+       r.cfg.OneShot = true  // bypass tick gate — pipeline always closes
+       r.runReflector(ctx)
+       r.cfg.OneShot = saved
+       return nil
+   }},
+   ```
+   The Reflector's `done = true` side-effect in one-shot mode doesn't matter here — PipelineTree controls execution, not `r.done`.
 
-3. **`pkg/runner/pipeline_tree_test.go`** — extend the existing test (or add a new one):
-   - Verify that when a phase's Run func appends a diagnostic (simulating internal failure), Execute returns an error
-   - Verify that when a phase's Run func returns an error directly, Execute also fails
-   - Mock or stub APIClient.CreateTask to verify it was called with the right title
+3. **Tests:**
+   - `pkg/runner/critic_test.go` (or existing file): add `TestWriteCritiqueArtifact` — writes to a temp dir, reads back, verifies verdict line present.
+   - `pkg/runner/pipeline_tree_test.go` — update phase count assertion from 4 to 5 (or add a test that `NewPipelineTree` has 5 phases named correctly including "reflector").
 
-**Scope boundary:** Don't change signatures of `runScout`, `runBuilder`, `runArchitect`, `runCritic` — they remain void. The detection mechanism works by watching the diagnostics file, not by propagating errors from those methods. Don't touch cmd/hive. Don't add pattern detection or evolve.go yet.
+**Scope boundary:** Don't change `runReflector`'s signature. Don't touch `cmd/hive`. Don't change how the Reflector advances state.md (that already works). The `r.done = true` in one-shot mode inside `runReflector` is a no-op side-effect when called from PipelineTree — ignore it.
 
 **Done criteria:**
 - `go build ./...` passes
-- `go test ./pkg/runner/...` passes (including updated tree tests)
-- A simulated phase failure (diagnostic appended mid-phase) causes Execute to return an error AND creates a "Fix: [phase]" task on the board
-- The pipeline loop doesn't spin on a broken phase — it hands off to the builder via a fix task
+- `go test ./pkg/runner/...` passes (including new critique artifact test)
+- `NewPipelineTree(r)` returns a 5-phase tree
+- After a pipeline run, `loop/critique.md` contains a verdict
+- After a pipeline run, `loop/reflections.md` has a new entry and `state.md` iteration counter has advanced

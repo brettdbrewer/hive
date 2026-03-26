@@ -54,6 +54,13 @@ func NewPipelineTree(r *Runner) *PipelineTree {
 			{Name: "architect", Run: func(ctx context.Context) error { r.runArchitect(ctx); return nil }},
 			{Name: "builder", Run: func(ctx context.Context) error { r.runBuilder(ctx); return nil }},
 			{Name: "critic", Run: func(ctx context.Context) error { r.runCritic(ctx); return nil }},
+			{Name: "reflector", Run: func(ctx context.Context) error {
+				prev := r.cfg.OneShot
+				r.cfg.OneShot = true
+				r.runReflector(ctx)
+				r.cfg.OneShot = prev
+				return nil
+			}},
 		},
 		fixTasker: ft,
 	}
