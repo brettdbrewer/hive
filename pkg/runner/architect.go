@@ -175,9 +175,12 @@ func parseArchitectSubtasks(content string) []architectSubtask {
 }
 
 // parseSubtasksStrict parses SUBTASK_TITLE:/SUBTASK_PRIORITY:/SUBTASK_DESCRIPTION: format.
+// Description continuation lines (non-empty, non-fence lines following SUBTASK_DESCRIPTION:)
+// are appended to the description until a blank line, code fence, or new SUBTASK_ prefix.
 func parseSubtasksStrict(content string) []architectSubtask {
 	var tasks []architectSubtask
 	var current architectSubtask
+	inDesc := false
 
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(line)
@@ -186,10 +189,19 @@ func parseSubtasksStrict(content string) []architectSubtask {
 				tasks = append(tasks, current)
 			}
 			current = architectSubtask{title: strings.TrimSpace(strings.TrimPrefix(line, "SUBTASK_TITLE:"))}
+			inDesc = false
 		} else if strings.HasPrefix(line, "SUBTASK_PRIORITY:") {
 			current.priority = strings.TrimSpace(strings.TrimPrefix(line, "SUBTASK_PRIORITY:"))
+			inDesc = false
 		} else if strings.HasPrefix(line, "SUBTASK_DESCRIPTION:") {
 			current.desc = strings.TrimSpace(strings.TrimPrefix(line, "SUBTASK_DESCRIPTION:"))
+			inDesc = true
+		} else if inDesc {
+			if line == "" || strings.HasPrefix(line, "```") {
+				inDesc = false
+			} else {
+				current.desc += " " + line
+			}
 		}
 	}
 	if current.title != "" {

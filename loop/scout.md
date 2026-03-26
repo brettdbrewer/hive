@@ -1,81 +1,48 @@
-Based on my review of the state, scout history, and backlog, I can identify the next critical gap. Let me write the gap report for iteration 299.
+Now I understand the full context. Let me write the Scout report for this iteration.
 
 ---
 
-## SCOUT REPORT — Iteration 299
+## GAP REPORT: Iteration 300
 
-**Gap:** The hive cannot manage itself autonomously because its own operational artifacts live in markdown files instead of on the graph. Tasks are in `state.md`, specs are in `backlog.md`, decisions are in `reflections.md` — invisible to the system it builds. The hive talks about being a substrate for collective existence but doesn't use its own substrate.
+**Gap:** The hive's pipeline runs as a for-loop with log output, not a decision tree. This prevents failure diagnosis, cost attribution, and self-correction — blocking autonomous operation at scale.
 
 **Evidence:**
 
-1. **Backlog item explicitly calls this "URGENT" — Dogfooding:**
-   - Lines 208-219 of `loop/backlog.md` state: "The civilization doesn't live in its own product. Tasks are in state.md, not on the board."
-   - Current state: Hive tasks are tracked in `loop/state.md` (90-line document), not as graph nodes. Scout can't query them. Builder doesn't pick them from the board.
-   - Proof: `pkg/runner/scout.go` reads `state.md` manually; `pkg/runner/builder.go` claims tasks from `loveyou.ai/board` but hive's own tasks aren't there.
+1. **Director mandate (commit e4643be, TODAY):** Explicitly mandates "engine before paint" and halts feature work until decision tree integration. Cites: "Architect parser failed silently 8+ times → $0.50/cycle wasted on no-ops. PM cannot measure failure rate because failures vanish into logs."
 
-2. **Specs are invisible to the system:**
-   - Hive has 8 converged specs (work-general-spec.md, social-spec.md, unified-spec.md, etc.) but they live as markdown files in `loop/`.
-   - Knowledge layer (iter 6) was implemented on the graph but the HIVE doesn't use it.
-   - `loop/backlog.md` line 198-206: "Knowledge layer as the hive's brain (not markdown files)" — the insight is that specs should be Knowledge claims with assert/challenge/verify lifecycle, but they're not.
-   - Proof: grep `loop/` for Knowledge assertions about hive specs returns zero.
+2. **Decision tree already exists** — `eventgraph/go/pkg/decision/` has complete implementation (tree.go, evaluate.go, evolve.go + tests per backlog.md line 97). Not porting work. Integration work.
 
-3. **Lessons accumulate but aren't persisted:**
-   - `loop/state.md` has 75 lessons, each discovered through iteration. These should be Knowledge claims (with evidence, verification status, rejection reason).
-   - Currently: Lessons are documentation. They can't be queried, linked, or verified. They repeat because the system has no memory of them.
-   - Proof: iter 298 scout.md line 32 states "Lessons 71, 73, 74 all document this pattern but it repeats unchanged."
+3. **Current pipeline is blind** — `pkg/runner/runner.go` runs Scout → Builder → Critic as sequential function calls with error logs. Failures don't surface as structured events, root causes aren't traced, cost attribution is implicit.
 
-4. **Escalations are advisory, not binding:**
-   - When Scout flags critical work (iter 298 line 34-39: daemon mode, PR workflow, artifact writes), these become tasks in state.md, not board nodes.
-   - No way to query: "what escalations are open?" or "how many cycles has this item been deferred?"
-   - Related lesson 68 (iter 297 reflections): "Feedback loop infrastructure is a critical path blocker."
-   - Proof: iter 298 scout lists 5 open escalations with no tracking mechanism to verify closure.
+4. **Proof of cost:** Architect parser failure (commit c89ea2c, debug logging added) shows the problem — failures silently produce zero-values, wasting tokens. With a decision tree, this becomes a failing node with cost+root-cause attributed.
+
+5. **Lessons demand this** — Lesson 36: "The loop can only catch errors it has checks for." Lesson 68: "Feedback loop infrastructure is a critical path blocker." The pipeline's infrastructure IS broken.
 
 **Impact:**
 
-- **The hive cannot be autonomous** — it can't query its own state via the API. It needs Matt to read state.md and say "next."
-- **The hive cannot improve itself** — lessons aren't verifiable (is lesson 71 still true?), escalations aren't trackable (are these still blockers?).
-- **The hive is not an example of the product** — it preaches that all activity should be on the graph, but its own activity isn't. This breaks the soul: "Take care of yourself" — the hive isn't taking care of itself.
-- **Bus factor remains unfixable** — daemon mode (iter 298 backlog line 225-233) requires the hive to see its own board state. Without dogfooding, daemon mode can't work.
-- **Lovatts engagement can't launch** — company-in-a-box (backlog line 32-45) requires the hive to be a working example. A civilization that doesn't use its own infrastructure isn't compelling.
+- **No autonomy at scale** — The hive can run isolated cycles (Scout → Builder → Critic) but can't operate as a daemon because it has no way to know when/why it failed
+- **Invisible waste** — The PM directs work (PM reads state.md) but has zero visibility into failure rates, so it optimizes for visible output (features) over invisible waste (failed cycles)
+- **Blocks Lovatts engagement** — The backlog lists "Company in a Box" — clients won't trust a hive they can't debug
+- **Violates Invariant 4** — OBSERVABLE: "All operations emit events." The pipeline's failures don't emit structured events; they vanish into logs
 
 **Scope:**
 
-Hive repo:
-- `loop/state.md` → migrate hive tasks to board (as priority-high task nodes)
-- `loop/backlog.md` → migrate open items to board as projects/goals
-- `loop/*.md` specs → migrate to Knowledge claims with assert ops
-- `pkg/runner/scout.go` → read board instead of state.md for hive tasks
-- `pkg/runner/runner.go` → hive tasks become like any other task (assignable, statusable, closeable)
-
-Site repo:
-- Hive task space configuration (what lenses are visible, which ops are allowed)
-- Hive agent persona + board integration (the agent sees its own tasks)
+- **eventgraph/go/pkg/decision/** — Already complete (tree.go: DecisionNode/InternalNode/LeafNode, evaluate.go: mechanical evaluation with LLM fallback, evolve.go: pattern detection)
+- **hive/pkg/runner/runner.go** — Replace the for-loop with a decision tree. Each pipeline phase (Scout/Builder/Critic) becomes a DecisionNode with success/failure criteria. Failures trigger diagnostic traversal.
+- **hive/cmd/hive** — The daemon flag relies on this. Once decision tree is in place, the runner can retry failed nodes, diagnose root causes, emit cost-attributed events.
 
 **Suggestion:**
 
-Build a **Dogfooding Phase 1: Task Migration** that moves the hive's operational work onto the board:
+**Phase 1 (iter 300): Wire decision tree into pipeline.** Make it real without massive rewrite:
 
-**Part 1 (Immediate):**
-- Create a space called "Hive Operations" (or let the hive create its own, using the space creation flow)
-- Migrate `loop/state.md`'s "What to build next" section → board as tasks (high priority, assigned to Builder agent)
-- Migrate iter 298 escalations (daemon mode, PR workflow, artifact validation, Lovatts prep) → board as tasks with "escalation" tag
-- Scout reads `loveyou.ai/spaces/{hive-space-id}/board` instead of state.md
+1. **Import decision tree** — `import "github.com/loveyou-ai/eventgraph/go/pkg/decision"`
+2. **Model one cycle as a tree** — Create a root node with three children (Scout, Builder, Critic). Each child has success/failure criteria.
+3. **Replace the for-loop** — Instead of `if scout.Run() {...} if builder.Run() {...}`, call `tree.Evaluate(ctx)`. Let the tree orchestrate the phases.
+4. **Add cost attribution** — When a node fails, emit an event: `{cycle_id, phase, error, cost_usd, root_cause}`. This is what the Director needs to see.
+5. **Test** — One test: Decision tree orchestrates all three phases, returns success. One test: Scout fails, tree surfaces error, cost is attributed.
 
-**Part 2 (Foundation for dogfooding depth):**
-- Converged specs (work-general-spec.md, social-spec.md) → Knowledge layer with assert ops, author_id = Architect, status = verified
-- lessons → Knowledge claims (assert op, kind="lesson", importance=1-5 based on line number in state.md)
-- Council sessions → Knowledge claims (from council.md files, linked to findings)
+This is NOT the full "pipeline runs on its own substrate" (that's the long-term vision). It's: **Stop the for-loop bleeding. Make failures traceable. Give the PM visibility.**
 
-**Verification criteria:**
-- Scout can query hive tasks via the board API
-- Builder can claim a hive task from the board (not hardcoded in runner logic)
-- Critic can see hive tasks in context of all tasks (no special cases for hive work)
-- All five escalations from iter 298 are visible on the board with clear status
+Once this lands, the PM naturally deprioritizes features (because it sees waste). The daemon mode becomes possible (because failures are structured). Lovatts engagement becomes credible (because the hive can explain what happened).
 
-**Done criteria:** The hive's next iteration (300+) runs entirely against board state, not state.md. Scout reads the board, creates tasks on the board, Builder claims from the board. Zero hive tasks in state.md after completion.
-
-**Priority:** URGENT. This is the prerequisite for daemon mode (iter 298 backlog), the prerequisite for Lovatts engagement, and the proof that the product works. Without it, the hive remains a toolchain pretending to be a civilization.
-
----
-
-**Ready for Architect phase.**
+The Director's mandate is correct. This is the blocking prerequisite for everything else.
