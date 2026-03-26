@@ -1,4 +1,29 @@
-# Build Report — Daily Budget Tracker
+# Build Report — Fix RunCouncil budget tracking + nil-safety
+
+## Gap
+Two issues from Critic review of the daily budget tracker:
+
+1. `RunCouncil` accumulated `totalCost` but never wrote it to the daily budget file — cross-invocation spend from council sessions was invisible to the ceiling check.
+2. `Spent()` and `Remaining()` lacked nil guards, breaking the "Safe to call on nil" contract advertised in the comments.
+
+## Changes
+
+### `pkg/runner/council.go`
+- Added `NewDailyBudget(cfg.HiveDir).Record(totalCost)` immediately after `wg.Wait()`.
+- Council sessions now contribute to cross-invocation spend tracking like all other runner methods.
+
+### `pkg/runner/budget.go`
+- Added nil guard to `Spent()`: returns `0` if receiver is nil.
+- Added nil guard to `Remaining()`: returns `ceiling` if receiver is nil (consistent with "no spend known" semantics).
+- Updated doc comments to advertise nil-safety on both methods.
+
+## Verification
+- `go.exe build -buildvcs=false ./...` — clean
+- `go.exe test -buildvcs=false ./...` — all pass (pkg/runner: 0.447s)
+
+---
+
+# Previous Build Report — Daily Budget Tracker
 
 ## Task
 Add file-backed daily budget tracker to `pkg/runner/budget.go`

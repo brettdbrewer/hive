@@ -71,6 +71,7 @@ func RunCouncil(ctx context.Context, cfg Config) error {
 	}
 
 	wg.Wait()
+	NewDailyBudget(cfg.HiveDir).Record(totalCost)
 	log.Printf("[council] all agents spoke (total cost: $%.4f)", totalCost)
 
 	// Synthesize — the Reflector summarizes.

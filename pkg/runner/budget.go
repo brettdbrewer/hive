@@ -50,8 +50,11 @@ func (d *DailyBudget) Record(amount float64) {
 	}
 }
 
-// Spent returns the sum of all recorded amounts for today.
+// Spent returns the sum of all recorded amounts for today. Safe to call on nil (returns 0).
 func (d *DailyBudget) Spent() float64 {
+	if d == nil {
+		return 0
+	}
 	data, err := os.ReadFile(d.path())
 	if err != nil {
 		return 0 // file not yet created is fine
@@ -72,8 +75,11 @@ func (d *DailyBudget) Spent() float64 {
 	return total
 }
 
-// Remaining returns ceiling minus today's spend. Returns 0 if already over.
+// Remaining returns ceiling minus today's spend. Returns 0 if already over. Safe to call on nil (returns ceiling).
 func (d *DailyBudget) Remaining(ceiling float64) float64 {
+	if d == nil {
+		return ceiling
+	}
 	r := ceiling - d.Spent()
 	if r < 0 {
 		return 0
