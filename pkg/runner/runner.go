@@ -185,16 +185,17 @@ func (r *Runner) runBuilder(ctx context.Context) {
 		if t.State == "done" || t.State == "closed" {
 			continue
 		}
-		if t.AssigneeID != "" {
-			if r.cfg.AgentID != "" && t.AssigneeID == r.cfg.AgentID {
-				if strings.HasPrefix(t.Title, "Fix:") {
-					fixTasks = append(fixTasks, t)
-				} else {
-					myTasks = append(myTasks, t)
-				}
-			}
-		} else {
+		// When agent-id is set, only work tasks assigned to this agent.
+		// When agent-id is empty, work ALL open tasks (assigned or not).
+		if t.AssigneeID != "" && r.cfg.AgentID != "" && t.AssigneeID != r.cfg.AgentID {
+			continue // assigned to someone else
+		}
+		if strings.HasPrefix(t.Title, "Fix:") {
+			fixTasks = append(fixTasks, t)
+		} else if t.AssigneeID == "" {
 			unassigned = append(unassigned, t)
+		} else {
+			myTasks = append(myTasks, t)
 		}
 	}
 
@@ -218,6 +219,9 @@ func (r *Runner) runBuilder(ctx context.Context) {
 	if len(myTasks) == 0 {
 		if r.tick%4 == 0 {
 			log.Printf("[builder] tick %d: no tasks", r.tick)
+		}
+		if r.cfg.OneShot {
+			r.done = true
 		}
 		return
 	}
@@ -281,15 +285,12 @@ func (r *Runner) workTask(ctx context.Context, t api.Node) {
 		// Check for file changes.
 		hasChanges := r.hasUncommittedChanges()
 		if !hasChanges {
-			// Fix tasks with no changes: the fix was already applied. Close the task.
-			if strings.HasPrefix(t.Title, "Fix:") {
-				log.Printf("[builder] fix task already resolved — closing")
-				_ = r.cfg.APIClient.CompleteTask(r.cfg.SpaceSlug, t.ID)
-				return
-			}
-			log.Printf("[builder] DONE but no file changes — leaving in-progress")
+			// Builder said DONE with no changes — work was already applied in a prior commit.
+			// Complete the task to avoid spin loops.
+			log.Printf("[builder] DONE but no file changes — completing (work already applied)")
 			_ = r.cfg.APIClient.CommentTask(r.cfg.SpaceSlug, t.ID,
-				"Operate returned DONE but no files were changed. Task may need a different approach.")
+				"Operate returned DONE but no files were changed. Work was likely applied in a prior commit.")
+			_ = r.cfg.APIClient.CompleteTask(r.cfg.SpaceSlug, t.ID)
 			return
 		}
 
