@@ -1,58 +1,66 @@
-Perfect. I now have a clear picture of what's been shipped and what's missing. Let me write the Scout report.
-
 ---
 
-## SCOUT REPORT — Iteration 289
+## SCOUT REPORT — Iteration 295
 
-**Gap:** Pipeline feedback loop is broken — Builder and Critic don't write artifacts, daemon accumulates branch drift when PRMode is enabled
+**Gap:** No production observability—the hive ships autonomous features but has no visibility into errors, performance, or usage.
 
 **Evidence:**
 
-1. **Builder never writes loop/build.md**
-   - `pkg/runner/runner.go:254-342` — `workTask()` handles DONE action: verifies build (line 294), commits+pushes (line 314), closes task (line 322)
-   - After all this, returns without writing any artifact
-   - Loop should track what was built; Reflector reads `loop/build.md` to write ZOOM/COVER sections
-   - Currently Reflector always sees empty file
+1. **State.md explicitly documents this** (line 101): "No observability: No error monitoring, no analytics, no usage tracking. Building into a void."
 
-2. ~~**Critic never writes loop/critique.md**~~ — **FIXED** (commit 47ba066)
-   - `pkg/runner/critic.go:116-121` — writes critique.md after Reason() returns
-   - `TestCritiqueArtifactWritten` in `runner_test.go` covers the write — passes
-   - This gap is closed; remove from future Scout traversals
+2. **Recent commits show PRMode + artifact infrastructure is solid** (commits 109e622, 15bc79c, f8e81fe):
+   - Daemon resets to main between cycles ✓
+   - Builder writes loop/build.md ✓  
+   - Critic writes loop/critique.md ✓
+   - Infrastructure for tracking what's built works
 
-3. **Daemon never resets to main when PRMode is enabled**
-   - `cmd/hive/main.go:379-438` — `runDaemon()` loops through cycles calling `runPipeline()` (line 398)
-   - No git branch reset between cycles
-   - When PRMode is enabled: first cycle creates feature branch from main ✓, second cycle creates feature branch from previous feature branch ✗
-   - This stacks commits across cycles; PRs include all prior iterations' diffs, making reviews impossible
+3. **But production has no error handling at site/hive level:**
+   - No Sentry/error tracking integration
+   - No analytics on what features users are adopting  
+   - No dashboard showing API errors, failed builds, failed deploys
+   - When the site or hive encounters a silent failure, nobody knows until Matt manually checks logs
 
-4. **State.md explicitly documents this as the next directive**
-   - Line 506-527: "Close the pipeline feedback loop — artifact writes + daemon branch hygiene"
-   - Three tasks listed with exact file locations and test requirements
-   - This is post-PRMode — PRMode shipped (recent commits), now the feedback loop needs closing
+4. **The PM role (pm.go) reads completed tasks but has no context on whether those tasks WORKED in production:**
+   - Builder ships code, deploys successfully, but if the feature breaks on production, PM doesn't know
+   - Loop can only improve what it can measure (lesson 36: "The loop can only catch errors it has checks for")
+
+5. **Backlog explicitly lists this under "URGENT"** (line 101): "Building into a void."
 
 **Impact:**
 
-- **Loop compounding:** Without artifact writes, each Reflector cycle says "no data to reflect on." The loop's knowledge doesn't compound. Lesson 43 violation: "NEVER skip artifact writes."
-- **PR review:** Without daemon branch reset, PRMode cycles create unusable PRs. Reviewer sees diffs from iterations 1+2+3, not just iteration 3. Cannot credibly offer code review gates to external clients (Lovatts engagement blocker).
-- **System health:** Lesson 36: "The loop can only catch errors it has checks for." Loop can't check what it doesn't measure. Artifact writes make measurement visible.
+- **Reliability risk:** Silent failures in production remain silent. The hive's credibility with Lovatts depends on knowing whether shipped features work.
+- **Feedback loop broken:** The PM uses completed tasks + git log to decide next priorities. If a shipped feature breaks, PM doesn't know, and keeps building on a cracked foundation.
+- **Debugging impossible:** When the site/hive has an issue, diagnosis requires manual log inspection. No structured error context.
+- **Adoption invisible:** Can't measure whether features are being used. No data on which product layers matter to users.
 
 **Scope:**
 
-Hive repo, three files:
-1. `pkg/runner/runner.go` — workTask() DONE branch (line 291-327)
-2. `pkg/runner/critic.go` — reviewCommit() end (line 135-140)  
-3. `cmd/hive/main.go` — runDaemon() cycle start (line 394-398)
+Hive repo + site repo:
+- `pkg/runner/observer.go` (exists but minimal—only reads git log + board state)
+- Site repo: error boundaries, error handler middleware
+- Site repo: analytics event schema and reporting
+- Both repos: structured logging (JSON logs with stack traces)
+- New infrastructure: error tracking service integration (Sentry/Rollbar or custom)
 
 **Suggestion:**
 
-Implement all three artifact writes + branch reset before next autonomous pipeline run. These are hard blockers for PRMode as external-repo support. The gaps are:
+Build a **production observability layer** with two parts:
 
-1. **Builder artifact** — After line 326 (task DONE log), write `loop/build.md` with task title, commit hash (`git log -1 --format=%H`), cost ($), duration
-2. **Critic artifact** — After line 111 (verdict parsed), write `loop/critique.md` with hash, verdict, and response content
-3. **Daemon branch reset** — Before line 398 (runPipeline call), when PRMode is enabled: `git fetch origin && git checkout main && git pull origin main`
+**Part 1 (hive repo): Pipeline observability**
+- Observer role logs structured data: build start time, end time, cost, commit hash, deploy target, deploy status
+- Add a `pipeline_events` table to store: tick number, phase, status (SUCCESS/FAILURE), error message (if any), cost
+- Build a `/hive/events` endpoint showing last 100 pipeline events (JSON)
+- Extend `/hive` dashboard to show: pipeline health (% success), recent errors, cost trend
 
-Tests are pre-defined in state.md lines 517-523.
+**Part 2 (site repo): Production observability**
+- Add error boundary in Go handlers + templ views — catch panics, log structured errors
+- Integrate Sentry (or self-hosted error tracking): every error posts `{"service": "site", "error": {...}, "timestamp": "...", "user_id": "...", "commit": "..."}`
+- Add basic analytics: every grammar op emits `{"op": "intend", "kind": "task", "user_id": "...", "space_id": "...", "timestamp": "..."}`
+- Build a `/status` page showing: site uptime, last 10 errors, active users today, top 5 ops by count
+- Observer role can query `/status` to see site health in its report
+
+**Priority:** HIGHEST. This is prerequisite for the Lovatts engagement. "Company in a box" requires proof that the hive's code actually works in production. Right now, the hive ships features but can't prove they're working.
 
 ---
 
-**Ready for Architect phase?**
+**Ready for Architect phase.**

@@ -502,26 +502,40 @@ Roles (`KindRole`) and Teams (`KindTeam`) are entity kinds with no membership mo
 **Ship as:** `iter 263: fix invite test isolation + role membership`
 
 
+
 ## What the Scout Should Focus On Next
 
-**Close the pipeline feedback loop — Builder artifact + daemon branch hygiene**
+## Make /hive Real — Show the Civilization Working
 
-The pipeline has two remaining gaps: the Builder doesn't write build.md, and the daemon accumulates branch drift in PRMode. The Critic artifact (critique.md) was fixed in commit 47ba066 — `TestCritiqueArtifactWritten` passes.
+**Target repo:** site
 
-**Target repo:** hive
+The landing page says "Watch it build →" and links to `/hive`. That page currently shows a scaffold. Anyone who clicks that link sees nothing. The hive has shipped 294+ iterations autonomously — it deserves a window.
 
-**Why now:** PRMode is live. Without the Builder artifact, the Reflector's ZOOM/COVER sections are always empty. Without the branch reset, PRMode cycles stack commits across iterations — the diffs become unusable.
+**Why now:** The pipeline is proven ($0.83/feature, 6 minutes, autonomous). The artifacts are written (build.md, critique.md, scout.md). The Reflector records each iteration. The data exists. The only missing piece is a page that surfaces it.
+
+**What the /hive page should show:**
+1. Pipeline phase indicator — which phase last ran (Scout / Builder / Critic / Reflector)
+2. Current open tasks from the hive space board (what's being worked on)
+3. Recent builds — last 5 build summaries from the hive agent's feed posts
+4. Iteration counter and cost (from state.md or feed post metadata)
+5. Live updates via HTMX polling (3s interval, same pattern as Chat)
 
 **Tasks for the Scout to create:**
 
-1. **Builder writes loop/build.md after DONE** (`pkg/runner/runner.go`, `workTask()`)
-   After a successful build, write a short summary to `loop/build.md`: task title, commit hash (from `git log -1 --format=%H`), cost, duration. Overwrite on each call. The Reflector reads this artifact — without it, the ZOOM and COVER sections are always empty. One test: `TestBuildArtifactWritten` — mock a DONE action and verify `loop/build.md` is created with the task title.
+1. **Read the current /hive handler** (`site/handlers.go` or `site/routes.go`) — find where `/hive` is served, read the current template. Understand what's already scaffolded before writing anything.
 
-2. ~~**Critic writes loop/critique.md after review**~~ — **DONE** (commit 47ba066, `TestCritiqueArtifactWritten` passes)
+2. **Extend the /hive handler** to fetch real data: call `ListNodes` for the "hive" space (kind=task, state=open), and fetch recent posts from the hive agent user (kind=post, last 10). Pass both to the template. Add a `HivePageData` struct with fields: `OpenTasks []Node`, `RecentPosts []Node`, `Iteration int`, `PipelinePhase string`.
 
-3. **Daemon resets to main before each cycle** (`cmd/hive/main.go`, `runDaemon()`)
-   At the start of each daemon cycle, when PRMode is enabled and the active repo is not on main, checkout main and pull: `git fetch origin && git checkout main && git pull origin main`. Log the branch before and after. Without this, the second cycle's feature branch starts from the first cycle's feature branch HEAD, making PRs include N prior iterations' commits. One test: add `TestBranchResetOnDaemonCycle` to `pkg/runner/runner_test.go` verifying `buildBranchName` returns empty string when PRMode=false.
+3. **Build the /hive template** (`site/views/hive.templ`) — four sections:
+   - **Header**: "The Civilization Engine" headline + subtitle
+   - **Pipeline status**: phase cards (Scout / Builder / Critic / Reflector) with the last-active phase highlighted (derive from most recent post content or task state)
+   - **Current work**: list of open tasks with title, state, assignee badge
+   - **Build log**: recent posts from the hive agent (title, body preview, timestamp) — these are the iteration summaries the post tool publishes
 
-**Why this matters:** The loop is the product. The Reflector's compounding knowledge is what makes the hive smarter over time. If build.md is always empty, every reflection says "no artifacts — nothing to reflect on." And if PRMode creates stacked branches, each PR review is impossible — the diff includes everything since the first build, not just the current change.
+4. **Add HTMX polling** — `hx-get="/hive" hx-trigger="every 5s" hx-target="#hive-content" hx-swap="outerHTML"` on the main content div. Add a partial route `/hive/status` that returns just the current task and recent post data (no full page reload).
 
-**Invariants:** VERIFIED (tests for each artifact write), EXPLICIT (Reflector's dependency on build.md must be visible in the code that produces it).
+5. **Tests** — one test in `handlers_test.go`: `TestHivePage` verifies the handler returns 200 and the template renders without error. One store query test: `TestListHiveActivity` verifies posts from the hive agent can be retrieved by user ID.
+
+**Invariants:** VERIFIED (tests for handler + store query), BOUNDED (cap posts to 10, tasks to 20), IDENTITY (filter by agent user ID, not by scanning post content for "hive:builder" strings).
+
+**Ship as:** `iter 295: /hive live dashboard — pipeline activity visible to all`
