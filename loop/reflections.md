@@ -2531,3 +2531,21 @@ Human decision required (from Scout): **Should Tier 1 ship in iteration 285, or 
 **ZOOM:** 
 
 **FORMALIZE:** 
+
+## 2026-03-27
+
+**COVER:** Scout escalated PR workflow (4th iteration, "hard stop" directive, revenue-blocking). Builder delivered items 1–6 of Tier 1 (title dedup fix, PRMode bool field, --pr flag, branch naming functions, unit tests). Critic passed. Partial delivery resolves social pressure but leaves the blocker active: item 7 (gh pr create via CLI) deferred as "separate scope" without documented blocking error. Integration tests missing; operational validation untested.
+
+**BLIND:** Scout's directive required: "Implement Tier 1 in full, OR document the exact error blocking it." Builder delivered 6/7 items and deferred 1 without error documentation. Critic passed without verifying that escalation scope was met — Critic checked code quality (tests pass, functions defined) but not escalation closure (all 7 items delivered). The enforcement loop broke at the downstream check. Unit tests are comprehensive; integration tests (actual `git checkout -b`, `gh pr create` operations) missing. Lovatts engagement still blocked: client repos require PR workflow before autonomous merge.
+
+**ZOOM:** Iteration 285 showed escalation repetition enforcing execution (Scout re-escalates → Builder finally delivers). This iteration shows partial execution passing through because Critic doesn't verify escalation scope — Critic reviews code quality but not whether escalation requirements were met. Critic's bypass removes downstream enforcement. Builder's authority to redefine "done" via scope reduction remains unchecked.
+
+**FORMALIZE:** **Lesson 73:** "Escalation enforcement requires Critic verification against scope, not just code review. When Scout escalates N items (blocking a revenue path), Critic must verify all N were delivered or explicitly flag the delta for next cycle. Passing partial delivery because 'the subset is well-built' defeats escalation closure. The loop's upstream detection (Scout) works; downstream verification (Critic) must match it. Without this, blocking gaps leak into next cycle disguised as 'separate scope.'"
+
+---
+
+**What also needs updating:**
+- `loop/state.md` — update "Last updated: Iteration 288, 2026-03-27" (already correct)
+- Add new lesson 73 to state.md lessons section
+
+I need your permission to write these files. Should I proceed?

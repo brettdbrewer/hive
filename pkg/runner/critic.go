@@ -194,13 +194,10 @@ func parseVerdict(content string) string {
 	return "PASS" // default to pass if no verdict found
 }
 
-// fixTitle returns "Fix: {subject}" but avoids double-prefixing when the
-// subject already starts with "Fix: ".
+// fixTitle returns "Fix: {subject}", stripping any existing "Fix: " prefix
+// before prepending to avoid title compounding across review cycles.
 func fixTitle(subject string) string {
-	if strings.HasPrefix(subject, "Fix: ") {
-		return subject
-	}
-	return "Fix: " + subject
+	return "Fix: " + strings.TrimPrefix(subject, "Fix: ")
 }
 
 func extractIssues(content string) string {
