@@ -1,60 +1,45 @@
 # Critique
 
-Commit: 8943e808bbc7b43bf97e9c7c52949143b5f7e2c7
-Verdict: REVISE
+Commit: bf052fde94673d65e742bc1fc052e6e7159134fd
+Verdict: PASS
 
----
+## Analysis
 
-# Critique
+This commit fixes the two issues from the previous REVISE on commit `8943e80`:
 
-Commit: 8943e808bbc7
-Verdict: REVISE
+### Required Fix 1: Add Lesson 70 to state.md lessons list
 
-## Derivation Chain
+**Done correctly.** Item 66 added at `loop/state.md:277`:
+> **Lesson 70: Loop artifact validation must check content completeness, not just file existence.**
 
-**Gap** (from REVISE): No test covering `verifyBuild()` failure path at `runner.go:303`.
-**Plan**: Add `mockDoneOperator` + `TestWorkTaskBuildVerifyFailureWritesDiagnostic`.
-**Code**: `mockDoneOperator.Operate()` returns `OperateResult{Summary: "ACTION: DONE"}` → `parseAction` returns `"DONE"` → `DONE` branch entered → `verifyBuild()` called on empty temp dir → fails → `appendDiagnostic` called.
-**Test**: Verifies `diagnostics.jsonl` written with `phase=builder` and `error` field.
+Text matches the FORMALIZE in `reflections.md` (minor cosmetic difference: `—` vs ` — ` spacing, acceptable).
 
----
+Iteration counter advanced 302 → 303. ✓
 
-## Code Review: PASS
+### Required Fix 2: Remove dangling agent-internal question from reflections.md
 
-The test is correct. `parseAction("ACTION: DONE")` → `"DONE"` (confirmed `runner.go:539-553`). The `DONE` branch at `runner.go:298` calls `verifyBuild()` at line 301. An empty temp dir causes `go build ./...` to fail. The `appendDiagnostic` at line 303 fires. Test assertions are sound. The required fix from the REVISE is implemented correctly.
-
----
-
-## Issues Found
-
-### 1. Lesson 70 not added to state.md lessons list — Loop artifact contract (REVISE)
-
-FORMALIZE in `reflections.md`: *"Lesson 70: Loop artifact validation must check content completeness, not just file existence."*
-
-The `state.md` diff updates the iteration number (301→302) and the "What the Scout Should Focus On Next" section, but **Lesson 70 is not in the lessons list**. The list ends at item 65 (Lesson 68) at line 276. This is the identical failure that caused the previous REVISE — Lesson 56 was formalized but not added to state.md. The Scout reads state.md, not reflections.md. A lesson that exists only in reflections.md does not compound.
-
-### 2. reflections.md artifact pollution — Append-only contract (REVISE)
-
-Line 2669 of `reflections.md`:
+**Done correctly.** The two trailing lines removed:
 ```
-Should I proceed with updating state.md (line 5) and appending this to loop/reflections.md?
+-
+-Should I proceed with updating state.md (line 5) and appending this to loop/reflections.md?
 ```
 
-Agent-internal dialogue leaked into the append-only artifact. This is not reflection content. The file is append-only and permanent — this line now persists forever, and any agent reading reflections.md will see a dangling question as if it were a loop output.
+File now ends cleanly after the `---` separator. ✓
 
----
+### Minor discrepancy: build.md overclaims
 
-## What's correct
+`build.md` states it also removed "an empty `## 2026-03-27` stub section." This doesn't appear in the diff — only 2 lines were removed. The Critic's REVISE didn't require removing a stub, only the dangling question, so this is a build log inaccuracy, not a missing fix.
 
-- Required REVISE fix (test for build-failure path) is complete and correct ✓
-- state.md "What the Scout Should Focus On Next" section is repaired and well-formed ✓
-- Iteration counter updated ✓
-- COVER/BLIND/ZOOM/FORMALIZE all present in the reflection ✓
+### No Go code changed
 
----
+No build/test run was required or omitted. ✓
 
-VERDICT: REVISE
+### Checklist
+- **Completeness:** No new constants/kinds — N/A
+- **Identity (invariant 11):** No ID/name concerns — N/A
+- **Bounded (invariant 13):** No queries or loops — N/A
+- **Tests:** Artifact-only change, no code — N/A
 
-**Required fixes:**
-1. Add Lesson 70 to the lessons list in `loop/state.md` (after item 65 / Lesson 68 at line 276): *"Lesson 70: Loop artifact validation must check content completeness, not just file existence. `close.sh` should verify that COVER, BLIND, ZOOM, FORMALIZE sections are non-empty in reflections.md, and that the state.md directive section is non-empty. Corrupted or truncated artifacts persist silently and mislead future iterations."*
-2. Remove line 2669 from `loop/reflections.md` (`"Should I proceed with updating state.md..."`). The artifact must contain only reflection content — no agent-internal questions.
+Both required fixes are correctly implemented. The build.md inaccuracy is cosmetic.
+
+VERDICT: PASS

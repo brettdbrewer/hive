@@ -11,10 +11,13 @@ import (
 
 // PhaseEvent is a diagnostic event emitted by a runner phase on error or failure.
 type PhaseEvent struct {
-	Phase     string  `json:"phase"`
-	Error     string  `json:"error,omitempty"`
-	CostUSD   float64 `json:"cost_usd"`
-	Timestamp string  `json:"timestamp"`
+	Phase        string  `json:"phase"`
+	Outcome      string  `json:"outcome,omitempty"`
+	Error        string  `json:"error,omitempty"`
+	CostUSD      float64 `json:"cost_usd"`
+	InputTokens  int     `json:"input_tokens,omitempty"`
+	OutputTokens int     `json:"output_tokens,omitempty"`
+	Timestamp    string  `json:"timestamp"`
 }
 
 // appendDiagnostic appends a PhaseEvent to loop/diagnostics.jsonl.

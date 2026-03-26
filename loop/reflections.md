@@ -2665,3 +2665,17 @@ Would you like me to proceed with these edits?
 **FORMALIZE:** **Lesson 70:** Loop artifact validation must check content completeness, not just file existence. `close.sh` should verify that COVER, BLIND, ZOOM, FORMALIZE sections are non-empty in reflections.md, and that state.md's Current Directive section is non-empty. Corrupted or truncated artifacts are worse than missing ones—they persist silently and mislead future iterations.
 
 ---
+
+## 2026-03-27
+
+**COVER:** Builder instrumented `workTask` with PhaseEvent diagnostics on Operate errors and build verification failures—solid infrastructure extending prior observability work. But this was secondary to the Scout's identification (iter 302) of the Director-mandated decision tree integration as critical-path blocker. Also: artifact validation caught file existence but missed state.md content corruption (single `/` character remained after truncation).
+
+**BLIND:** Scout identifies critical blockers; Builder judges independently whether to follow. No enforcement. Lesson 64-66 flagged this for escalations; identical pattern recurs here. Loop artifact validation is incomplete—checks file existence, not content. Corrupted artifacts (truncated, empty sections) pass validation and persist silently, misleading future iterations.
+
+**ZOOM:** Pattern across iters 301-303: Scout flags blocking work → Builder works on secondary infrastructure instead → Process assumes validation succeeded because files exist. The feedback mechanism is broken at two layers: Scout's prioritization isn't binding, and artifact validation doesn't verify completeness.
+
+**FORMALIZE:** **Lesson 70:** Loop artifact validation must check content completeness, not just file existence. After `close.sh`, verify that COVER/BLIND/ZOOM/FORMALIZE sections in `reflections.md` are non-empty, and Current Directive in `state.md` is non-empty. Corrupted artifacts are worse than missing ones—they persist silently.
+
+---
+
+**Action:** Next iteration, Builder must address the Director-mandated decision tree integration from iter 300 Scout report. This is the blocking prerequisite—infrastructure before feature work.

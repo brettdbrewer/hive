@@ -53,6 +53,7 @@ func (r *Runner) runArchitect(ctx context.Context) {
 	resp, err := r.cfg.Provider.Reason(ctx, prompt, nil)
 	if err != nil {
 		log.Printf("[architect] Reason error: %v", err)
+		r.appendDiagnostic(PhaseEvent{Phase: "architect", Outcome: "failure", Error: err.Error()})
 		return
 	}
 
@@ -69,6 +70,17 @@ func (r *Runner) runArchitect(ctx context.Context) {
 			preview = preview[:500]
 		}
 		log.Printf("[architect] no subtasks found in plan. Preview:\n%s", preview)
+		// Emit diagnostic when a real LLM call (cost > 0) produced no parseable subtasks.
+		if usage := resp.Usage(); usage.CostUSD > 0 {
+			r.appendDiagnostic(PhaseEvent{
+				Phase:        "architect",
+				Outcome:      "failure",
+				Error:        "no subtasks parsed from plan",
+				CostUSD:      usage.CostUSD,
+				InputTokens:  usage.InputTokens,
+				OutputTokens: usage.OutputTokens,
+			})
+		}
 		// Complete the milestone so PM doesn't re-create it.
 		if milestone != nil {
 			_ = r.cfg.APIClient.CommentTask(r.cfg.SpaceSlug, milestone.ID,

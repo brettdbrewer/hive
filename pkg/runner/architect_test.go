@@ -1,9 +1,72 @@
 package runner
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/lovyou-ai/eventgraph/go/pkg/decision"
+	"github.com/lovyou-ai/eventgraph/go/pkg/event"
+	"github.com/lovyou-ai/eventgraph/go/pkg/types"
+	"github.com/lovyou-ai/hive/pkg/api"
 )
+
+// mockCostProvider is a test double that returns a configurable TokenUsage.
+type mockCostProvider struct {
+	response string
+	usage    decision.TokenUsage
+}
+
+func (m *mockCostProvider) Reason(_ context.Context, _ string, _ []event.Event) (decision.Response, error) {
+	score, _ := types.NewScore(0.9)
+	return decision.NewResponse(m.response, score, m.usage), nil
+}
+func (m *mockCostProvider) Name() string  { return "mock-cost" }
+func (m *mockCostProvider) Model() string { return "mock-model" }
+
+func TestRunArchitectParseFailureWritesDiagnostic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"nodes":[]}`))
+	}))
+	defer srv.Close()
+
+	hiveDir := makeHiveDir(t, "# State\n", map[string]string{
+		"scout.md": "## Scout\nGap: missing feature X",
+	})
+
+	r := New(Config{
+		HiveDir:   hiveDir,
+		SpaceSlug: "test",
+		APIClient: api.New(srv.URL, "test-key"),
+		Provider: &mockCostProvider{
+			response: "This response has no subtask markers at all.",
+			usage:    decision.TokenUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.0042},
+		},
+		OneShot: true,
+	})
+
+	r.runArchitect(context.Background())
+
+	data, err := os.ReadFile(filepath.Join(hiveDir, "loop", "diagnostics.jsonl"))
+	if err != nil {
+		t.Fatalf("diagnostics.jsonl not written: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, `"phase":"architect"`) {
+		t.Errorf("diagnostics.jsonl missing phase=architect:\n%s", body)
+	}
+	if !strings.Contains(body, `"outcome":"failure"`) {
+		t.Errorf("diagnostics.jsonl missing outcome=failure:\n%s", body)
+	}
+	if !strings.Contains(body, `"error"`) {
+		t.Errorf("diagnostics.jsonl missing error field:\n%s", body)
+	}
+}
 
 func TestParseSubtasksMarkdown(t *testing.T) {
 	tests := []struct {
