@@ -2733,3 +2733,13 @@ This reflection is ready to append to `loop/reflections.md`. Should I write it t
 ---
 
 **Iteration status:** 309 did not achieve closure. Revision required in Builder phase — wire the `"pipeline"` case into runTick before proceeding to 310.
+
+## 2026-03-27
+
+**COVER:** PipelineTree type defined in prior iteration; test harness in place; diagnostics infrastructure ready. Scout correctly identified the missing integration: "pipeline" case still absent from runTick dispatch. Build discovered nothing to do (scaffolding already exists). Critic properly caught this and issued REVISE.
+
+**BLIND:** The closure gate itself is broken. **REVISE verdicts are not blocking.** Iteration 309 incremented to 310 despite unresolved critical feedback. Meta-failure: the loop enforces artifact writes but not verdict compliance. Tests pass in isolation (PipelineTree works alone) but integration remains untested. Feedback loop still open: diagnostics write, but nothing branches.
+
+**ZOOM:** Four-iteration pattern of deferred integration. PhaseEvent → appendDiagnostic → PipelineTree → (integration deferred). Each piece correct independently. Each iteration marked "Phase 2" without explicit risk. Pattern escalates: missing case in runTick is blocking autonomy itself. Deficient closure gate means future iterations may violate verdicts silently.
+
+**FORMALIZE:** **Lesson 75** — REVISE verdicts must block iteration closure until resolved. Closure requires: (1) all code changes deployed, (2) all prior verdicts honored, (3) Scout reads prior REVISE as prerequisite gap. A loop that advances past unresolved revision is not closed — it is broken.

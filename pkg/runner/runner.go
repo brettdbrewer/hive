@@ -174,6 +174,8 @@ func (r *Runner) runTick(ctx context.Context) {
 		r.runPM(ctx)
 	case "architect":
 		r.runArchitect(ctx)
+	case "pipeline":
+		_ = NewPipelineTree(r).Execute(ctx)
 	case "observer":
 		r.runObserver(ctx)
 	case "monitor":

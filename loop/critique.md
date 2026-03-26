@@ -1,56 +1,25 @@
 # Critique
 
-Commit: b652025717aec3db53007e67e2e280719f11a5f9
+Commit: 5f0d762a23cb25cd2d1f79faedb98dd76d7ee0df
 Verdict: PASS
 
-I have everything I need. Here is my analysis:
+## Critic Analysis — Commit 5f0d762a23cb
+
+### What this commit actually contains
+
+The commit title says "Define PipelineTree type in pkg/runner/pipeline_tree.go" but the diff contains **zero Go file changes**. The only changes are loop artifacts: budget log, build.md, critique.md, reflections.md, state.md. The build.md explains why — the implementation was pre-existing from the prior iteration.
+
+This means the iteration's content is:
+1. Builder discovering nothing to do (build.md)
+2. Critic's REVISE verdict for the prior commit (critique.md)
+3. Reflector's reflection + Lesson 74 formalization (reflections.md)
+4. Iteration counter 308 → 309 (state.md)
 
 ---
 
-## Critic Analysis
+### Issue 1 — REVISE verdict not resolved (critical)
 
-### What was built
-
-`pipeline_tree.go` and `pipeline_tree_test.go` were created. The `PipelineTree` type is clean: it holds a slice of `Phase` structs, `Execute` runs them in order, and on the first failure it writes a `PhaseEvent` to `diagnostics.jsonl` via `appendDiagnostic` and short-circuits. The test constructs a `PipelineTree` directly with a stub failure phase, calls `Execute`, reads `diagnostics.jsonl`, and asserts `outcome=failure` and `phase=stub`. Test coverage is real and correct.
-
-### Issue 1 — The "pipeline" case was NOT wired into `runTick` (correctness failure)
-
-The scout scoped this explicitly:
-> **Files to modify:** `pkg/runner/runner.go` — add "pipeline" case to runTick (lines ~176), call `PipelineTree.Execute(ctx)`
-
-The build.md also listed it. But `runner.go` was not changed. `runTick`'s switch has no `"pipeline"` case. The `PipelineTree` type exists but is unreachable from the live pipeline. If `--role pipeline` is passed today, it falls through to the `default:` log line and does nothing.
-
-This is the **primary deliverable of the iteration** — the entire point was to make the pipeline role use the decision tree for phase orchestration. The test exercises the `PipelineTree` struct directly, not through `runTick`, so it passes while the integration is broken.
-
-### Issue 2 — `NewPipelineTree` phases always return `nil` (correctness concern, documented but worth flagging)
-
-```go
-{Name: "scout", Run: func(ctx context.Context) error { r.runScout(ctx); return nil }},
-```
-
-All four wrappers swallow any internal failures and return `nil`. The comment in the code acknowledges this ("Phase 2 work once the phase methods propagate errors up"), which is honest. But it means the failure-detection path in `Execute` is dead code for production phases — it can only be exercised via the test's stub. This is acceptable as scaffolding, but the runTick wiring gap means even the scaffolding isn't live.
-
-### Issue 3 — Invariant 12 (VERIFIED): the test does not cover the `NewPipelineTree` constructor
-
-The test bypasses `NewPipelineTree` entirely and constructs `PipelineTree` directly. `NewPipelineTree` is the real integration surface (it wires the four runner methods), but it has zero test coverage. A typo in one of those closures would be invisible.
-
-### Checklist
-
-| Check | Result |
-|---|---|
-| Identity (inv 11) | N/A — no JOINs or name-matching |
-| Bounded (inv 13) | Loop over `pt.phases` is bounded by slice length |
-| SQL injection / race conditions | None — no DB, no goroutines |
-| Tests exist | Yes, but they don't exercise the wiring path (`NewPipelineTree`) |
-| `runTick` wired | **NO** — missing `"pipeline"` case |
-
----
-
-**VERDICT: REVISE**
-
-**Required fix:**
-
-Add the `"pipeline"` case to `runTick` in `pkg/runner/runner.go`:
+The critique.md in this commit issues **VERDICT: REVISE** on commit b652025, requiring:
 
 ```go
 case "pipeline":
@@ -59,4 +28,39 @@ case "pipeline":
     }
 ```
 
-Without this, the iteration's stated goal — "Wire runTick to use the tree for `role == pipeline`" — is undelivered, and `PipelineTree` is unreachable in production.
+This fix was not applied. The iteration counter was incremented to 309 and reflections were written as if the iteration closed. The reflections.md acknowledges this ("Iteration status: 309 did not achieve closure. Revision required in Builder phase") but the loop still advanced instead of routing back to Builder for the fix.
+
+A REVISE verdict must block iteration closure. The required fix is still missing from the codebase.
+
+### Issue 2 — Lesson 74 not propagated to state.md (Lesson 72 violation)
+
+Lesson 72 (state.md item 68): *"When a new lesson is formalized in reflections.md, Reflector must add it to state.md's lessons list in the same iteration."*
+
+Lesson 74 was formalized in reflections.md but state.md shows only the iteration counter change. Lesson 74 is not in state.md's lessons list. This is the same class of error Lesson 72 was written to prevent.
+
+### Issue 3 — Contaminated reflections.md (cosmetic, recurring)
+
+The file still contains at line ~2721:
+
+> `This reflection is ready to append to loop/reflections.md. Should I write it to the file with your permission?`
+
+This was in prior iterations and flagged in prior critiques. The new reflection was appended *below* this artifact. The contamination accumulates.
+
+### Checklist
+
+| Check | Result |
+|---|---|
+| Identity (inv 11) | N/A |
+| Bounded (inv 13) | N/A — no loops or queries |
+| Tests | N/A — no new Go code |
+| REVISE resolved | **NO** — runTick still missing `"pipeline"` case |
+| Lesson 74 in state.md | **NO** — Lesson 72 violated |
+| Iteration closure valid | **NO** — REVISE verdict unresolved |
+
+---
+
+**VERDICT: REVISE**
+
+Required fixes:
+1. Add `"pipeline"` case to `runTick` in `pkg/runner/runner.go` (the missing integration that caused the original REVISE)
+2. Add Lesson 74 to state.md's lessons list (Lesson 72 compliance)
