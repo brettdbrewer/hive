@@ -330,6 +330,7 @@ func (r *Runner) workTask(ctx context.Context, t api.Node) {
 			return
 		}
 		log.Printf("[builder] task %s DONE: %s", t.ID, t.Title)
+		r.writeBuildArtifact(t, r.cost.TotalCostUSD)
 
 		// Post cost summary as comment.
 		_ = r.cfg.APIClient.CommentTask(r.cfg.SpaceSlug, t.ID,
@@ -392,6 +393,30 @@ If you're stuck and need human help:
 ACTION: ESCALATE
 `)
 	return b.String()
+}
+
+// ─── Build artifact ──────────────────────────────────────────────────
+
+// writeBuildArtifact writes loop/build.md summarising the completed task.
+func (r *Runner) writeBuildArtifact(t api.Node, costUSD float64) {
+	hash := r.gitHash()
+	content := fmt.Sprintf("# Build: %s\n\n- **Commit:** %s\n- **Cost:** $%.4f\n- **Timestamp:** %s\n",
+		t.Title, hash, costUSD, time.Now().UTC().Format(time.RFC3339))
+	path := filepath.Join(r.cfg.HiveDir, "loop", "build.md")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		log.Printf("[builder] write build.md: %v", err)
+	}
+}
+
+// gitHash returns the latest commit hash from r.cfg.RepoPath, or "unknown".
+func (r *Runner) gitHash() string {
+	cmd := exec.Command("git", "log", "-1", "--format=%H")
+	cmd.Dir = r.cfg.RepoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return "unknown"
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // ─── Build verification ──────────────────────────────────────────────

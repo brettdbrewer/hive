@@ -149,6 +149,44 @@ func TestExtractSummary(t *testing.T) {
 	}
 }
 
+func TestBuildArtifactWritten(t *testing.T) {
+	repoDir := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runGit("init")
+	runGit("config", "user.email", "test@test.com")
+	runGit("config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(repoDir, "file.go"), []byte("package main\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", ".")
+	runGit("commit", "-m", "Add feature X")
+
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+	r := New(Config{HiveDir: hiveDir, RepoPath: repoDir})
+
+	task := api.Node{ID: "task-1", Title: "Add feature X", Kind: "task"}
+	r.writeBuildArtifact(task, 0.0042)
+
+	data, err := os.ReadFile(filepath.Join(hiveDir, "loop", "build.md"))
+	if err != nil {
+		t.Fatalf("build.md not written: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, "Add feature X") {
+		t.Errorf("build.md does not contain task title:\n%s", body)
+	}
+	if !strings.Contains(body, "0.0042") {
+		t.Errorf("build.md does not contain cost:\n%s", body)
+	}
+}
+
 func TestCritiqueArtifactWritten(t *testing.T) {
 	// Set up a minimal git repo with two commits so hash~1 is valid.
 	repoDir := t.TempDir()

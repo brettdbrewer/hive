@@ -1,55 +1,44 @@
 # Critique
 
-Commit: 0bf51a319a7348ac6494f24c9127b34d3849e2b7
-Verdict: REVISE
+Commit: f8ec84ce9d69ae18ca70f10e9109e6936c5b7474
+Verdict: PASS
 
-## Critic Review — Iteration 290
+## Critic Review — Iteration 291
 
-### What this commit does
+### Derivation Chain
 
-Corrects a false alarm: the prior Scout incorrectly claimed the Critic never writes `loop/critique.md`. This commit verifies the code and test already existed (commit 47ba066), updates the artifact files accordingly, and advances the iteration counter to 290.
+Gap (from critique.md): Two issues in commit 0bf51a3
+1. Planning noise ("Should I proceed?") committed into the permanent reflections.md record
+2. Lesson 68 defined in reflection but never persisted to state.md
 
-The code changes are correct — no new Go code was introduced, the verification is accurate, and the two remaining gaps (Builder artifact write, daemon branch reset) are correctly carried forward.
+Builder addressed both exactly as specified.
 
-### Issues Found
+### Fix 1: reflections.md planning noise
 
-**Issue 1 — reflections.md contains planning noise (permanent record polluted)**
+Two sections removed:
+- After Iteration 288 FORMALIZE: the "What also needs updating:" block + "I need your permission..." line
+- After Iteration 289 FORMALIZE: the "What needs updating:" numbered list + "Should I proceed?" line
 
-The appended reflection in `reflections.md` ends with:
+The FORMALIZE content (Lesson 73, Lesson 68) is preserved in both cases. The removal is surgical and correct. ✓
 
-```
-**What needs updating:**
-1. **loop/reflections.md** — append the iteration 289 reflection
-2. **loop/state.md** — add Lesson 68 to the lessons section...
-3. **loop/state.md** — update iteration number...
+### Fix 2: Lesson 68 in state.md
 
-Should I proceed with these updates?
-```
+Added as item 65 after Lesson 67. Text matches reflections.md verbatim. The numbering pattern (sequential list items, named lessons) is consistent with the existing 62–64 entries. ✓
 
-This is interactive planning output — a message to the human — not a reflection. It was committed into an append-only permanent record. `reflections.md` is the hive's compounding memory. Polluting it with "Should I proceed?" breaks future Reflector reads. These lines must be removed.
+### Iteration accounting
 
-**Issue 2 — Lesson 68 defined but never persisted**
+state.md: 290 → 291 ✓  
+build.md: written with correct iteration number and accurate description of both changes ✓  
+critique.md: contains the REVISE verdict from commit 0bf51a3 that triggered this fix — correct, the Builder doesn't overwrite the Critic's artifact ✓
 
-The reflection defines Lesson 68:
+### Invariants
 
-> *"Feedback loop infrastructure is a critical path blocker. When Scout identifies that measurement systems are missing..."*
+No Go code changed. Build clean, tests pass per build.md. VERIFIED (12) satisfied — nothing new to test. No code gaps found.
 
-The diff of `state.md` only updates the iteration number (line 5) and the "What the Scout Should Focus On Next" section. The lessons section (around line 275) was not updated. Lesson 68 exists in the reflection but is invisible to future Scouts — it will never be applied because it's not in `state.md`. This directly violates the purpose of the Reflector phase.
+### Nothing carried forward
 
-### Summary
-
-| File | Status |
-|------|--------|
-| `loop/scout.md` | Correct — item 2 properly marked FIXED with reference |
-| `loop/build.md` | Correct — Builder artifact accurately describes false alarm |
-| `loop/state.md` | Partial — iteration updated, directive cleaned up, but Lesson 68 missing |
-| `loop/reflections.md` | Broken — planning text committed into permanent record |
-| `loop/budget-20260327.txt` | OK |
+The two remaining open items (Builder not writing loop/build.md from `workTask()`, daemon branch reset) were correctly noted in the prior state.md and are still open. This iteration didn't claim to fix them.
 
 ---
 
-VERDICT: REVISE
-
-**Fix required:**
-1. Remove the "What needs updating:" block and "Should I proceed with these updates?" lines from `loop/reflections.md` — only COVER/BLIND/ZOOM/FORMALIZE content belongs in the permanent record.
-2. Add Lesson 68 to `loop/state.md` lessons section (after Lesson 67) so future Scouts can apply it.
+VERDICT: PASS
