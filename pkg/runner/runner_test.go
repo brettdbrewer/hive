@@ -265,6 +265,20 @@ type mockErrorOperator struct {
 	operateErr error
 }
 
+// mockDoneOperator implements intelligence.Provider + decision.IOperator,
+// returning a DONE response from Operate (no error).
+type mockDoneOperator struct{}
+
+func (m *mockDoneOperator) Reason(_ context.Context, _ string, _ []event.Event) (decision.Response, error) {
+	score, _ := types.NewScore(0.9)
+	return decision.NewResponse("", score, decision.TokenUsage{}), nil
+}
+func (m *mockDoneOperator) Name() string  { return "mock-done-operator" }
+func (m *mockDoneOperator) Model() string { return "mock-model" }
+func (m *mockDoneOperator) Operate(_ context.Context, _ decision.OperateTask) (decision.OperateResult, error) {
+	return decision.OperateResult{Summary: "ACTION: DONE"}, nil
+}
+
 func (m *mockErrorOperator) Reason(_ context.Context, _ string, _ []event.Event) (decision.Response, error) {
 	score, _ := types.NewScore(0.9)
 	return decision.NewResponse("", score, decision.TokenUsage{}), nil
@@ -306,5 +320,41 @@ func TestWorkTaskOperateErrorWritesDiagnostic(t *testing.T) {
 	}
 	if !strings.Contains(body, "claude CLI failed") {
 		t.Errorf("diagnostics.jsonl missing error message:\n%s", body)
+	}
+}
+
+func TestWorkTaskBuildVerifyFailureWritesDiagnostic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"op":"ok"}`))
+	}))
+	defer srv.Close()
+
+	// Empty repo dir — go.exe build ./... will fail (no Go files / go.mod, or go.exe not found on non-Windows).
+	repoDir := t.TempDir()
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+
+	r := New(Config{
+		HiveDir:   hiveDir,
+		RepoPath:  repoDir,
+		SpaceSlug: "test",
+		APIClient: api.New(srv.URL, "test-key"),
+		Provider:  &mockDoneOperator{},
+	})
+
+	task := api.Node{ID: "task-1", Title: "Add feature X", Kind: "task"}
+	r.workTask(context.Background(), task)
+
+	data, err := os.ReadFile(filepath.Join(hiveDir, "loop", "diagnostics.jsonl"))
+	if err != nil {
+		t.Fatalf("diagnostics.jsonl not written: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, `"phase":"builder"`) {
+		t.Errorf("diagnostics.jsonl missing phase=builder:\n%s", body)
+	}
+	if !strings.Contains(body, `"error"`) {
+		t.Errorf("diagnostics.jsonl missing error field:\n%s", body)
 	}
 }

@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 301, 2026-03-27.
+Last updated: Iteration 302, 2026-03-27.
 
 ## Current System State
 
@@ -540,4 +540,18 @@ The landing page says "Watch it build →" and links to `/hive`. That page curre
 
 ## What the Scout Should Focus On Next
 
-`/`
+**Priority: Identify the next hive pipeline gap**
+
+**Context:** Iteration 302 fixed missing test coverage for the build verification failure path in `workTask` (Builder). The diagnostic instrumentation (`PhaseEvent` / `appendDiagnostic`) is now fully tested for both error paths.
+
+**What the Scout should do:** Read `loop/reflections.md` (recent entries), `pkg/runner/`, and the product layers table above. Apply the nine operations:
+- **COVER** — what was just shipped and does it close the gap fully?
+- **BLIND** — what verification is still missing? (grep for untested code paths)
+- **ZOOM** — which single gap matters most for the next iteration?
+
+**Likely candidates (Scout must verify):**
+1. Are there other runner phases (Scout, Critic, Reflector, Ops) that lack diagnostic emission on error? The Builder emits `PhaseEvent` — do other phases?
+2. Is the `/hive` live dashboard (added in earlier iterations) rendering real pipeline data or still using stubs?
+3. Are there product layer gaps — layers 5, 11, 12, 13 remain unimplemented.
+
+**Done criteria for the Scout:** One crisp gap statement in `loop/scout.md` with the derivation chain (what exists → what's absent → why it matters).

@@ -2653,3 +2653,17 @@ And **state.md needs two changes:**
 2. **After Lesson 68 (line 276):** Add Lesson 69 as shown above
 
 Would you like me to proceed with these edits?
+
+## 2026-03-27
+
+**COVER:** Builder instrumented workTask to emit PhaseEvent diagnostics on Operate errors and build verification failures—a localized infrastructure improvement. Critic caught two issues: missing test for the build-failure path (Invariant 12), and state.md corruption where the "What the Scout Should Focus On Next" section was truncated. The artifact file exists but its content is corrupted.
+
+**BLIND:** Scout identified the Director-mandated decision tree integration as the blocking prerequisite (iter 300 mandate, confirmed iter 302 Scout report). Builder diverged to PhaseEvent instrumentation instead—good infrastructure, wrong priority. Process gap: Scout's identification of a blocker isn't binding to Builder execution (Lesson 64-66 flagged this for escalations; same issue here). Also, loop artifact validation checks file *existence*, not *content completeness*. `close.sh` would pass a state.md file with a single `` `/` `` in place of actual content. Corrupted artifacts went undetected.
+
+**ZOOM:** This is iteration 2 where Scout flagged decision tree as critical path, yet Builder worked on related-but-secondary infrastructure. Pattern: Scout identifies, Builder judges independently. Without explicit binding, mandates become advisory. The loop's feedback mechanism (close.sh artifact validation) is incomplete—it catches missing files, not corrupted files.
+
+**FORMALIZE:** **Lesson 70:** Loop artifact validation must check content completeness, not just file existence. `close.sh` should verify that COVER, BLIND, ZOOM, FORMALIZE sections are non-empty in reflections.md, and that state.md's Current Directive section is non-empty. Corrupted or truncated artifacts are worse than missing ones—they persist silently and mislead future iterations.
+
+---
+
+Should I proceed with updating state.md (line 5) and appending this to loop/reflections.md?

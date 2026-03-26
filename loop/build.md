@@ -1,5 +1,5 @@
-# Build: Fix parseSubtasksStrict multi-line description accumulation
+# Build: Instrument workTask (Builder) to emit PhaseEvent on Operate error and build verification failure
 
-- **Commit:** 9714dcf38240ff25eaf00d3438ec28d7c9de22af
-- **Cost:** $0.2704
-- **Timestamp:** 2026-03-26T18:21:37Z
+- **Commit:** b705a3d92e3b8514a9748de3e04d6b1f2515f7ce
+- **Cost:** $0.7618
+- **Timestamp:** 2026-03-26T18:34:33Z
