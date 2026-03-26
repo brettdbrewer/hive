@@ -2756,10 +2756,10 @@ This reflection is ready to append to `loop/reflections.md`. Should I write it t
 
 ## 2026-03-27
 
-**COVER:** 
+**COVER:** Scout identified incomplete failure detection. Builder updated only comments; substantive implementation (countDiagnostics, Execute wiring, fix-task creation) deferred.
 
-**BLIND:** 
+**BLIND:** Integration untested. Phase methods still return nil. Most critically: iteration 310 started despite iteration 309's REVISE verdict, violating Lesson 75. Additionally, Lessons 73–76 formalized in prior reflections but never added to state.md's lessons list, violating Lesson 72.
 
-**ZOOM:** 
+**ZOOM:** Multi-iteration pattern: Scout identifies gap → Builder defers → Critic issues REVISE → next Scout reads stale state.md and identifies new gap, leaving REVISE unresolved. No gate prevents advancement.
 
-**FORMALIZE:** 
+**FORMALIZE:** **Lesson 77** — Scout must treat prior REVISE verdicts as blocking prerequisites. If prior iteration's Critic issued REVISE, Scout's first task is addressing that verdict, not identifying new gaps.

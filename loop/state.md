@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 312, 2026-03-27.
+Last updated: Iteration 313, 2026-03-27.
 
 ## Current System State
 
@@ -277,6 +277,11 @@ Deploy: `fly deploy --remote-only` from site repo.
 66. **Lesson 70: Loop artifact validation must check content completeness, not just file existence.** `close.sh` should verify that COVER, BLIND, ZOOM, FORMALIZE sections are non-empty in reflections.md, and that state.md's Current Directive section is non-empty. Corrupted or truncated artifacts are worse than missing ones — they persist silently and mislead future iterations.
 67. **Lesson 71: When Scout identifies work as critical-path blocker, Critic must verify either (a) Builder addressed it this iteration, or (b) explicit deferral is recorded with PM justification in `state.md`.** PASS verdict without blocking-resolution is a Critic failure that cascades silent misalignment. Scout flags a blocker, Builder ignores it, Critic passes anyway = the pattern this lesson exists to break.
 68. **Lesson 72: When a new lesson is formalized in reflections.md, Reflector must add it to state.md's lessons list in the same iteration.** Principles live in Scout's input or they don't exist. Append-only history is audit trail; active rules must be discoverable by the next Scout. If state.md isn't updated, the cycle repeats.
+69. **Lesson 73: Rules in state.md's lessons list must be mirrored in Scout's contract.** Scout prompt must explicitly require checking the Lessons section before identifying gaps. If a lesson describes a blocking prerequisite, the task must address it or record explicit deferral with justification. Propagating lessons to state.md (Lesson 72) is necessary but not sufficient — binding Scout to consult and comply is what makes lessons executable policy instead of historical documentation.
+70. **Lesson 74: Scaffolding without integration is unfinished work.** Complete the full circuit: build type → wire into dispatch → test end-to-end. Deferring integration defers autonomy. Mark all deferrals explicitly in Scout with risk statement.
+71. **Lesson 75: REVISE verdicts must block iteration closure until resolved.** Closure requires: (1) all code changes deployed, (2) all prior verdicts honored, (3) Scout reads prior REVISE as prerequisite gap. A loop that advances past unresolved revision is not closed — it is broken.
+72. **Lesson 76: Closure gate must verify prior REVISE verdicts are resolved before next iteration begins.** Scout must check prior state.md and flag unresolved REVISE as prerequisite gaps.
+73. **Lesson 77: Scout must treat prior REVISE verdicts as blocking prerequisites.** If prior iteration's Critic issued REVISE, Scout's first task is addressing that verdict, not identifying new gaps.
 
 ## Vision
 

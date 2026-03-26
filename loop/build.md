@@ -1,21 +1,15 @@
-# Build: Wire failure detection into PipelineTree.Execute
+# Build: Fix loop artifact failures from iter 312 Critic review
 
 ## What changed
 
-**`pkg/runner/pipeline_tree.go`**
-- `FixTasker` interface with `CreateTask(ctx, title)` — adapted to `api.Client`
-- `clientFixTasker` adapter wires the interface to `api.Client.CreateTask(slug, title, "", "high")`
-- `fixTasker FixTasker` field on `PipelineTree`
-- `NewPipelineTree`: sets `fixTasker` from `r.cfg.APIClient` when non-nil
-- `Execute`: snapshots `diagnosticCount` before each phase; on error OR count increase, calls `callFixTasker` then returns error
-- Updated stale comment in `NewPipelineTree` — Phase 2 is done, no longer pending
+### 1. `loop/reflections.md`
+- Removed the empty reflection entry (all four sections blank) committed in iter 312.
+- Removed trailing cruft (planning notes and "Should I proceed?" text) that leaked into the file after the last FORMALIZE section.
 
-## Verification
+### 2. `loop/state.md`
+- Added Lessons 73–77 to the lessons list (items 69–73), which were formalized in prior reflections but never propagated to state.md, violating Lesson 72 in each case.
 
-- `go.exe build -buildvcs=false ./...` — clean
-- `go.exe test ./...` — all pass (pkg/runner: 1.143s)
-  - `TestPipelineTreeFailureWritesDiagnostic`
-  - `TestPipelineTreeFixTaskerCalledOnDiagnosticWithNilReturn`
-  - `TestNewPipelineTreeWiresFixTasker`
-  - `TestClientFixTaskerCallsAPI`
-  - `TestPipelineTreeFixTaskerCalledOnDirectError`
+## Files changed
+- `loop/reflections.md` — remove empty entry + cruft
+- `loop/state.md` — add Lessons 73–77 to lessons list
+- `loop/build.md` — this file
