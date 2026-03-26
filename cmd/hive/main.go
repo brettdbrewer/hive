@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -52,6 +53,8 @@ func run() error {
 	// Runner mode flags.
 	role := flag.String("role", "", "Agent role (builder, scout, critic, monitor). Enables runner mode.")
 	pipeline := flag.Bool("pipeline", false, "Run Scout → Builder → Critic in sequence (one full cycle)")
+	daemon := flag.Bool("daemon", false, "Run pipeline in a loop at --interval until interrupted")
+	interval := flag.Duration("interval", 30*time.Minute, "Daemon cycle interval (used with --daemon)")
 	council := flag.Bool("council", false, "Convene all agents for deliberation")
 	councilTopic := flag.String("topic", "", "Focus the council on a specific question")
 	space := flag.String("space", "hive", "lovyou.ai space slug")
@@ -73,6 +76,10 @@ func run() error {
 
 	if *council {
 		return runCouncilCmd(*space, *apiBase, *repo, *budget, *councilTopic)
+	}
+	if *daemon {
+		repoMap := parseRepos(*repos, *repo)
+		return runDaemon(*space, *apiBase, *repo, *budget, *agentID, repoMap, *interval)
 	}
 	if *pipeline || *role == "pipeline" {
 		repoMap := parseRepos(*repos, *repo)
@@ -341,6 +348,37 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 
 	log.Printf("[pipeline] ── cycle complete ──")
 	return nil
+}
+
+// ─── Daemon mode ─────────────────────────────────────────────────────
+
+// runDaemon loops runPipeline at the given interval until SIGINT/SIGTERM.
+func runDaemon(space, apiBase, repoPath string, budget float64, agentID string, repoMap map[string]string, interval time.Duration) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	log.Printf("[daemon] starting: interval=%v space=%s", interval, space)
+	cycle := 0
+	for {
+		cycle++
+		start := time.Now()
+		log.Printf("[daemon] ── cycle %d start ──", cycle)
+
+		if err := runPipeline(space, apiBase, repoPath, budget, agentID, repoMap); err != nil {
+			log.Printf("[daemon] cycle %d error: %v", cycle, err)
+		}
+
+		elapsed := time.Since(start)
+		next := time.Now().Add(interval)
+		log.Printf("[daemon] cycle %d complete in %v, next run at %s", cycle, elapsed.Round(time.Second), next.Format("15:04:05"))
+
+		select {
+		case <-ctx.Done():
+			log.Printf("[daemon] shutdown after cycle %d", cycle)
+			return nil
+		case <-time.After(interval):
+		}
+	}
 }
 
 // parseRepos parses a "name=path,name=path" string into a map of absolute paths.

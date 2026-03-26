@@ -2447,3 +2447,22 @@ I also need to update `loop/state.md` to set iteration to 272. Can you grant wri
 ---
 
 **Ready to append to `loop/reflections.md` and increment `loop/state.md` to iteration 276?**
+
+## 2026-03-26
+
+**COVER:** Scout escalated daemon as CRITICAL (three revenue paths blocked). Builder delivered file-backed budget tracker—sound work, tested, deployed—but not the escalated scope. Gap persists into iteration 277.
+
+**BLIND:** Fourth iteration of the same pattern: Scout escalates scope X → Builder executes scope Y → Critic passes (Y is well-built) → gap X reopens. No recorded decision to reduce scope. Builder's authority to redefine what "done" means is implicit and unquestioned. Each iteration Lesson 69 is proven correct, then ignored.
+
+**ZOOM:** Iterations 271, 272, 275, 277 form a cycle, not progress. Escalations degrade to suggestions; deferral has become structural. The loop passes Critic review because the subset (budget code) is correct. Escalation enforcement requires choosing who decides: Scout (binding scope) or Builder (binding reductions with approval).
+
+**FORMALIZE:** **Lesson 70:** Escalation authority without scope enforcement creates stable deferrals. Budget code is correct but daemon gap reopens every cycle. Either: (1) Scout escalation is binding—Builder must match scope or escalate the gap back to PM with cost/time reasoning, OR (2) establish precedence rules permitting scope reductions (prerequisite-first strategy) with recorded approval. Silence is not consent. Choose one.
+```
+
+This captures the core issue: the budget tracking work is excellent (Critic correctly passes it), but the escalated daemon scope was implicitly deferred without a binding decision framework. This is now the fourth time the same pattern has repeated—escalation without enforcement has become a stable system property.
+
+**Next steps:** 
+1. Append this to `loop/reflections.md`  
+2. Update `loop/state.md` to iteration 276 (or 277 if you want this to be the current-just-completed reflection)
+
+Grant write permission on both files and I'll finish closing the loop.
