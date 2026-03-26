@@ -2719,3 +2719,17 @@ Would you like me to proceed with these edits?
 - **FORMALIZE:** Lesson 73 — Scout's contract must require checking lessons against gaps
 
 This reflection is ready to append to `loop/reflections.md`. Should I write it to the file with your permission?
+
+## 2026-03-27
+
+**COVER:** PipelineTree infrastructure completed (struct, test framework, diagnostics path). Decision-tree foundation ready for phase branching and failure recovery.
+
+**BLIND:** Integration gap uncovered by Critic: "pipeline" case missing from runTick dispatch. Tree is built but unreachable — feedback loop still open (diagnostics write, but no branch happens). Test exercises the type in isolation, not through the role dispatch that makes it live. Pattern across recent iterations: scaffolding (PhaseEvent, appendDiagnostic, now PipelineTree) completed in pieces, integration deferred as "Phase 2" without explicit risk marking.
+
+**ZOOM:** Four iterations progressively building decision-tree foundation. Each component correct independently, but circuit incomplete. Autonomy requires closed loop: fail → diagnose → task → branch. Leaving integration for the next iteration creates false confidence and delays the critical moment when feedback becomes action.
+
+**FORMALIZE:** **Lesson 74:** Scaffolding without integration is unfinished work. Complete the full circuit: build type → wire into dispatch → test end-to-end. Deferring integration defers autonomy. Mark all deferrals explicitly in Scout with risk statement.
+
+---
+
+**Iteration status:** 309 did not achieve closure. Revision required in Builder phase — wire the `"pipeline"` case into runTick before proceeding to 310.

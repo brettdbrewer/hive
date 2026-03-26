@@ -1,8 +1,26 @@
-# Build: Test PipelineTree failure path in pkg/runner/pipeline_tree_test.go
+# Build: PipelineTree type in pkg/runner/pipeline_tree.go
 
-- **Files created:**
-  - `pkg/runner/pipeline_tree.go` — `Phase` and `PipelineTree` types; `NewPipelineTree(r *Runner)` wires the four pipeline phases (scout, architect, builder, critic); `Execute(ctx)` runs phases in order and emits a `PhaseEvent{Outcome: "failure"}` diagnostic via `appendDiagnostic` on the first failure
-  - `pkg/runner/pipeline_tree_test.go` — `TestPipelineTreeFailureWritesDiagnostic`: constructs a `PipelineTree` directly with a stub phase returning `fmt.Errorf("injected failure")`, calls `Execute(ctx)`, and verifies `loop/diagnostics.jsonl` contains a line with `outcome=failure` and `phase=stub`
-- **Build:** `go.exe build -buildvcs=false ./...` — clean
-- **Tests:** `go.exe test ./...` — all pass (pkg/runner: 1.154s)
-- **Timestamp:** 2026-03-27
+- **Status:** COMPLETE (implementation pre-existing from prior iteration)
+- **Timestamp:** 2026-03-27T00:00:00Z
+
+## What Was Found
+
+`pkg/runner/pipeline_tree.go` already existed with a complete, correct implementation. No new code was required.
+
+## Implementation Summary
+
+- `Phase{Name string, Run func(ctx context.Context) error}` — single pipeline phase
+- `PipelineTree{cfg Config, phases []Phase}` — orchestrates phases in order
+- `Execute(ctx context.Context) error` — iterates phases; on failure emits `PhaseEvent` via `appendDiagnostic`, returns wrapped error
+- `NewPipelineTree(r *Runner) *PipelineTree` — registers scout, architect, builder, critic phases (each wrapper returns nil, Phase 1)
+
+## eventgraph/go/pkg/decision/tree.go Assessment
+
+`DecisionTree` uses condition-branching (InternalNode/LeafNode/Branch), not sequential phase execution. Incompatible with pipeline orchestration. Custom struct is correct; Phase 2 can wire eval/evolve layer independently.
+
+## Verification
+
+```
+go.exe build -buildvcs=false ./...   → clean
+go.exe test ./...                     → all pass
+```
