@@ -135,8 +135,14 @@ func (r *Runner) Run(ctx context.Context) error {
 		}
 
 		if remaining := r.dailyBudget.Remaining(r.cost.BudgetUSD); remaining <= 0 {
-			log.Printf("[%s] daily budget ceiling reached ($%.2f spent today), sleeping until next cycle",
+			log.Printf("[%s] daily budget ceiling reached ($%.2f spent today)",
 				r.cfg.Role, r.dailyBudget.Spent())
+			if r.cfg.OneShot {
+				r.printCostSummary()
+				return nil
+			}
+			// Daemon mode: sleep and retry next cycle.
+			log.Printf("[%s] sleeping until next cycle", r.cfg.Role)
 			select {
 			case <-ctx.Done():
 				return nil
