@@ -1,41 +1,39 @@
-# Critique: [hive:builder] Add early return on `empty_sections` with cost fields in `runReflector`
+# Critique: [hive:builder] Expand marker candidates in `parseReflectorOutput` (start and boundary detection)
 
-**Verdict:** REVISE
+**Verdict:** PASS
 
-**Summary:** ## Critic Review — Iteration 323
+**Summary:** ## Critic Review — Iteration 324
 
 ### Derivation chain
 
-Scout identified two bugs: (1) parser missing `**KEY**:` format variants, and (2) no early return on `empty_sections`. Builder scoped to bug #2 only — the early return + cost fields. The build report accurately describes the scope. The code change is small and correct: +8 lines to `runReflector`, adds cost fields and a `return`.
+Scout identified Bug #1 (parser missing format variants) in a prior iteration. Builder implemented `markerCandidates()` and rewired `parseReflectorOutput()` to try all 7 variants per key, picking earliest-occurring. Tests added for all new variants.
 
-### Code correctness
+### Logic correctness
 
-The production fix is correct:
-- `usage := resp.Usage()` extracted to avoid double-call. ✓
-- `CostUSD`, `InputTokens`, `OutputTokens` populated in `PhaseEvent`. ✓
-- `return` added after `appendDiagnostic` — execution cannot reach `appendReflection` or `advanceIterationCounter`. ✓
-- `Timestamp` not set in `PhaseEvent` — handled correctly by `appendDiagnostic` which sets it if empty (diagnostic.go:26-28). ✓
+**Start detection:** Earliest-index-wins across all candidates is correct. When `**COVER:**` matches at 0 and `COVER:` matches at 2 (as a substring), index 0 wins and `bestEnd` = 0 + len(`**COVER:**`) = 10. Content starts correctly after the full marker.
 
-### Test coverage (VERIFIED — invariant 12)
+**Boundary detection:** Same candidate set for next-key scanning. The "mixed formats" test validates cross-format boundaries — COVER using `**COVER:**`, BLIND using `## BLIND:` — and confirms COVER does not bleed into BLIND's content. This is the critical negative assertion.
 
-`TestRunReflectorEmptySectionsDiagnostic` exists and was passing before this commit. It verifies the diagnostic write. But the **new behavioral claim** of this commit is: *when sections are empty, `reflections.md` is not written and `state.md` counter is not incremented*. The test does not verify either of these absences.
+**`## KEY:` vs `### KEY:` false-match risk:** `"## COVER:"` = `['#','#',' ','C'...]` is NOT a substring of `"### COVER:"` = `['#','#','#',' ','C'...]` — they differ at index 2. No false match.
 
-Specifically:
-- No assertion that `reflections.md` does not exist (or was not appended to) after the `empty_sections` path.
-- No assertion that `state.md` still reads `Iteration 5,` (the initial value) after the call — i.e., that the counter was not bumped.
+**Lowercase candidate risk:** `blind:` in the candidate list could match "blind:" appearing mid-sentence in COVER content, causing a false boundary. This is a theoretical concern, but it existed previously with `BLIND:` (uppercase). The LLM output is unlikely to contain these exact words with colons in body text.
 
-If someone removed the `return`, the existing test would still pass. The derivation (early return prevents corruption) has no verification.
+### Test coverage (Invariant 12)
 
-**Invariant 12 applies directly:** "If the Critic can't point to a test that covers the change, REVISE." The change is the early return — and the test doesn't cover it.
+All 7 `markerCandidates()` variants are tested. Critically:
+- `TestRunReflectorEmptySectionsDiagnostic` (from b871c21) contains both absence assertions: `reflections.md should not exist after empty_sections early return` and `state.md iteration counter was advanced despite empty_sections early return`. The behavioral contract from Lesson 83 is already enforced.
+- The "mixed formats boundary detection" test asserts the negative (`COVER bled into BLIND`). Lesson 82's requirement is satisfied.
 
-### Scope note (not a REVISE)
+### Process observation
 
-Bug #1 (parser not handling `**COVER**:` format) remains open. This means the loop will keep emitting `empty_sections` diagnostics — the early return now handles those gracefully, but the root cause is unresolved. That's a legitimate one-bug-per-iteration choice; it belongs on the Scout's radar for iteration 324.
+`loop/build.md` in this commit documents b871c21 (the previous close), not d3188cb. The Builder shipped new code without updating build.md to reflect this iteration's work. The close.sh bundled the Reflector artifacts for iteration 323 together with the Builder's iteration 324 code, leaving build.md stale. This breaks the audit trail — the next Reflector will reflect on an artifact that describes the *previous* Builder's work. Not a correctness issue but a process gap worth flagging.
+
+### Invariants
+
+- **IDENTITY (11):** Not applicable — no ID/name usage.
+- **BOUNDED (13):** `markerCandidates()` returns a fixed 7-element slice. `keys` is a fixed 4-element slice. No unbounded loops.
+- **VERIFIED (12):** Tests present and complete, including absence assertions.
 
 ---
 
-VERDICT: REVISE
-
-**Required fix:** Add two assertions to `TestRunReflectorEmptySectionsDiagnostic`:
-1. After `runReflector` returns, assert `reflections.md` does NOT exist (or is empty) — the early return must prevent the append.
-2. Assert `state.md` still contains `Iteration 5,` — the counter must NOT have been incremented.
+VERDICT: PASS

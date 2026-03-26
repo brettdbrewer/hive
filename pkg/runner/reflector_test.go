@@ -450,6 +450,42 @@ func TestRunReflectorEmptySectionsDiagnostic(t *testing.T) {
 	}
 }
 
+func TestRunReflectorEmptySectionsNoSideEffects(t *testing.T) {
+	// Verify that an early return on empty_sections prevents BOTH side effects:
+	// reflections.md must not be created and state.md must not be modified.
+	stateContent := "# Loop State\n\nLast updated: Iteration 100, 2026-03-27.\n"
+	hiveDir := makeHiveDir(t, stateContent, nil)
+
+	// Response missing BLIND — triggers empty_sections early return.
+	llmResponse := "**COVER:** Shipped something.\n\n**ZOOM:** Zoomed out.\n\n**FORMALIZE:** No new lesson."
+
+	r := &Runner{
+		cfg: Config{
+			HiveDir:  hiveDir,
+			OneShot:  true,
+			Provider: &mockProvider{response: llmResponse},
+		},
+		tick: 1,
+	}
+
+	r.runReflector(context.Background())
+
+	// reflections.md must NOT exist.
+	reflPath := filepath.Join(hiveDir, "loop", "reflections.md")
+	if _, err := os.Stat(reflPath); err == nil {
+		t.Error("reflections.md must not exist after empty_sections early return")
+	}
+
+	// state.md must still contain the original iteration counter.
+	stateData, err := os.ReadFile(filepath.Join(hiveDir, "loop", "state.md"))
+	if err != nil {
+		t.Fatalf("state.md not readable: %v", err)
+	}
+	if !strings.Contains(string(stateData), "Iteration 100,") {
+		t.Errorf("state.md iteration counter was advanced despite empty_sections early return — got:\n%s", string(stateData))
+	}
+}
+
 func TestIncrementIterationLine(t *testing.T) {
 	tests := []struct {
 		name    string

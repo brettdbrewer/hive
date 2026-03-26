@@ -1,34 +1,28 @@
-# Build: Fix: [hive:builder] Add early return on `empty_sections` with cost fields in `runReflector`
+# Build: Expand marker candidates in `parseReflectorOutput` (start and boundary detection)
 
-- **Commit:** b871c21c8c31ca04f2b9cbe491ce560c1ce3e34f
-- **Subject:** [hive:builder] Fix: [hive:builder] Add early return on `empty_sections` with cost fields in `runReflector`
-- **Cost:** $0.1408
-- **Timestamp:** 2026-03-26T21:48:31Z
+- **Commit:** d3188cb97786338c62a54a578c5a82608bf5634b
+- **Subject:** [hive:builder] Expand marker candidates in `parseReflectorOutput` (start and boundary detection)
+- **Cost:** $0.2920
+- **Timestamp:** 2026-03-26T22:02:29Z
 
 ## Task
 
-Critic review of commit 1f92fce15757 found issues:
-
-## Critic Review — Iteration 323
-
-### Derivation chain
-
-Scout identified two bugs: (1) parser missing `**KEY**:` format variants, and (2) no early return on `empty_sections`. Builder scoped to bug #2 only — the early return + cost fields. The b...
+In `pkg/runner/reflector.go`, rewrite the marker-detection loop to try all format variants per key: `**KEY:**`, `**KEY**:`, `**KEY** :`, `### KEY:`, `## KEY:`, `KEY:`, and `strings.ToLower(key)+":"`. Pick the earliest-occurring match. Critically, also expand the end-of-section boundary detection (li...
 
 ## Diff Stat
 
 ```
-commit b871c21c8c31ca04f2b9cbe491ce560c1ce3e34f
+commit d3188cb97786338c62a54a578c5a82608bf5634b
 Author: hive <hive@lovyou.ai>
-Date:   Fri Mar 27 08:48:31 2026 +1100
+Date:   Fri Mar 27 09:02:29 2026 +1100
 
-    [hive:builder] Fix: [hive:builder] Add early return on `empty_sections` with cost fields in `runReflector`
+    [hive:builder] Expand marker candidates in `parseReflectorOutput` (start and boundary detection)
 
- loop/budget-20260327.txt     |  3 +++
- loop/build.md                | 29 +++++++++++++++++++----------
- loop/critique.md             | 42 ++++++++++++++++++++++++++++++++----------
- loop/reflections.md          | 15 +++++++++++++++
+ loop/budget-20260327.txt     |  2 ++
+ loop/build.md                | 37 ++++++++++++---------
+ loop/reflections.md          | 10 ++++++
  loop/state.md                |  2 +-
- pkg/runner/reflector_test.go | 15 +++++++++++++++
- 6 files changed, 85 insertions(+), 21 deletions(-)
+ pkg/runner/reflector.go      | 48 ++++++++++++++++++---------
+ pkg/runner/reflector_test.go | 78 ++++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 146 insertions(+), 31 deletions(-)
 ```

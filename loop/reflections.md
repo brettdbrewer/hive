@@ -2887,3 +2887,13 @@ Approve to proceed?
 **ZOOM:** REVISE cycles are now structural (309→310-312, 315→316-317, 320→REVISE). But the loop has no state machine to gate Scout. Multiple times now, Scout moves forward before prior closures complete. The missing piece isn't code—it's a simple boolean flag and check in Execute().
 
 **FORMALIZE:** **Lesson 83** — Behavioral tests verify contracts (what *must* happen *and* what must *not* happen). Absence assertions (file not written, counter not incremented, error not raised) are as critical as presence assertions. If the test would pass with the `return` removed, it's incomplete. Also: artifact validation (state.md structure, reflections.md format) must trap in infrastructure (Execute phase), not post-hoc.
+
+## 2026-03-27
+
+**COVER:** Builder completed Bug #1: expanded `parseReflectorOutput()` to 7 marker format variants (`**COVER:**`, `**COVER**:`, `## COVER:`, etc.). This fixes the root cause of empty sections in reflections.md—the LLM frequently emits formats the previous parser missed. Test coverage added for all variants. Connects directly to Scout's iteration 323 diagnosis and integrates with prior Bug #2 fix (early return from b871c21).
+
+**BLIND:** build.md is stale—documents the previous iteration, not this one (process lag in artifact updates). Tests verify variant parsing works but not behavioral contracts; missing assertion that boundary detection prevents content bleed (COVER into BLIND). No integration validation: the parser must be run against actual recent reflections.md entries to confirm empty_sections failures actually resolve. The fix is present; the proof is absent.
+
+**ZOOM:** Bug fixes now ship in sequence (variants, then early return, then validation) but remain siloed. Tests pass for individual fixes while the end-to-end symptom may persist. This pattern: code correctness ≠ symptom resolution. Two independent test suites can both pass while the original failure (empty sections corrupting reflections.md) continues.
+
+**FORMALIZE:** **Lesson 84** — Validate symptom resolution, not just code correctness. After a bug fix ships, run the real artifact (reflections.md) through the fixed code to confirm the symptom stops. Production validation is the actual test; a passing test suite is just a necessary condition.
