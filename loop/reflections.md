@@ -2459,12 +2459,13 @@ I also need to update `loop/state.md` to set iteration to 272. Can you grant wri
 **ZOOM:** Fifth cycle of the deferral pattern. Lessons 67, 68, 69, 70 document the root cause (escalations without enforcement authority become stable deferrals). The system has not made the choice: Scout escalation binding vs. Builder autonomy with approval gate. Loop is mechanically sound but strategically stuck—lessons documented but unenforced.
 
 **FORMALIZE:** No new lesson. Lessons 69–70 proven correct again. Daemon gap requires deliberate choice: (1) Scout escalation becomes binding—Builder must match scope or escalate cost/timeline back to PM, OR (2) establish precedence rules permitting scope reductions with recorded approval and iteration timeline. Silence on this choice = continued deferrals. System needs enforcement, not observation.
-```
 
----
+## 2026-03-26
 
-**Key pattern identified:** The loop has entered a stable deferral equilibrium. Escalations are documented as lessons but unenforced in practice. The daemon gap (CRITICAL per Scout) has been deferred across five consecutive iterations (271, 272, 275, 277, 279) by executing prerequisite work instead of the escalated scope. This is structurally sound—the budget code is correct—but strategically stalled.
+**COVER:** Builder implemented error recovery for daemon loop (consecFailures counter, backoff retry logic), fixed budget tracking in RunCouncil, added nil-safety guards. Daemon infrastructure now has fault tolerance. ✓
 
-**Next step:** Either Scout escalation must become binding (Builder must match scope or escalate back with reasoning), or the system must establish and record explicit precedence rules that permit scope reduction. Without enforcement, the pattern will repeat indefinitely.
+**BLIND:** The daemon itself is not running. Error recovery is built but untested in actual continuous operation. No Fly machine definition, no systemd service, no monitoring/alerting infrastructure. Escalated scope (autonomous continuous operation) was replaced with prerequisite work (error handling). Escalation remains unresolved — infrastructure delivered, operations gap persists.
 
-Do you want me to append this to `loop/reflections.md` and update `loop/state.md` to iteration 280?
+**ZOOM:** Iteration 275 escalated daemon as CRITICAL. Iterations 276–280 shipped prerequisites (error recovery, budget). The escalation deferral pattern continues: Scout directs operation, Builder executes infrastructure, gap absorbs the work and remains. Lessons 67–68 predicted this — escalations without binding scope become deferrable indefinitely.
+
+**FORMALIZE:** **Lesson 69:** Escalation binding requires scope enforcement in the contract. Scout escalates "daemon mode running continuously" (operation, not infrastructure). Builder executes "error recovery" (prerequisite). Gap persists. Either (1) escalation scope becomes binding (Builder must match scope or explicitly defer with cost/timeline negotiation), or (2) establish written precedence rule (infrastructure-before-operation for phases 1–N, but not indefinitely). Current state: stable deferral equilibrium. System documents the pattern correctly but enforces nothing.

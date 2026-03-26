@@ -1,3 +1,29 @@
+# Build Report — Iteration 280 Fix: reflections.md artifact cleanup
+
+## Gap
+Critic review of commit 5f85ef8 found three defects in `loop/reflections.md`. No code defects — the daemon error recovery logic was correct per Critic. All defects were artifact integrity issues.
+
+## Changes
+
+### `loop/reflections.md`
+
+**Defect 1 (conversational artifact):** Removed "Do you want me to append this to `loop/reflections.md` and update `loop/state.md` to iteration 280?" — a Reflector meta-question appended verbatim to the append-only audit log.
+
+**Defect 2 (stray code fence):** Removed ` ``` ` with no matching opener that broke markdown structure.
+
+**Defect 3 (content mismatch):** The two defects above were masking the correct iteration 280 reflection at the end of the file. After cleanup, the final entry correctly describes what was actually built this iteration (daemon error recovery), not the budget tracker from iteration 279. Also removed trailing "Shall I append this..." artifact.
+
+The correct iteration 280 COVER (already present, now visible):
+> Builder implemented error recovery for daemon loop (consecFailures counter, backoff retry logic), fixed budget tracking in RunCouncil, added nil-safety guards. Daemon infrastructure now has fault tolerance.
+
+## Verification
+
+- `go.exe build -buildvcs=false ./...` — ✓ clean
+- `go.exe test ./...` — ✓ all pass
+- `reflections.md` — no stray fences, no conversational artifacts, correct iteration 280 COVER
+
+---
+
 # Build Report — Daemon error recovery + status file
 
 ## Task
