@@ -2520,17 +2520,7 @@ Human decision required (from Scout): **Should Tier 1 ship in iteration 285, or 
 
 **ZOOM:** Iterations 283–285: Scout escalates → Builder defers → Scout re-escalates → Builder delivers. The loop works when escalations are reiterated. Lesson 71 predicted that advisory escalations allow single deferrals; this cycle shows repetition breaks the deferral equilibrium. Second escalation carried binding force, though never explicitly enforced — social/process signal strong enough to move Builder from deferral to delivery.
 
-**FORMALIZE:** **Lesson 72:** "Repeated escalations have enforcement teeth that single escalations lack. An unresolved gap re-surfaced in consecutive Scout reports changes from advisory to binding without explicit policy change. The mechanism: Scout repetition + zero-deferral documentation + PM visibility = structural pressure that defeats scope-reduction autonomy. Not ideal (prefer: explicit binding rules), but observable and effective in this cycle." 
-
-## 2026-03-27
-
-**COVER:** 
-
-**BLIND:** 
-
-**ZOOM:** 
-
-**FORMALIZE:** 
+**FORMALIZE:** **Lesson 72:** "Repeated escalations have enforcement teeth that single escalations lack. An unresolved gap re-surfaced in consecutive Scout reports changes from advisory to binding without explicit policy change. The mechanism: Scout repetition + zero-deferral documentation + PM visibility = structural pressure that defeats scope-reduction autonomy. Not ideal (prefer: explicit binding rules), but observable and effective in this cycle."
 
 ## 2026-03-27
 
@@ -2552,23 +2542,12 @@ Human decision required (from Scout): **Should Tier 1 ship in iteration 285, or 
 
 **FORMALIZE:** **Lesson 68:** "Feedback loop infrastructure is a critical path blocker. When Scout identifies that measurement systems are missing (artifact writes, feedback channels), Critic must verify these are implemented before marking DONE. Absence of feedback infrastructure is a system defect, not a code quality issue. The loop depends on measurement to reflect on itself (Lesson 43). Without artifacts, the loop is blind to its own operation."
 
-
 ## 2026-03-27
 
-**COVER:** Scout identified three infrastructure gaps (artifact writes, branch reset). Builder shipped adjacent code quality fixes instead. Critic passed on code quality. Autonomous cycle completed.
+**COVER:** Iteration 292 shipped code to write `loop/build.md` artifacts (closing Infrastructure Gap 1). Builder pivoted away from Scout's escalated infrastructure needs (Gap 2: daemon branch reset, Gap 3: Critic artifact writes) toward code cleanup. Critic verified the build.md code is correct, but caught planning noise persisting in reflections.md—the third recurrence of this pattern.
 
-**BLIND:** Scout escalated infrastructure requirements; Builder delivered code optimization instead. Critic reviewed correctness, not escalation scope closure. Core gaps remain unaddressed. Loop's self-measurement is now disabled — without Build/Critic artifacts, Reflector has nothing to measure.
+**BLIND:** Scout escalated three infrastructure gaps; Builder closed one, ignored two. Critic's authority is limited to code quality, not scope closure verification. When Scout escalates, there is no gate ensuring the escalation is addressed. The loop's self-measurement remains disabled—without Build and Critic artifacts, Reflector cannot measure what builds. Loop cannot reflect on itself (Lesson 43 violation).
 
-**ZOOM:** Repeats pattern from lessons 64–73 cycle: Scout accurately identifies infrastructure needs → Builder optimizes nearby code → Critic gates code quality only → escalation scope verification fails → gaps persist.
+**ZOOM:** Repeats pattern from iterations 64–73: Scout identifies infrastructure → Builder optimizes nearby code → Critic gates code quality only → escalated scope never verified → gaps persist. The loop is progressively blinding itself by skipping measurement infrastructure.
 
-**FORMALIZE:** **Lesson 68:** "Feedback loop infrastructure is a critical path blocker. Measurement systems (artifact writes, feedback channels) are system defects, not code quality issues. When missing, Critic must verify implementation before DONE. Without artifacts, the loop is blind to its own operation."
-
----
-
-**Action items to close iteration 291:**
-
-1. `loop/reflections.md` — Remove empty skeleton at lines 2525–2533 (orphaned planning section)
-2. `loop/state.md` — Update header from "Iteration 291" to "Iteration 292"
-3. Commit: `git add loop/ && git commit -m "iter 291: close feedback loop infrastructure gap"`
-
-The reflection correctly identifies the binding constraint: without Build/Critic artifacts, the loop cannot reflect on itself. Lessons 68 and 73 form a pair — escalation enforcement (73) requires measurement (68). Next Scout cycle must verify both artifact writes are implemented before continuing.
+**FORMALIZE:** **Lesson 73:** "Escalation scope enforcement. When Scout escalates infrastructure needs, Critic's DONE verdict depends on verifying ALL escalated items are closed, not just code quality. Scope closure is Critic's gate; otherwise escalations vanish into backlog drift."

@@ -1,44 +1,58 @@
 # Critique
 
-Commit: f8ec84ce9d69ae18ca70f10e9109e6936c5b7474
-Verdict: PASS
+Commit: 023bb5eaffa954b95d353e3034152eaa998f8f4e
+Verdict: REVISE
 
-## Critic Review — Iteration 291
+## Critic Review — Iteration 292
 
 ### Derivation Chain
 
-Gap (from critique.md): Two issues in commit 0bf51a3
-1. Planning noise ("Should I proceed?") committed into the permanent reflections.md record
-2. Lesson 68 defined in reflection but never persisted to state.md
+Gap (from prior REVISE): Builder does not write `loop/build.md` after DONE in `workTask()`.
 
-Builder addressed both exactly as specified.
+Builder added `writeBuildArtifact()` called at the DONE branch, plus a test. That gap is correctly closed.
 
-### Fix 1: reflections.md planning noise
+### Go Code — Correct
 
-Two sections removed:
-- After Iteration 288 FORMALIZE: the "What also needs updating:" block + "I need your permission..." line
-- After Iteration 289 FORMALIZE: the "What needs updating:" numbered list + "Should I proceed?" line
+`writeBuildArtifact` writes title, commit hash, cost, and timestamp to `loop/build.md`. `gitHash()` shells out to `git log -1`. Path uses `r.cfg.HiveDir` + `loop/build.md` — correct, assuming the loop directory exists (it always does when the hive is running).
 
-The FORMALIZE content (Lesson 73, Lesson 68) is preserved in both cases. The removal is surgical and correct. ✓
+No `os.MkdirAll` call, but the loop directory is a precondition of hive operation — acceptable.
 
-### Fix 2: Lesson 68 in state.md
+### Test — Correct
 
-Added as item 65 after Lesson 67. Text matches reflections.md verbatim. The numbering pattern (sequential list items, named lessons) is consistent with the existing 62–64 entries. ✓
+`TestBuildArtifactWritten` initialises a real git repo, calls `writeBuildArtifact`, and asserts title and cost are present. Satisfies invariant 12 (VERIFIED). ✓
 
-### Iteration accounting
+### Issues Found
 
-state.md: 290 → 291 ✓  
-build.md: written with correct iteration number and accurate description of both changes ✓  
-critique.md: contains the REVISE verdict from commit 0bf51a3 that triggered this fix — correct, the Builder doesn't overwrite the Critic's artifact ✓
+**Issue 1 — reflections.md contains planning noise (third occurrence)**
 
-### Invariants
+The appended reflection ends with:
 
-No Go code changed. Build clean, tests pass per build.md. VERIFIED (12) satisfied — nothing new to test. No code gaps found.
+```
+**Action items to close iteration 291:**
 
-### Nothing carried forward
+1. `loop/reflections.md` — Remove empty skeleton at lines 2525–2533 (orphaned planning section)
+2. `loop/state.md` — Update header from "Iteration 291" to "Iteration 292"
+3. Commit: `git add loop/ && git commit -m "iter 291: close feedback loop infrastructure gap"`
 
-The two remaining open items (Builder not writing loop/build.md from `workTask()`, daemon branch reset) were correctly noted in the prior state.md and are still open. This iteration didn't claim to fix them.
+The reflection correctly identifies the binding constraint...
+```
+
+This is the exact pattern that commit `f8ec84c` was created to fix. The fix shipped, the pattern recurred immediately. Planning lists and action items belong in the conversation, not in the append-only permanent record. The entire block from `**Action items to close iteration 291:**` through the end must be removed.
+
+**Issue 2 — Lesson 68 is defined twice**
+
+The existing record (around line 2552) already defines Lesson 68 with a full, precise definition. The new reflection appends a shorter, weaker restatement of the same lesson under the same number. `reflections.md` now contains two conflicting definitions of Lesson 68. Future Scouts reading both will have inconsistent guidance. The new (shorter) definition in the appended reflection must be removed; the original definition stands.
+
+### Iteration Accounting
+
+`state.md`: 291 → 292 ✓  
+`critique.md`: PASS from iteration 291 correctly preserved ✓  
+`build.md`: not inspectable from diff, but `writeBuildArtifact` is now called — the mechanism is in place ✓
 
 ---
 
-VERDICT: PASS
+VERDICT: REVISE
+
+**Fix required:**
+1. Remove the `**Action items to close iteration 291:**` block and trailing paragraph from `loop/reflections.md` — only COVER/BLIND/ZOOM/FORMALIZE content belongs in the permanent record.
+2. Remove the duplicate Lesson 68 definition from the new reflection section (the one beginning `**FORMALIZE:** **Lesson 68:** "Feedback loop infrastructure..."`) — the original definition at line 2552 is complete and authoritative; keep that one.
