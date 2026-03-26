@@ -352,25 +352,62 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 
 // ─── Daemon mode ─────────────────────────────────────────────────────
 
+const (
+	daemonMaxConsecFailures = 3
+	daemonBackoffInterval   = 5 * time.Minute
+)
+
 // runDaemon loops runPipeline at the given interval until SIGINT/SIGTERM.
+// On pipeline failure it retries after a short backoff. After 3 consecutive
+// failures it halts. Writes loop/daemon.status after each cycle.
 func runDaemon(space, apiBase, repoPath string, budget float64, agentID string, repoMap map[string]string, interval time.Duration) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	hiveDir := findHiveDir()
+	statusPath := filepath.Join(hiveDir, "loop", "daemon.status")
+
 	log.Printf("[daemon] starting: interval=%v space=%s", interval, space)
 	cycle := 0
+	consecFailures := 0
+
 	for {
 		cycle++
 		start := time.Now()
 		log.Printf("[daemon] ── cycle %d start ──", cycle)
 
-		if err := runPipeline(space, apiBase, repoPath, budget, agentID, repoMap); err != nil {
-			log.Printf("[daemon] cycle %d error: %v", cycle, err)
-		}
+		pipelineErr := runPipeline(space, apiBase, repoPath, budget, agentID, repoMap)
 
 		elapsed := time.Since(start)
+
+		var statusLine string
+		if pipelineErr != nil {
+			consecFailures++
+			log.Printf("[daemon] ████ cycle %d FAILED (%d/%d consecutive): %v ████",
+				cycle, consecFailures, daemonMaxConsecFailures, pipelineErr)
+			statusLine = fmt.Sprintf("cycle=%d error: %v", cycle, pipelineErr)
+			writeDaemonStatus(statusPath, statusLine)
+
+			if consecFailures >= daemonMaxConsecFailures {
+				return fmt.Errorf("[daemon] halting after %d consecutive failures — last error: %w",
+					daemonMaxConsecFailures, pipelineErr)
+			}
+
+			log.Printf("[daemon] backing off %v before retry (cycle %d)", daemonBackoffInterval, cycle+1)
+			select {
+			case <-ctx.Done():
+				log.Printf("[daemon] shutdown during backoff after cycle %d", cycle)
+				return nil
+			case <-time.After(daemonBackoffInterval):
+			}
+			continue
+		}
+
+		consecFailures = 0
 		next := time.Now().Add(interval)
 		log.Printf("[daemon] cycle %d complete in %v, next run at %s", cycle, elapsed.Round(time.Second), next.Format("15:04:05"))
+		statusLine = fmt.Sprintf("cycle=%d ok", cycle)
+		writeDaemonStatus(statusPath, statusLine)
 
 		select {
 		case <-ctx.Done():
@@ -378,6 +415,13 @@ func runDaemon(space, apiBase, repoPath string, budget float64, agentID string, 
 			return nil
 		case <-time.After(interval):
 		}
+	}
+}
+
+// writeDaemonStatus writes a one-line status to the daemon status file.
+func writeDaemonStatus(path, line string) {
+	if err := os.WriteFile(path, []byte(line+"\n"), 0o644); err != nil {
+		log.Printf("[daemon] warning: could not write status file %s: %v", path, err)
 	}
 }
 

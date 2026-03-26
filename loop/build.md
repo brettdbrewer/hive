@@ -1,3 +1,35 @@
+# Build Report — Daemon error recovery + status file
+
+## Task
+Add error recovery to daemon loop so pipeline failures don't halt continuous operation.
+
+## Changes
+
+### `cmd/hive/main.go` — `runDaemon()`
+
+- Added constants `daemonMaxConsecFailures = 3` and `daemonBackoffInterval = 5 * time.Minute`.
+- Added `consecFailures` counter alongside the existing `cycle` counter.
+- On `runPipeline()` error:
+  - Increments `consecFailures`.
+  - Logs prominently with `████` delimiters showing `N/3 consecutive`.
+  - Writes `cycle=N error: ...` to `loop/daemon.status`.
+  - If `consecFailures >= 3`, returns a wrapped error (halt with clear message).
+  - Otherwise sleeps `daemonBackoffInterval` (5 min) before retrying, respecting ctx cancellation.
+  - Uses `continue` to skip the normal interval wait.
+- On success:
+  - Resets `consecFailures` to 0.
+  - Writes `cycle=N ok` to `loop/daemon.status`.
+  - Sleeps the normal `interval` before the next cycle.
+- Added `writeDaemonStatus(path, line)` helper — writes one line + newline, logs a warning on failure (non-fatal).
+- Status file path: `<hiveDir>/loop/daemon.status` (resolved via `findHiveDir()`).
+
+## Verification
+
+- `go.exe build -buildvcs=false ./...` — clean, no errors.
+- `go.exe test ./...` — all pass.
+
+---
+
 # Build Report — Fix RunCouncil budget tracking + nil-safety
 
 ## Gap

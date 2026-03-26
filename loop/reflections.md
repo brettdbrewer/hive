@@ -2449,3 +2449,22 @@ I also need to update `loop/state.md` to set iteration to 272. Can you grant wri
 **ZOOM:** Iterations 271, 272, 275, 277 form a cycle, not progress. Escalations degrade to suggestions; deferral has become structural. The loop passes Critic review because the subset (budget code) is correct. Escalation enforcement requires choosing who decides: Scout (binding scope) or Builder (binding reductions with approval).
 
 **FORMALIZE:** **Lesson 70:** Escalation authority without scope enforcement creates stable deferrals. Budget code is correct but daemon gap reopens every cycle. Either: (1) Scout escalation is binding—Builder must match scope or escalate the gap back to PM with cost/time reasoning, OR (2) establish precedence rules permitting scope reductions (prerequisite-first strategy) with recorded approval. Silence is not consent. Choose one.
+
+## 2026-03-26
+
+**COVER:** Scout escalated daemon mode as CRITICAL (three revenue paths blocked: Lovatts engagement, SaaS, vision credibility). Builder delivered file-backed daily budget tracker with nil-safety fixes—sound work, tested, shipped to production. Budget code is prerequisite infrastructure for daemon mode, not daemon itself. Gap persists into iteration 280.
+
+**BLIND:** Builder's autonomy to execute a subset of escalated scope goes unquestioned. No recorded approval for scope reduction. No explicit deferral decision or timeline. Escalation has no binding authority; it degrades to advisory. Same pattern as iterations 271, 272, 275, 277: Scout escalates X → Builder reduces to prerequisite Y → Critic passes Y → gap X reopens.
+
+**ZOOM:** Fifth cycle of the deferral pattern. Lessons 67, 68, 69, 70 document the root cause (escalations without enforcement authority become stable deferrals). The system has not made the choice: Scout escalation binding vs. Builder autonomy with approval gate. Loop is mechanically sound but strategically stuck—lessons documented but unenforced.
+
+**FORMALIZE:** No new lesson. Lessons 69–70 proven correct again. Daemon gap requires deliberate choice: (1) Scout escalation becomes binding—Builder must match scope or escalate cost/timeline back to PM, OR (2) establish precedence rules permitting scope reductions with recorded approval and iteration timeline. Silence on this choice = continued deferrals. System needs enforcement, not observation.
+```
+
+---
+
+**Key pattern identified:** The loop has entered a stable deferral equilibrium. Escalations are documented as lessons but unenforced in practice. The daemon gap (CRITICAL per Scout) has been deferred across five consecutive iterations (271, 272, 275, 277, 279) by executing prerequisite work instead of the escalated scope. This is structurally sound—the budget code is correct—but strategically stalled.
+
+**Next step:** Either Scout escalation must become binding (Builder must match scope or escalate back with reasoning), or the system must establish and record explicit precedence rules that permit scope reduction. Without enforcement, the pattern will repeat indefinitely.
+
+Do you want me to append this to `loop/reflections.md` and update `loop/state.md` to iteration 280?
