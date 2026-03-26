@@ -305,6 +305,22 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 			}
 		}
 
+		// After Architect, check if tasks actually exist. If not, skip remaining roles.
+		if role == "builder" || role == "critic" || role == "reflector" {
+			openTasks, _ := client.GetTasks(space, "")
+			hasOpen := false
+			for _, t := range openTasks {
+				if t.Kind == "task" && t.State != "done" && t.State != "closed" {
+					hasOpen = true
+					break
+				}
+			}
+			if !hasOpen {
+				log.Printf("[pipeline] no open tasks — skipping %s (nothing to work on)", role)
+				continue
+			}
+		}
+
 		log.Printf("[pipeline] ── %s ── (repo: %s)", role, filepath.Base(activeRepo))
 
 		model := runner.ModelForRole(role)
