@@ -10,36 +10,54 @@ import (
 	"time"
 )
 
+// markerCandidates returns all format variants the LLM might use for a section key.
+// Callers pick the earliest-occurring match across the set.
+func markerCandidates(key string) []string {
+	return []string{
+		"**" + key + ":**",
+		"**" + key + "**:",
+		"**" + key + "** :",
+		"### " + key + ":",
+		"## " + key + ":",
+		key + ":",
+		strings.ToLower(key) + ":",
+	}
+}
+
 // parseReflectorOutput extracts COVER/BLIND/ZOOM/FORMALIZE sections from
-// reflector LLM output. Sections are delimited by "**KEY:**" or "KEY:" markers.
+// reflector LLM output. Tries all format variants per key and picks the
+// earliest-occurring match. The same candidate set is used for boundary
+// detection so sections using any variant are correctly terminated.
 // Returns a map of section name → trimmed content.
 func parseReflectorOutput(content string) map[string]string {
 	keys := []string{"COVER", "BLIND", "ZOOM", "FORMALIZE"}
 	result := map[string]string{}
 
 	for i, key := range keys {
-		// Try bold markdown first: **KEY:**
-		marker := "**" + key + ":**"
-		idx := strings.Index(content, marker)
-		markerLen := len(marker)
-
-		if idx < 0 {
-			// Fallback: plain KEY:
-			marker = key + ":"
-			idx = strings.Index(content, marker)
-			markerLen = len(marker)
+		// Find the earliest-occurring marker among all candidates.
+		bestIdx := -1
+		bestEnd := -1
+		for _, candidate := range markerCandidates(key) {
+			if idx := strings.Index(content, candidate); idx >= 0 {
+				if bestIdx < 0 || idx < bestIdx {
+					bestIdx = idx
+					bestEnd = idx + len(candidate)
+				}
+			}
 		}
-		if idx < 0 {
+		if bestIdx < 0 {
 			continue
 		}
 
-		start := idx + markerLen
+		start := bestEnd
 
 		// Find where this section ends (start of next section).
+		// Check all candidate formats for each subsequent key so that a section
+		// using e.g. "## BLIND:" is found as the boundary for COVER.
 		end := len(content)
 		for _, nextKey := range keys[i+1:] {
-			for _, nextMarker := range []string{"**" + nextKey + ":**", nextKey + ":"} {
-				if nextIdx := strings.Index(content[start:], nextMarker); nextIdx >= 0 {
+			for _, nextCandidate := range markerCandidates(nextKey) {
+				if nextIdx := strings.Index(content[start:], nextCandidate); nextIdx >= 0 {
 					if abs := start + nextIdx; abs < end {
 						end = abs
 					}

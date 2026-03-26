@@ -108,6 +108,84 @@ func TestParseReflectorOutput(t *testing.T) {
 			t.Errorf("COVER not trimmed: %q", got["COVER"])
 		}
 	})
+
+	t.Run("bold-colon-outside variant **KEY**:", func(t *testing.T) {
+		input := "**COVER**: Shipped auth fix.\n**BLIND**: No rollback.\n**ZOOM**: Pattern.\n**FORMALIZE**: No new lesson."
+		got := parseReflectorOutput(input)
+		if !strings.Contains(got["COVER"], "Shipped auth fix") {
+			t.Errorf("COVER = %q", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "No rollback") {
+			t.Errorf("BLIND = %q", got["BLIND"])
+		}
+	})
+
+	t.Run("bold-space-colon variant **KEY** :", func(t *testing.T) {
+		input := "**COVER** : Done.\n**BLIND** : Missed.\n**ZOOM** : Big picture.\n**FORMALIZE** : No new lesson."
+		got := parseReflectorOutput(input)
+		if !strings.Contains(got["COVER"], "Done") {
+			t.Errorf("COVER = %q", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "Missed") {
+			t.Errorf("BLIND = %q", got["BLIND"])
+		}
+	})
+
+	t.Run("h3 heading ### KEY:", func(t *testing.T) {
+		input := "### COVER:\nShipped.\n\n### BLIND:\nMissed.\n\n### ZOOM:\nBig picture.\n\n### FORMALIZE:\nNo new lesson."
+		got := parseReflectorOutput(input)
+		if !strings.Contains(got["COVER"], "Shipped") {
+			t.Errorf("COVER = %q", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "Missed") {
+			t.Errorf("BLIND = %q", got["BLIND"])
+		}
+	})
+
+	t.Run("h2 heading ## KEY:", func(t *testing.T) {
+		input := "## COVER:\nShipped.\n\n## BLIND:\nMissed.\n\n## ZOOM:\nBig picture.\n\n## FORMALIZE:\nNo new lesson."
+		got := parseReflectorOutput(input)
+		if !strings.Contains(got["COVER"], "Shipped") {
+			t.Errorf("COVER = %q", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "Missed") {
+			t.Errorf("BLIND = %q", got["BLIND"])
+		}
+	})
+
+	t.Run("lowercase key:", func(t *testing.T) {
+		input := "cover: Shipped.\nblind: Missed.\nzoom: Big picture.\nformalize: No new lesson."
+		got := parseReflectorOutput(input)
+		if !strings.Contains(got["COVER"], "Shipped") {
+			t.Errorf("COVER = %q", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "Missed") {
+			t.Errorf("BLIND = %q", got["BLIND"])
+		}
+	})
+
+	t.Run("mixed formats boundary detection", func(t *testing.T) {
+		// COVER uses **COVER:**, BLIND uses ## BLIND: — tests that the boundary
+		// for COVER is found even though BLIND uses a different format.
+		input := "**COVER:** Shipped the entity pipeline.\n\n## BLIND:\nNo tests written.\n\n### ZOOM:\nPattern converging.\n\n**FORMALIZE**: No new lesson."
+		got := parseReflectorOutput(input)
+		if !strings.Contains(got["COVER"], "Shipped the entity pipeline") {
+			t.Errorf("COVER = %q", got["COVER"])
+		}
+		// COVER must NOT bleed into BLIND's content
+		if strings.Contains(got["COVER"], "No tests written") {
+			t.Errorf("COVER bled into BLIND: %q", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "No tests written") {
+			t.Errorf("BLIND = %q", got["BLIND"])
+		}
+		if !strings.Contains(got["ZOOM"], "Pattern converging") {
+			t.Errorf("ZOOM = %q", got["ZOOM"])
+		}
+		if !strings.Contains(got["FORMALIZE"], "No new lesson") {
+			t.Errorf("FORMALIZE = %q", got["FORMALIZE"])
+		}
+	})
 }
 
 func TestBuildReflectorPrompt(t *testing.T) {

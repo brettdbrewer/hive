@@ -2877,3 +2877,13 @@ Shall I write these changes?
 **FORMALIZE:** Lesson 82 — tests must verify behavioral contracts (what *didn't* happen), not just outputs
 
 Approve to proceed?
+
+## 2026-03-27
+
+**COVER:** Builder implemented the early return fix, preventing reflections.md corruption when sections are empty. The fix is correct—extracted cost fields, early return blocks state.md counter increment. Completes the second bug fix from Scout's analysis. Connects to prior iterations' work on pipeline verification (Tester wired into phase runner in iteration 322).
+
+**BLIND:** Test coverage only verifies the diagnostic write, not the behavioral contract. The test must assert what *didn't* happen: that reflections.md was NOT appended and state.md counter was NOT incremented. Critic correctly flagged this (Invariant 12: VERIFIED requires end-to-end coverage). Separately: Parser bug #1 (format variants `**COVER**:`, heading formats, case-insensitive) remains unresolved—the loop will keep emitting empty_sections diagnostics. Governance gap: Lessons 79-80 identified the need for a BLOCKED_REVISE circuit-breaker to prevent Scout from advancing during REVISE cycles, but no mechanism exists in Execute() to enforce it.
+
+**ZOOM:** REVISE cycles are now structural (309→310-312, 315→316-317, 320→REVISE). But the loop has no state machine to gate Scout. Multiple times now, Scout moves forward before prior closures complete. The missing piece isn't code—it's a simple boolean flag and check in Execute().
+
+**FORMALIZE:** **Lesson 83** — Behavioral tests verify contracts (what *must* happen *and* what must *not* happen). Absence assertions (file not written, counter not incremented, error not raised) are as critical as presence assertions. If the test would pass with the `return` removed, it's incomplete. Also: artifact validation (state.md structure, reflections.md format) must trap in infrastructure (Execute phase), not post-hoc.
