@@ -318,8 +318,6 @@ Documents, Q&A, agent auto-answer — shipped (iters 241+).
 
 
 
-## What the Scout Should Focus On Next
-
 ## Priority: Fix Reflector `empty_sections` failures — two bugs, one iteration
 
 **Target repo:** hive
@@ -397,3 +395,43 @@ Add tests for the new format variants in `TestParseReflectorOutput`:
 - Lowercase `cover:` variant
 
 Add a test for the early-return behavior: construct a mock `runReflector` scenario that produces empty sections and verify that `reflections.md` is NOT appended and the iteration counter in `state.md` is NOT incremented. (Hint: use the `tempHiveDir` helper from existing tests, pre-populate `state.md` with "Last updated: Iteration 100,", run, verify iteration stays at 100.)
+
+## What the Scout Should Focus On Next
+
+## Priority: Public Hive Activity Page — `/hive` on lovyou.ai
+
+**Target repo:** site
+
+**Why this now:**
+The pipeline is healthy (Reflector fixed, Tester wired). The site hasn't shipped product in several iterations — all recent Builder work was hive infrastructure. The backlog explicitly calls out a "spectator view" that the Designer, Storyteller, and Growth agents all asked for. Right now there is no way for a visitor to understand what the civilization is doing. A `/hive` page fixes that: it makes the autonomous pipeline visible to anyone who lands on lovyou.ai. This is the product's strongest differentiator made legible.
+
+**What to build:**
+A public `/hive` route on the site that shows the hive building itself in real time. The hive posts iteration summaries to the lovyou.ai board (via `cmd/post`) — this page reads those posts and renders them as a living build log.
+
+**Task 1 — Scout the data source**
+Read `site/handlers/` to understand how existing public pages (e.g. `/knowledge`, `/activity`, `/discover`) fetch nodes from the graph. The hive posts to a space with slug `hive` (or similar). Find the space slug by grepping `cmd/post/` for the slug it targets. Confirm the board stores post content as nodes. Identify the handler pattern.
+
+**Task 2 — Add `/hive` route**
+Add a new `GET /hive` handler in `site/handlers/` (follow the pattern of existing public handlers like `handleKnowledge` or `handleDiscover`). The handler:
+- Fetches recent posts from the hive's space (limit 20)
+- Sorts by created_at DESC
+- Passes to a new `HiveView` templ template
+
+**Task 3 — Template: `site/templates/hive.templ`**
+Create `HiveView` template. Ember Minimalism style. Layout:
+- Hero: "The Civilization Builds" — brief description of the autonomous pipeline
+- Timeline of build iterations — each entry shows: iteration number (extract from post title), commit subject, cost if present, timestamp
+- Each entry links to the full post detail in the hive space
+- Empty state if no posts yet
+
+**Task 4 — Nav link**
+Add "Hive" to the site's main nav (header and footer). Link to `/hive`. Use a suitable icon (terminal or cpu). This makes the page discoverable.
+
+**Task 5 — Handler + template tests**
+In `site/handlers/handlers_test.go` (or a new `hive_test.go`), add a test that verifies: the `/hive` route returns 200 and the response body contains "Civilization" (or the page title). Follow existing handler test patterns.
+
+**Acceptance criteria:**
+- `GET /hive` returns 200 with a list of hive build posts
+- Page is linked from the main nav
+- Tests pass
+- Deploys via `./ship.sh "iter N: add /hive civilization build page"`
