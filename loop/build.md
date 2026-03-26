@@ -1,16 +1,8 @@
-# Build: Feed recent diagnostics into PM prompt
+# Build: Test PipelineTree failure path in pkg/runner/pipeline_tree_test.go
 
-## Gap
-PM prompt had no visibility into recent pipeline failures. Phases that fail and burn tokens without producing output were invisible to the PM, so it could keep issuing directives that depended on broken infrastructure.
-
-## Changes
-
-### `pkg/runner/pm.go`
-- Added `readRecentDiagnostics(hiveDir string) string` — reads the last 20 lines of `loop/diagnostics.jsonl`, parses each as a `PhaseEvent`, and formats them as a human-readable list (timestamp, phase, outcome, cost, error).
-- Updated `runPM` to call `readRecentDiagnostics` and pass the result to `buildPMPrompt`.
-- Updated `buildPMPrompt` signature to accept `recentFailures string`.
-- Added `## Recent Pipeline Failures` section to the PM prompt template, placed between "Completed Work" and "Current Scout Directive" so the PM sees failure context before issuing a new directive.
-
-## Verification
-- `go.exe build -buildvcs=false ./...` — success, no errors
-- `go.exe test ./...` — all packages pass (`pkg/runner`: 1.108s)
+- **Files created:**
+  - `pkg/runner/pipeline_tree.go` — `Phase` and `PipelineTree` types; `NewPipelineTree(r *Runner)` wires the four pipeline phases (scout, architect, builder, critic); `Execute(ctx)` runs phases in order and emits a `PhaseEvent{Outcome: "failure"}` diagnostic via `appendDiagnostic` on the first failure
+  - `pkg/runner/pipeline_tree_test.go` — `TestPipelineTreeFailureWritesDiagnostic`: constructs a `PipelineTree` directly with a stub phase returning `fmt.Errorf("injected failure")`, calls `Execute(ctx)`, and verifies `loop/diagnostics.jsonl` contains a line with `outcome=failure` and `phase=stub`
+- **Build:** `go.exe build -buildvcs=false ./...` — clean
+- **Tests:** `go.exe test ./...` — all pass (pkg/runner: 1.154s)
+- **Timestamp:** 2026-03-27

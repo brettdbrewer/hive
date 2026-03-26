@@ -541,20 +541,37 @@ The landing page says "Watch it build →" and links to `/hive`. That page curre
 
 **Ship as:** `iter 295: /hive live dashboard — pipeline activity visible to all`
 
+
 ## What the Scout Should Focus On Next
 
-**Priority: Identify the next hive pipeline gap**
+**Priority: Decision tree pipeline integration — Phase 1**
 
-**Context:** Iteration 302 fixed missing test coverage for the build verification failure path in `workTask` (Builder). The diagnostic instrumentation (`PhaseEvent` / `appendDiagnostic`) is now fully tested for both error paths.
+**Target repo:** hive
 
-**What the Scout should do:** Read `loop/reflections.md` (recent entries), `pkg/runner/`, and the product layers table above. Apply the nine operations:
-- **COVER** — what was just shipped and does it close the gap fully?
-- **BLIND** — what verification is still missing? (grep for untested code paths)
-- **ZOOM** — which single gap matters most for the next iteration?
+**Why now:** The Director mandated "engine before paint" in commit `e4643be`. Iterations 302–308 built the prerequisite diagnostic infrastructure (PhaseEvent, appendDiagnostic, diagnostics.jsonl, PM reads failures). The foundation is ready. The decision tree engine already exists at `eventgraph/go/pkg/decision/` (tree.go, evaluate.go, evolve.go) and is already imported in `pkg/runner/runner.go` (line 17) for `TokenUsage`. The pipeline is still a sequential for-loop. Failures don't trigger branching. Root causes don't become tasks. Until this is wired, the PM optimizes blind.
 
-**Likely candidates (Scout must verify):**
-1. Are there other runner phases (Scout, Critic, Reflector, Ops) that lack diagnostic emission on error? The Builder emits `PhaseEvent` — do other phases?
-2. Is the `/hive` live dashboard (added in earlier iterations) rendering real pipeline data or still using stubs?
-3. Are there product layer gaps — layers 5, 11, 12, 13 remain unimplemented.
+**What exists (do NOT rebuild):**
+- `eventgraph/go/pkg/decision/` — tree.go, evaluate.go, evolve.go, tests. Complete.
+- `pkg/runner/diagnostic.go` — PhaseEvent struct, appendDiagnostic(). Complete.
+- `pkg/runner/runner.go` — already imports `decision` package (line 17), runTick dispatches by role.
 
-**Done criteria for the Scout:** One crisp gap statement in `loop/scout.md` with the derivation chain (what exists → what's absent → why it matters).
+**What to build (Phase 1 — minimum viable decision tree):**
+
+1. **`pkg/runner/pipeline_tree.go`** — define a `PipelineTree` that models one pipeline cycle as a decision tree:
+   - Root node: "run-cycle"
+   - Phase nodes: scout, architect, builder, critic — each as a `DecisionNode` with:
+     - Success condition: `PhaseEvent.Outcome == "success"`
+     - Failure branch: emit PhaseEvent via `appendDiagnostic`, create a fix task via APIClient
+   - Wire existing `runScout`, `runArchitect`, `runBuilder(ctx, task)`, `runCritic` calls as leaf actions
+
+2. **Update `runTick` in `runner.go`** — replace the bare `switch r.cfg.Role` for the `"pipeline"` role with `PipelineTree.Execute(ctx)`. Keep existing single-role dispatch untouched (scout/builder/critic still work standalone for `--role` flags).
+
+3. **`pkg/runner/pipeline_tree_test.go`** — one test: build a minimal tree with a stub phase that returns failure, verify appendDiagnostic writes an entry to diagnostics.jsonl.
+
+**Scope boundary:** Phase 1 is wire-up, not replacement. Don't refactor the existing role handlers. Don't touch cmd/hive. Don't add the `evolve.go` pattern-detection yet — that's Phase 2. Just: tree orchestrates phases, failures emit diagnostics, one test proves it.
+
+**Done criteria:**
+- `go build ./...` passes
+- `go test ./pkg/runner/...` passes (including the new tree test)
+- `runTick` for `role == "pipeline"` uses the decision tree, not a bare sequential call
+- A failed phase writes a PhaseEvent to diagnostics.jsonl
