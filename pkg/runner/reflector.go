@@ -214,15 +214,24 @@ func (r *Runner) runReflector(ctx context.Context) {
 
 	log.Printf("[reflector] tick %d: reflecting", r.tick)
 
-	// Read loop artifacts (all optional — tolerate missing files).
-	scout := readLoopArtifact(r.cfg.HiveDir, "scout.md")
-	build := readLoopArtifact(r.cfg.HiveDir, "build.md")
-	critique := readLoopArtifact(r.cfg.HiveDir, "critique.md")
+	// Read artifacts from the graph first, fall back to files.
+	// The graph is the source of truth; files are legacy cache.
+	scout := r.readFromGraph("Scout Report:")
+	if scout == "" {
+		scout = readLoopArtifact(r.cfg.HiveDir, "scout.md")
+	}
+	build := r.readFromGraph("Build:")
+	if build == "" {
+		build = readLoopArtifact(r.cfg.HiveDir, "build.md")
+	}
+	critique := r.readFromGraph("Critique:")
+	if critique == "" {
+		critique = readLoopArtifact(r.cfg.HiveDir, "critique.md")
+	}
 
-	// Block reflection when the Critic has requested revisions.
-	// The iteration counter must not advance until the Builder has addressed the issues.
-	if strings.Contains(critique, "VERDICT: REVISE") {
-		log.Printf("[reflector] critique.md contains VERDICT: REVISE — skipping reflection")
+	// Block reflection when the Critic's verdict is REVISE.
+	if strings.Contains(strings.ToUpper(critique), "REVISE") {
+		log.Printf("[reflector] critique contains REVISE — skipping reflection")
 		if r.cfg.OneShot {
 			r.done = true
 		}
@@ -323,6 +332,19 @@ func readRecentReflections(hiveDir string) string {
 		return "..." + string(data[len(data)-2000:])
 	}
 	return string(data)
+}
+
+// readFromGraph reads the latest node matching a title prefix from the graph.
+// Returns body content, or "" if not found or API unavailable.
+func (r *Runner) readFromGraph(titlePrefix string) string {
+	if r.cfg.APIClient == nil {
+		return ""
+	}
+	node := r.cfg.APIClient.LatestByTitle(r.cfg.SpaceSlug, titlePrefix)
+	if node == nil {
+		return ""
+	}
+	return node.Body
 }
 
 // appendReflection appends an entry to loop/reflections.md (creates if absent).

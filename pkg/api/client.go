@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -162,6 +163,93 @@ func (c *Client) CreateTask(slug, title, description, priority string) (*Node, e
 		return nil, err
 	}
 	return resp.Node, nil
+}
+
+// GetDocuments fetches document nodes from a space's knowledge layer.
+func (c *Client) GetDocuments(slug string, limit int) ([]Node, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	u := fmt.Sprintf("%s/app/%s/documents?limit=%d", c.base, slug, limit)
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.setHeaders(req)
+
+	var resp struct {
+		Documents []Node `json:"documents"`
+	}
+	if err := c.do(req, &resp); err != nil {
+		return nil, fmt.Errorf("GetDocuments: %w", err)
+	}
+	return resp.Documents, nil
+}
+
+// GetClaims fetches claim nodes from a space's knowledge layer.
+func (c *Client) GetClaims(slug string, limit int) ([]Node, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	u := fmt.Sprintf("%s/app/%s/knowledge?tab=claims&limit=%d", c.base, slug, limit)
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.setHeaders(req)
+
+	var resp struct {
+		Claims []Node `json:"claims"`
+	}
+	if err := c.do(req, &resp); err != nil {
+		return nil, fmt.Errorf("GetClaims: %w", err)
+	}
+	return resp.Claims, nil
+}
+
+// GetFeed fetches recent posts from a space's feed.
+func (c *Client) GetFeed(slug string, limit int) ([]Node, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	u := fmt.Sprintf("%s/app/%s/feed?limit=%d", c.base, slug, limit)
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.setHeaders(req)
+
+	var resp struct {
+		Posts []Node `json:"posts"`
+	}
+	if err := c.do(req, &resp); err != nil {
+		return nil, fmt.Errorf("GetFeed: %w", err)
+	}
+	return resp.Posts, nil
+}
+
+// LatestByTitle finds the most recent node matching a title prefix.
+// Searches tasks, documents, and claims. Returns nil if not found.
+func (c *Client) LatestByTitle(slug, prefix string) *Node {
+	tasks, _ := c.GetTasks(slug, "")
+	for i := len(tasks) - 1; i >= 0; i-- {
+		if strings.HasPrefix(tasks[i].Title, prefix) {
+			return &tasks[i]
+		}
+	}
+	docs, _ := c.GetDocuments(slug, 50)
+	for i := range docs {
+		if strings.HasPrefix(docs[i].Title, prefix) {
+			return &docs[i]
+		}
+	}
+	claims, _ := c.GetClaims(slug, 50)
+	for i := range claims {
+		if strings.HasPrefix(claims[i].Title, prefix) {
+			return &claims[i]
+		}
+	}
+	return nil
 }
 
 // PostUpdate posts to the feed (social — visible to followers).
