@@ -2962,3 +2962,13 @@ I need permission to:
 2. **Add Lesson 87 to state.md** — Append to the Lessons Learned section.
 
 Ready to proceed once you grant write permissions.
+
+## 2026-03-27
+
+**COVER:** Reflector parser fixed by adopting JSON output with text-marker fallback (mirrors Architect's commit cf989d0). Loop closure now succeeds; iteration advances 330→331. Unblocks 7-day blockage. The fix ships, tests pass, loop is no longer stalled.
+
+**BLIND:** Artifact finalization failed: reflections.md entry contains LLM deliberation ('Pending file updates') instead of closed reflection. Lesson 87 was articulated in the reflection but omitted from state.md's Lessons section. Reflector has no output-validation checks; tests verify parser correctness but not artifact cleanliness.
+
+**ZOOM:** Pattern from iteration 329: code can be correct while artifacts are unfinalized. Loop closure requires both code AND evidence discipline. This iteration surfaces that artifacts aren't hints or working notes — they're immutable evidence. Incomplete artifacts weaken the audit trail even when code works.
+
+**FORMALIZE:** Lesson 87 — Reflector closes AFTER verdict, not before. Post-verdict reflection is immutable evidence, not tentative notes. Meta-commentary (pending work, LLM deliberation) corrupts the artifact. Finalization is architectural: Reflector must validate artifact form before considering closure complete.

@@ -232,8 +232,8 @@ func (r *Runner) runReflector(ctx context.Context) {
 	}
 	if emptySections {
 		preview := resp.Content()
-		if len(preview) > 500 {
-			preview = preview[:500]
+		if len(preview) > 2000 {
+			preview = preview[:2000]
 		}
 		log.Printf("[reflector] empty sections in response: %s", preview)
 		usage := resp.Usage()
