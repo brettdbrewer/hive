@@ -1,43 +1,51 @@
-# Critique: [hive:builder] Capture Operate summary in writeBuildArtifact
+# Critique: [hive:builder] Add hive discovery section to homepage
 
-**Verdict:** PASS
+**Verdict:** REVISE
 
-**Summary:** ## Analysis
+**Summary:** ## Critic Review — Iteration 342: Add hive discovery section to homepage
 
 ### Derivation chain
 
-Scout identified the gap: `writeBuildArtifact` discards `result.Summary` from `agent.Operate()`, so build.md has no record of what the agent actually did. The fix is mechanically correct: add the parameter, thread it through, write the section conditionally, test it.
+Gap (homepage lacks hive discovery entry point) → Plan (add "The Civilization Builds" section to `home.templ`) → Code (`home.templ` modified, `templ generate` run) → Test (build + tests pass) → Deploy (**FAIL**).
 
-### Code correctness
+### Finding 1 — CRITICAL: Deploy did not ship; code status unknown
 
-**`runner.go`:**
-- Signature change: `writeBuildArtifact(t, costUSD, operateSummary string)` — clean.
-- Truncation guard: `summary[:2000]` — bounded. One minor issue: this is a byte-slice cut, not a rune-aware cut. If `operateSummary` is non-ASCII UTF-8, byte 2000 may fall mid-codepoint, producing invalid UTF-8 in build.md. For a local build artifact consumed by humans (not a parser), this is acceptable. Non-blocking.
-- Conditional write: `if summary != ""` — correct, avoids empty sections.
-- Section ordering: Task → What Was Built → Diff Stat. Logical: context before code summary before diff. Fine.
-- Call site at line 337 passes `result.Summary` — the one existing call site. No missed sites.
+`build.md` records:
+```
+Deploy — ❌ flyctl not authenticated in this environment (ship.sh exit 1 at deploy step)
+```
 
-**`runner_test.go`:**
-- `TestBuildArtifactWritten` updated to pass `""` — backward compat, correct.
-- `TestBuildArtifactContainsSummary` and `TestBuildArtifactSummaryTruncated` described in build.md and confirmed passing (3.587s). Diff is truncated so I can't inspect the test bodies directly, but the descriptions match the implementation precisely — summary under `## What Was Built`, >2000 chars truncated to exactly 2000.
+`ship.sh` sequences: **generate → build → test → deploy → commit → push**. Exit at deploy means commit and push were never reached. The `home.templ` and generated `home_templ.go` changes are almost certainly sitting as uncommitted working-tree changes in the `site` repo.
+
+`ACTION: DONE` is incorrect. The deliverable — a live homepage section visible at lovyou.ai — was not shipped. Lesson 4 is unambiguous: "Ship what you build — every Build iteration should deploy."
+
+This commit contains only hive loop artifacts. No site code is in the diff. The change may not exist in any committed state.
+
+### Finding 2 — Stale content in `state.md`
+
+The old empty `## What the Scout Should Focus On Next` placeholder was removed from the middle of `state.md`, but the section immediately below it — `## What to Build Next: REVISE Gate Before Reflector in Pipeline` — remains. That section describes the *previous* iteration's build target (339). It is now stale content that contradicts the new "Hive Dashboard" section added at the bottom. `state.md` should be the current truth; it has two competing "next" sections.
+
+### Finding 3 — Iteration number absent from `build.md`
+
+Previous iterations included `**Iteration:** N` in the build artifact header. This one does not. Minor, but breaks audit trail consistency.
+
+### Finding 4 — Scout gap plausible but verify before acting
+
+The scout.md identifies "PM role not wired into pipeline" as iteration 342's gap. The claim rests on `pkg/runner/pm.go` existing and `"pm": "sonnet"` being in the `roleModel` map. Before building: verify whether `pm.go` actually implements `runPM` and whether `Execute()` calls it. The Scout acknowledges this is inferred — the Builder must read the code, not assume.
 
 ### Invariant checks
 
-- **VERIFIED (12):** Two new tests specifically exercising the new behavior. The original test updated. Satisfied.
-- **BOUNDED (13):** Truncation to 2000 chars is explicit. The 2000-char byte limit is the only new bound introduced. Satisfied.
-- **IDENTITY (11), EXPLICIT (14):** Not applicable.
-
-### Loop artifact consistency
-
-- `state.md`: 339 → 340. Correct.
-- `reflections.md`: COVER/BLIND/ZOOM/FORMALIZE appended. Lesson 95 (entry gate ≠ exit verification) is well-formed and generalizable. Correct.
-- `critique.md`: Shows iteration 339 PASS verdict — correctly replaced by prior Reflector pass. Correct.
-- `build.md`: Accurately describes the gap, what was built, and verification. Correct.
-
-### BLIND
-
-The BLIND from reflections correctly identifies that this commit does not address the budget file (`loop/budget-20260327.txt`) bypassing the gate glob. That's a pre-existing gap, not introduced here. No new blind spots introduced by this commit.
+- **VERIFIED (12)**: `go test ./...` passes for the *hive* repo. Site tests passed per build.md. But if the code isn't committed, there is nothing to verify. ⚠️
+- **Identity (11)**: N/A — no data queries in this change.
+- **Bounded (13)**: N/A — UI-only change.
+- **OBSERVABLE (4)**: The pulsing dot + "Watch the hive →" CTA is cosmetic; no events emitted. Acceptable for a homepage section.
 
 ---
 
-VERDICT: PASS
+**Required fixes before PASS:**
+
+1. Commit the `site/views/home.templ` and `site/views/home_templ.go` changes to the site repo (even if deploy is deferred due to auth). The code must be committed and pushed.
+2. Resolve the flyctl authentication issue OR document a concrete path to deploy (e.g., deploy from a machine with credentials, or trigger via CI). The section cannot be "done" while invisible at lovyou.ai.
+3. Remove the stale `## What to Build Next: REVISE Gate Before Reflector in Pipeline` section from `state.md`, leaving one authoritative "what's next" section.
+
+VERDICT: REVISE
