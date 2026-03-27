@@ -294,6 +294,47 @@ func TestRunArchitectOperateInstructionIncludesCauses(t *testing.T) {
 	}
 }
 
+// TestRunArchitectOperateInstructionNoCausesWhenNoMilestone verifies that when
+// the Architect uses the Operate path with no milestone (scout-report fallback),
+// the curl template does NOT include a "causes" key — an empty milestoneID should
+// produce no causes suffix, not causes:[""].
+func TestRunArchitectOperateInstructionNoCausesWhenNoMilestone(t *testing.T) {
+	// Server returns empty board (no milestone) but has a scout report.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			resp := api.BoardResponse{Nodes: []api.Node{}}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		_, _ = w.Write([]byte(`{"op":"ok"}`))
+	}))
+	defer srv.Close()
+
+	op := &mockCaptureOperator{}
+	hiveDir := makeHiveDir(t, "# State\n", map[string]string{
+		"scout.md": "## Scout\nGap: missing auth layer",
+	})
+	r := New(Config{
+		HiveDir:   hiveDir,
+		RepoPath:  t.TempDir(),
+		SpaceSlug: "hive",
+		APIClient: api.New(srv.URL, "test-key"),
+		Provider:  op,
+		OneShot:   true,
+	})
+
+	r.runArchitect(context.Background())
+
+	if op.capturedInstruction == "" {
+		t.Fatal("Operate was not called — Architect did not use Operate path")
+	}
+	if strings.Contains(op.capturedInstruction, `"causes"`) {
+		t.Errorf("Operate instruction should NOT contain causes when no milestone present — got:\n%s",
+			op.capturedInstruction)
+	}
+}
+
 func TestParseSubtasksMarkdown(t *testing.T) {
 	tests := []struct {
 		name       string

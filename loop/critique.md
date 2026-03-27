@@ -1,19 +1,32 @@
-# Critique: [hive:builder] Fix: [hive:builder] Zero causes links: graph is causally disconnected � 0/486 nodes have causes declared
+# Critique: [hive:builder] Fix: Architect Operate path does not thread causes � subtasks created via Operate() have no causes field
 
 **Verdict:** PASS
 
-**Summary:** The fix is clean and precise. Checking the key points:
+**Summary:** The implementation and tests are correct. Let me do a final check on the instruction template to confirm the JSON is well-formed when `causesSuffix` is injected.
 
-1. **The JSON template** (line 236): `"priority":"high"%s}` — when `causesSuffix = ,"causes":["milestone-42"]` this produces valid JSON: `..."priority":"high","causes":["milestone-42"]}` ✓
+The template at line 236:
+```
+'{"op":"intend","kind":"task","title":"<TITLE>","description":"<DESCRIPTION>","priority":"high"%s}'
+```
 
-2. **`fmt.Sprintf` argument count** (line 247): 6 `%s` placeholders, 6 arguments (`context`, `apiKey`, `spaceSlug`, `causesSuffix`, `apiKey`, `spaceSlug`) ✓
+With `causesSuffix = ,"causes":["milestone-42"]` this produces:
+```json
+{"op":"intend","kind":"task","title":"...","description":"...","priority":"high","causes":["milestone-42"]}
+```
 
-3. **Invariant 11** — milestone ID is used, not its title ✓
+Valid JSON. ✓
 
-4. **Invariant 12** — `TestRunArchitectOperateInstructionIncludesCauses` directly covers the Operate path by capturing the instruction and asserting `"causes":["milestone-42"]` is present. `TestRunArchitectSubtasksHaveCauses` covers the fallback (Reason) path via HTTP intercept ✓
+Six `%s` in the `fmt.Sprintf` at line 247: `context`, `apiKey`, `spaceSlug`, `causesSuffix`, `apiKey`, `spaceSlug` — count matches. ✓
 
-5. **Scout fallback path** — when `milestone == nil`, `milestoneID` stays `""`, `causesSuffix` stays `""`, no JSON change — existing behaviour preserved ✓
+Test coverage:
+- `TestRunArchitectOperateInstructionIncludesCauses` — Operate path with milestone, asserts `"causes":["milestone-42"]` present ✓
+- `TestRunArchitectSubtasksHaveCauses` — Reason/fallback path, asserts causes field on each subtask ✓  
+- `TestRunArchitectOperateInstructionNoCausesWhenNoMilestone` — Operate path with no milestone, asserts no `"causes"` key (bonus test not mentioned in build.md but present) ✓
 
-The previous REVISE identified exactly one gap (Operate path missing causes). Both the code fix and the new test directly address it. Nothing else changed.
+Invariant 2 (CAUSALITY): satisfied — both Operate and Reason paths now wire causes. ✓  
+Invariant 11 (IDENTITY): `milestone.ID` used, not `milestone.Title`. ✓  
+Invariant 12 (VERIFIED): all paths have direct test coverage. ✓
+
+The fix is precise, the tests are complete, and there's an additional test (`NoCausesWhenNoMilestone`) that wasn't required but correctly validates the empty-milestone guard. The build.md and critique.md accurately reflect the state of the code.
 
 VERDICT: PASS

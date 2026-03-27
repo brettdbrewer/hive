@@ -34,9 +34,10 @@ func TestBuildTitle(t *testing.T) {
 	}
 }
 
-// TestPostCreatesNode verifies that the post() function sends op=express with
-// kind=post, title, and body to /app/hive/op.
-func TestPostCreatesNode(t *testing.T) {
+// TestPostCreatesDocument verifies that the post() function sends op=intend with
+// kind=document, title, and description to /app/hive/op.
+// Build reports are structured documents, not casual feed posts.
+func TestPostCreatesDocument(t *testing.T) {
 	var received map[string]string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,17 +58,17 @@ func TestPostCreatesNode(t *testing.T) {
 		t.Fatalf("post() error: %v", err)
 	}
 
-	if received["op"] != "express" {
-		t.Errorf("op = %q, want %q", received["op"], "express")
+	if received["op"] != "intend" {
+		t.Errorf("op = %q, want %q", received["op"], "intend")
 	}
-	if received["kind"] != "post" {
-		t.Errorf("kind = %q, want %q", received["kind"], "post")
+	if received["kind"] != "document" {
+		t.Errorf("kind = %q, want %q", received["kind"], "document")
 	}
 	if received["title"] != "Fix: some bug" {
 		t.Errorf("title = %q, want %q", received["title"], "Fix: some bug")
 	}
-	if received["body"] == "" {
-		t.Error("body is empty, want non-empty build summary")
+	if received["description"] == "" {
+		t.Error("description is empty, want non-empty build summary")
 	}
 }
 
@@ -429,7 +430,7 @@ func TestSyncClaimsClaimWithNoMetadata(t *testing.T) {
 }
 
 // TestBuildTitleExtractedOnPost verifies that buildTitle + post produces a
-// feed node whose title comes from build.md (not just "Iteration N").
+// document node whose title comes from build.md (not just "Iteration N").
 func TestBuildTitleExtractedOnPost(t *testing.T) {
 	buildMD := []byte("# Build: Fix: Observer AllowedTools missing knowledge.search\n\n## What Was Built\nFixed it.")
 
@@ -438,7 +439,7 @@ func TestBuildTitleExtractedOnPost(t *testing.T) {
 		var payload map[string]string
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &payload)
-		if payload["op"] == "express" {
+		if payload["op"] == "intend" && payload["kind"] == "document" {
 			receivedTitle = payload["title"]
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -459,5 +460,199 @@ func TestBuildTitleExtractedOnPost(t *testing.T) {
 	want := "Fix: Observer AllowedTools missing knowledge.search"
 	if receivedTitle != want {
 		t.Errorf("post title = %q, want %q", receivedTitle, want)
+	}
+}
+
+// TestExtractCritiqueTitle verifies title extraction from critique.md.
+func TestExtractCritiqueTitle(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "standard format",
+			input: "# Critique: Fix: causes field missing on subtasks\n\n**Verdict:** PASS\n",
+			want:  "Critique: Fix: causes field missing on subtasks",
+		},
+		{
+			name:  "no heading",
+			input: "**Verdict:** PASS\n",
+			want:  "",
+		},
+		{
+			name:  "multi-hash heading",
+			input: "## Critique: Some thing\n",
+			want:  "Critique: Some thing",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractCritiqueTitle([]byte(tt.input))
+			if got != tt.want {
+				t.Errorf("extractCritiqueTitle() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestAssertCritiqueCreatesClaimNode verifies that assertCritique reads
+// critique.md and POSTs op=assert kind=claim to /app/hive/op.
+func TestAssertCritiqueCreatesClaimNode(t *testing.T) {
+	var received map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/app/hive/op" {
+			http.NotFound(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &received)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"node":{"id":"claim-456"}}`))
+	}))
+	defer srv.Close()
+
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "loop"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	critiqueContent := "# Critique: Fix: missing causes field\n\n**Verdict:** PASS\n\nAll tests pass.\n"
+	if err := os.WriteFile(filepath.Join(tmp, "loop", "critique.md"), []byte(critiqueContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	if err := assertCritique("lv_testkey", srv.URL); err != nil {
+		t.Fatalf("assertCritique() error: %v", err)
+	}
+
+	if received["op"] != "assert" {
+		t.Errorf("op = %q, want %q", received["op"], "assert")
+	}
+	if received["kind"] != "claim" {
+		t.Errorf("kind = %q, want %q", received["kind"], "claim")
+	}
+	if received["title"] != "Critique: Fix: missing causes field" {
+		t.Errorf("title = %q, want %q", received["title"], "Critique: Fix: missing causes field")
+	}
+	if !strings.Contains(received["body"], "PASS") {
+		t.Errorf("body %q does not contain verdict", received["body"])
+	}
+}
+
+// TestAssertCritiqueMissingFile verifies that assertCritique returns an error
+// when critique.md does not exist.
+func TestAssertCritiqueMissingFile(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	err := assertCritique("lv_testkey", "http://localhost:9999")
+	if err == nil {
+		t.Fatal("expected error for missing critique.md, got nil")
+	}
+}
+
+// TestExtractLatestReflection verifies that extractLatestReflection returns
+// the first ## section from reflections.md (the most recent entry).
+func TestExtractLatestReflection(t *testing.T) {
+	input := `# Reflection Log
+
+## 2026-03-27
+
+**COVER:** Something was built.
+
+**BLIND:** Something was missed.
+
+## Iteration 1 — 2026-03-22
+
+**COVER:** Earlier entry.
+`
+	title, body := extractLatestReflection([]byte(input))
+	if title != "2026-03-27" {
+		t.Errorf("title = %q, want %q", title, "2026-03-27")
+	}
+	if !strings.Contains(body, "Something was built") {
+		t.Errorf("body %q does not contain expected content", body)
+	}
+	if strings.Contains(body, "Earlier entry") {
+		t.Error("body should not contain content from the second entry")
+	}
+}
+
+// TestExtractLatestReflectionNoEntry verifies that extractLatestReflection
+// returns empty strings when there are no ## sections.
+func TestExtractLatestReflectionNoEntry(t *testing.T) {
+	input := "# Reflection Log\n\nNo entries yet.\n"
+	title, body := extractLatestReflection([]byte(input))
+	if title != "" || body != "" {
+		t.Errorf("expected empty title and body, got title=%q body=%q", title, body)
+	}
+}
+
+// TestAssertLatestReflectionCreatesDocument verifies that assertLatestReflection
+// reads reflections.md and POSTs op=intend kind=document to /app/hive/op.
+func TestAssertLatestReflectionCreatesDocument(t *testing.T) {
+	var received map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/app/hive/op" {
+			http.NotFound(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &received)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"node":{"id":"doc-789"}}`))
+	}))
+	defer srv.Close()
+
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "loop"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	reflContent := "# Reflection Log\n\n## 2026-03-27\n\n**COVER:** Build was clean.\n"
+	if err := os.WriteFile(filepath.Join(tmp, "loop", "reflections.md"), []byte(reflContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	if err := assertLatestReflection("lv_testkey", srv.URL); err != nil {
+		t.Fatalf("assertLatestReflection() error: %v", err)
+	}
+
+	if received["op"] != "intend" {
+		t.Errorf("op = %q, want %q", received["op"], "intend")
+	}
+	if received["kind"] != "document" {
+		t.Errorf("kind = %q, want %q", received["kind"], "document")
+	}
+	if received["title"] != "Reflection: 2026-03-27" {
+		t.Errorf("title = %q, want %q", received["title"], "Reflection: 2026-03-27")
+	}
+	if !strings.Contains(received["description"], "Build was clean") {
+		t.Errorf("description %q does not contain reflection content", received["description"])
+	}
+}
+
+// TestAssertLatestReflectionMissingFile verifies that assertLatestReflection
+// returns an error when reflections.md does not exist.
+func TestAssertLatestReflectionMissingFile(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	err := assertLatestReflection("lv_testkey", "http://localhost:9999")
+	if err == nil {
+		t.Fatal("expected error for missing reflections.md, got nil")
 	}
 }

@@ -73,7 +73,7 @@ func main() {
 		title = fmt.Sprintf("Iteration %s", iteration)
 	}
 
-	// Post iteration summary to Feed.
+	// Post build report as KindDocument.
 	if err := post(apiKey, baseURL, title, string(build)); err != nil {
 		fmt.Fprintf(os.Stderr, "post: %v\n", err)
 		os.Exit(1)
@@ -82,7 +82,7 @@ func main() {
 	// Create task on Board and mark complete.
 	if err := createTask(apiKey, baseURL, title, string(build)); err != nil {
 		fmt.Fprintf(os.Stderr, "task: %v\n", err)
-		// Non-fatal — feed post succeeded.
+		// Non-fatal — document post succeeded.
 	}
 
 	// Sync loop state to the Mind.
@@ -101,6 +101,18 @@ func main() {
 	// via knowledge_search and survive scout.md being overwritten next iteration.
 	if err := assertScoutGap(apiKey, baseURL); err != nil {
 		fmt.Fprintf(os.Stderr, "assert scout gap: %v\n", err)
+		// Non-fatal — post succeeded.
+	}
+
+	// Assert the critique verdict as a KindClaim node.
+	if err := assertCritique(apiKey, baseURL); err != nil {
+		fmt.Fprintf(os.Stderr, "assert critique: %v\n", err)
+		// Non-fatal — post succeeded.
+	}
+
+	// Post the latest reflection entry as a KindDocument node.
+	if err := assertLatestReflection(apiKey, baseURL); err != nil {
+		fmt.Fprintf(os.Stderr, "assert reflection: %v\n", err)
 		// Non-fatal — post succeeded.
 	}
 
@@ -172,9 +184,10 @@ func syncMindState(apiKey, baseURL, state string) error {
 }
 
 func createTask(apiKey, baseURL, title, description string) error {
-	// Create task (intend op).
+	// Create task (intend op with kind=task).
 	payload, _ := json.Marshal(map[string]string{
 		"op":          "intend",
+		"kind":        "task",
 		"title":       title,
 		"description": description,
 	})
@@ -372,6 +385,127 @@ func extractIterationFromScout(data []byte) string {
 	return string(m[1])
 }
 
+// assertCritique reads loop/critique.md and creates a KindClaim node so
+// critique verdicts are searchable via knowledge_search and survive
+// critique.md being overwritten next iteration.
+func assertCritique(apiKey, baseURL string) error {
+	data, err := os.ReadFile("loop/critique.md")
+	if err != nil {
+		return fmt.Errorf("read critique.md: %w", err)
+	}
+
+	title := extractCritiqueTitle(data)
+	if title == "" {
+		return fmt.Errorf("could not find critique title in critique.md")
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"op":    "assert",
+		"kind":  "claim",
+		"title": title,
+		"body":  string(data),
+	})
+	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	fmt.Printf("asserted critique as claim: %q\n", title)
+	return nil
+}
+
+// extractCritiqueTitle extracts the title from the first heading in critique.md.
+// e.g. "# Critique: Fix: foo" → "Critique: Fix: foo"
+func extractCritiqueTitle(data []byte) string {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "#") {
+			line = strings.TrimLeft(line, "#")
+			return strings.TrimSpace(line)
+		}
+	}
+	return ""
+}
+
+// assertLatestReflection reads loop/reflections.md, extracts the most recent
+// entry (the first ## section), and creates a KindDocument node so reflections
+// are persistent and browsable in the Documents lens.
+func assertLatestReflection(apiKey, baseURL string) error {
+	data, err := os.ReadFile("loop/reflections.md")
+	if err != nil {
+		return fmt.Errorf("read reflections.md: %w", err)
+	}
+
+	title, body := extractLatestReflection(data)
+	if title == "" {
+		return fmt.Errorf("could not find reflection entry in reflections.md")
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"op":          "intend",
+		"kind":        "document",
+		"title":       "Reflection: " + title,
+		"description": body,
+	})
+	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	fmt.Printf("asserted reflection as document: %q\n", title)
+	return nil
+}
+
+// extractLatestReflection parses the first ## section from reflections.md
+// (which is the most recent entry, since entries are prepended).
+// Returns the section heading and body text.
+func extractLatestReflection(data []byte) (title, body string) {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	var lines []string
+	inEntry := false
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "## ") {
+			if inEntry {
+				break // hit next entry, stop
+			}
+			title = strings.TrimPrefix(line, "## ")
+			inEntry = true
+			continue
+		}
+		if inEntry {
+			lines = append(lines, line)
+		}
+	}
+
+	body = strings.TrimSpace(strings.Join(lines, "\n"))
+	return title, body
+}
+
 // extractGapTitle parses the "**Gap:** ..." line from scout.md.
 func extractGapTitle(data []byte) string {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -385,12 +519,15 @@ func extractGapTitle(data []byte) string {
 	return ""
 }
 
+// post creates a KindDocument node for the build report via the intend op.
+// Build reports are structured documents (not casual posts) and belong in the
+// Documents lens, not the Feed.
 func post(apiKey, baseURL, title, body string) error {
 	payload, _ := json.Marshal(map[string]string{
-		"op":    "express",
-		"kind":  "post",
-		"title": title,
-		"body":  body,
+		"op":          "intend",
+		"kind":        "document",
+		"title":       title,
+		"description": body,
 	})
 	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
 	req.Header.Set("Authorization", "Bearer "+apiKey)

@@ -1,54 +1,60 @@
 # Test Report: Fix Architect Operate path causality (Invariant 2)
 
-- **Build:** Fix: [hive:builder] Zero causes links: graph is causally disconnected
-- **Commit:** 274999c35fdcbc4a82b4700e79b91d247f2d496c
+- **Build:** Fix: Architect Operate path does not thread causes — subtasks created via Operate() have no causes field
+- **Commit:** 2abed27cb2f5d340ee227ac82108df3479f21ce4
 - **Result:** PASS — all tests green
 
 ## What Was Tested
 
-The fix added `milestoneID` to `buildArchitectOperateInstruction` so the curl template the Architect gives to the LLM includes `"causes":["<milestoneID>"]`. Two paths through `runArchitect` create tasks: the Operate path and the Reason/fallback path. Both needed causality wires. The fix covered the Operate path (previously missing); the Reason path was already covered by a prior iteration.
+The fix added `milestoneID` as a 3rd parameter to `buildArchitectOperateInstruction`, injecting `,"causes":["<milestoneID>"]` into the curl template the LLM receives. Two production paths create tasks: the Operate path (IOperator) and the Reason/fallback path. Both were verified for causality. One edge case was missing coverage and was added.
 
 ## Tests Run
 
-### New tests (this iteration)
+### Tests verified by Builder (confirmed passing)
 
 | Test | File | Result |
 |------|------|--------|
 | `TestRunArchitectOperateInstructionIncludesCauses` | `pkg/runner/architect_test.go` | PASS |
 | `TestRunArchitectSubtasksHaveCauses` | `pkg/runner/architect_test.go` | PASS |
-| `TestWriteBuildArtifactDocumentCauses` | `pkg/runner/runner_test.go` | PASS |
 
-**TestRunArchitectOperateInstructionIncludesCauses** — Core fix test. Sets up a milestone with ID `milestone-42`, uses `mockCaptureOperator` to intercept the `OperateTask.Instruction`, and asserts the instruction contains `"causes":["milestone-42"]`. Directly verifies the Operate path embeds the causes suffix. Would have failed before the fix (milestoneID was not passed to `buildArchitectOperateInstruction`).
+**TestRunArchitectOperateInstructionIncludesCauses** — Core fix test. Sets up a milestone (`milestone-42`), uses `mockCaptureOperator` to intercept the instruction, asserts `"causes":["milestone-42"]` is present. Would have failed before the fix (milestoneID was not passed to `buildArchitectOperateInstruction`).
 
-**TestRunArchitectSubtasksHaveCauses** — Integration test of the Reason/fallback path. Uses a real `mockProvider` that returns SUBTASK_ format, captures all HTTP POST bodies to the fake API server, and asserts every `op=intend` request includes `"causes":["milestone-77"]`.
+**TestRunArchitectSubtasksHaveCauses** — Reason/fallback path. Uses a real `mockProvider` that returns SUBTASK_ format, captures all HTTP POST bodies, asserts every `op=intend` request includes `"causes":["milestone-77"]`.
 
-**TestWriteBuildArtifactDocumentCauses** — Verifies `writeBuildArtifact` calls `CreateDocument` with `causes:[task.ID]`, so build documents are causally linked to the task that triggered the build.
+### New test (added by Tester)
+
+| Test | File | Result |
+|------|------|--------|
+| `TestRunArchitectOperateInstructionNoCausesWhenNoMilestone` | `pkg/runner/architect_test.go` | PASS |
+
+**TestRunArchitectOperateInstructionNoCausesWhenNoMilestone** — Edge case: Operate path triggered by scout-report fallback (no milestone on board). Verifies the curl template does NOT include `"causes"` at all — an empty `milestoneID` must produce empty `causesSuffix`, not `"causes":[""]`. This ensures Invariant 2 is respected symmetrically: causes are declared only when a causal parent exists.
 
 ### Full suite
 
 ```
-ok  github.com/lovyou-ai/hive/cmd/mcp-graph       1.355s
-ok  github.com/lovyou-ai/hive/cmd/mcp-knowledge   0.711s
-ok  github.com/lovyou-ai/hive/cmd/post            1.403s
-ok  github.com/lovyou-ai/hive/pkg/api             1.301s
-ok  github.com/lovyou-ai/hive/pkg/authority       0.807s
-ok  github.com/lovyou-ai/hive/pkg/hive            1.029s
-ok  github.com/lovyou-ai/hive/pkg/loop            0.982s
-ok  github.com/lovyou-ai/hive/pkg/resources       0.856s
-ok  github.com/lovyou-ai/hive/pkg/runner          4.041s
-ok  github.com/lovyou-ai/hive/pkg/workspace       0.540s
+ok  github.com/lovyou-ai/hive/cmd/mcp-graph       (cached)
+ok  github.com/lovyou-ai/hive/cmd/mcp-knowledge   (cached)
+ok  github.com/lovyou-ai/hive/cmd/post             (cached)
+ok  github.com/lovyou-ai/hive/pkg/api              (cached)
+ok  github.com/lovyou-ai/hive/pkg/authority        (cached)
+ok  github.com/lovyou-ai/hive/pkg/hive             (cached)
+ok  github.com/lovyou-ai/hive/pkg/loop             (cached)
+ok  github.com/lovyou-ai/hive/pkg/resources        (cached)
+ok  github.com/lovyou-ai/hive/pkg/runner           3.578s
+ok  github.com/lovyou-ai/hive/pkg/workspace        (cached)
 ```
 
 No regressions.
 
 ## Edge Cases Considered
 
-- **No milestone present** — `buildArchitectOperateInstruction` receives `milestoneID=""`, `causesSuffix` is empty, no `"causes"` key in the curl payload. Correct: without a milestone parent there is no causal ancestor to declare.
-- **Operate path vs Reason path** — two distinct code paths, both tested for causality.
-- **mockCaptureOperator vs mockProvider** — Operate path requires `IOperator`; Reason path uses `IProvider`. Tests use appropriate mocks so coverage is unambiguous.
+- **Milestone present (Operate path)** — causes suffix injected into curl template. ✓ Tested.
+- **No milestone (Operate path, scout-report fallback)** — no causes key in template, not even `"causes":[""]`. ✓ Tested (new).
+- **Milestone present (Reason path)** — causes passed to `CreateTask`. ✓ Tested.
+- **No milestone (Reason path)** — `causes` is nil, `CreateTask` called without it. Covered implicitly by existing parse tests.
 
 ## Coverage Notes
 
-- `buildArchitectOperateInstruction`: the only change is injecting `causesSuffix`; tested directly by `TestRunArchitectOperateInstructionIncludesCauses`.
-- `runArchitect` Operate path milestone ID extraction: covered by the same test.
+- `buildArchitectOperateInstruction`: both branches of `if milestoneID != ""` are now covered.
+- `runArchitect` Operate path: both milestone and no-milestone cases covered.
 - No untested code paths introduced.
