@@ -222,8 +222,10 @@ func (r *Runner) runReflector(ctx context.Context) {
 	// Block reflection when the Critic has requested revisions.
 	// The iteration counter must not advance until the Builder has addressed the issues.
 	if strings.Contains(critique, "VERDICT: REVISE") {
-		log.Printf("[reflector] tick %d: critique.md contains VERDICT: REVISE — blocking until revision complete", r.tick)
-		r.appendDiagnostic(PhaseEvent{Phase: "reflector", Outcome: "revise_blocked"})
+		log.Printf("[reflector] critique.md contains VERDICT: REVISE — skipping reflection")
+		if r.cfg.OneShot {
+			r.done = true
+		}
 		return
 	}
 
