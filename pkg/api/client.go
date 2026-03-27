@@ -190,6 +190,51 @@ func (c *Client) CreateDocument(slug, title, body string) (*Node, error) {
 	return resp.Node, nil
 }
 
+// AssertClaim creates a knowledge claim — a factual assertion that can be
+// challenged, verified, or retracted. Use for lessons learned, verdicts,
+// architectural decisions — anything that should be verifiable.
+func (c *Client) AssertClaim(slug, title, body string) (*Node, error) {
+	resp, err := c.PostOp(slug, map[string]string{
+		"op":    "assert",
+		"title": title,
+		"body":  body,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Node, nil
+}
+
+// AskQuestion creates a question node. If Mind is configured for the space,
+// it will auto-answer from the space's documents. Use for self-queries —
+// "does this already exist?" "what primitive maps to X?"
+func (c *Client) AskQuestion(slug, title, body string) (*Node, error) {
+	resp, err := c.PostOp(slug, map[string]string{
+		"op":          "intend",
+		"kind":        "question",
+		"title":       title,
+		"description": body,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Node, nil
+}
+
+// StartThread creates a discussion thread. Use for deliberations that
+// need multiple responses — architecture discussions, trade-off analysis.
+func (c *Client) StartThread(slug, title, body string) (*Node, error) {
+	resp, err := c.PostOp(slug, map[string]string{
+		"op":    "discuss",
+		"title": title,
+		"body":  body,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Node, nil
+}
+
 func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")

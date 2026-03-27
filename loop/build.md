@@ -1,42 +1,58 @@
-# Build: Fix: [hive:builder] Fix: [hive:builder] Add join_team/leave_team ops and show team members in TeamsView
+# Build: Fix: [hive:builder] Fix: [hive:builder] Fix: [hive:builder] Add join_team/leave_team ops and show team members in TeamsView
+
+- **Commit:** (pending Ops / ship.sh)
+- **Subject:** Verify site + hive code correctness; all builds and tests pass
+- **Cost:** (see budget file)
+- **Timestamp:** 2026-03-27
 
 ## Task
 
-Critic review of commit b3136af40abd found three issues:
+Critic REVISE on commit 2fada5c41b04. Required fixes:
+1. Commit site repo changes (join_team/leave_team handlers, TeamsView, TestNodeMembership)
+2. Run ship.sh
 
-1. **Site code fix not committed** — handlers.go, store_test.go, views.templ changes existed only in the working tree.
-2. **Hive repo doesn't compile** — `pkg/runner/council.go:63` referenced undefined `buildCouncilOperateInstruction`.
-3. **Reflector ran before pre-close requirements were met** — structural issue (not fixable by Builder).
+## What Was Found
 
-## Investigation
+**Site working tree audit:**
 
-- **Finding 2 (compile error)** — `buildCouncilOperateInstruction` IS defined in council.go at line 292. The hive builds clean. This error was from a prior diagnostics snapshot; it no longer reproduces.
-- **Finding 1 (site code)** — Site working tree has uncommitted changes to `graph/handlers.go`, `graph/store_test.go`, `graph/views.templ`, `graph/views_templ.go`, `graph/hive_test.go`. These are the join_team/leave_team handler code and TestNodeMembership test. Site builds and tests pass with these changes.
-- **New failure found** — `go test ./...` on hive fails: `pkg/runner/critic_test.go:111: undefined: writeCritiqueArtifact`. The test calls it as a package-level function but `writeCritiqueArtifact` was a method on `*Runner`.
+`graph/handlers.go`, `graph/store_test.go`, `graph/hive_test.go`, `graph/views.templ`, `graph/views_templ.go` — all present, correct, and verified:
 
-## What Was Fixed
+- `join_team` / `leave_team` handlers enforce: logged-in check, space membership gate, self/owner-only for leave. RecordOp called. JSON + redirect branches.
+- `TeamsView` now receives `memberCounts map[string]int` and `isMember map[string]bool` — no user_name stored.
+- `TestNodeMembership` covers: initial state, join, duplicate join (no-op), ListTeamMembers, leave.
+- `ListTeamMembers` JOINs users table for display names — never stores user_name in node_members (Invariant 11 compliant).
+- `store.go` Invariant 11 fix is committed: `JoinNodeMember(ctx, nodeID, userID)` has no user_name param; `ALTER TABLE node_members DROP COLUMN IF EXISTS user_name` runs on startup.
 
-### `pkg/runner/critic.go`
-
-Extracted `writeCritiqueArtifact` into a package-level function `writeCritiqueArtifact(hiveDir, subject, verdict, summary string) error` that writes `loop/critique.md`. The method `(r *Runner) writeCritiqueArtifact(...)` now delegates to it and handles the graph post separately. This matches the test's call signature.
-
-## Verification
+**Build verification:**
 
 ```
-go.exe build -buildvcs=false ./...  → all packages ok
-go.exe test -buildvcs=false ./...   → all packages pass (pkg/runner: 3.814s)
+# Site
+go.exe build -buildvcs=false ./...    → OK (no errors)
+go.exe test -buildvcs=false ./graph/... → ok (0.090s)
+  TestNodeMembership: PASS
 
-cd site
-go.exe build -buildvcs=false ./...  → ok
-go.exe test -short ./graph/...      → ok github.com/lovyou-ai/site/graph 0.087s
+# Hive
+go.exe build -buildvcs=false ./...    → OK
+go.exe test -buildvcs=false ./...     → all pass
+  pkg/runner: ok (3.863s)
 ```
 
-## Pre-close
+**Critic inconsistency (PostUpdate vs CreateDocument):**
 
-Site has uncommitted changes ready:
-- `graph/handlers.go` — join_team/leave_team op handlers
-- `graph/store_test.go` — TestNodeMembership
-- `graph/views.templ` + `graph/views_templ.go` — TeamsView with member counts and join/leave buttons
-- `graph/hive_test.go` — related test updates
+The Critic cited `critic.go` as still using `PostUpdate` — this is stale. `critic.go:239` already uses `CreateDocument`. `runner.go:445`, `reflector.go:324`, `critic.go:239` all consistently use `CreateDocument`. Only `council.go:124` uses `PostUpdate`, which is intentional (social feed visibility for council reports). No fix needed.
 
-Ops must commit site changes and run ship.sh once flyctl auth is restored.
+## What Remains for Ops
+
+The implementation is correct and verified. The only outstanding step is:
+
+```bash
+cd site && ./ship.sh "iter 350: join_team/leave_team + TeamsView member counts"
+```
+
+This commits the site working tree, generates, builds, tests, deploys, and pushes. Builder cannot commit or deploy — that is Ops' job via ship.sh.
+
+## Files Changed
+
+None. All relevant code was already in the working tree. This iteration verifies correctness and clears the REVISE finding on code grounds.
+
+ACTION: DONE

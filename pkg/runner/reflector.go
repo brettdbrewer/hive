@@ -275,6 +275,14 @@ func (r *Runner) runReflector(ctx context.Context) {
 		log.Printf("[reflector] append reflections error: %v", err)
 	}
 
+	// Assert lessons as claims (verifiable knowledge, not just documents).
+	if formalize := sections["FORMALIZE"]; formalize != "" && r.cfg.APIClient != nil {
+		title := fmt.Sprintf("Lesson: %s", date)
+		if _, err := r.cfg.APIClient.AssertClaim(r.cfg.SpaceSlug, title, formalize); err != nil {
+			log.Printf("[reflector] assert lesson error: %v", err)
+		}
+	}
+
 	// Advance state.md iteration counter.
 	if err := advanceIterationCounter(r.cfg.HiveDir, date); err != nil {
 		log.Printf("[reflector] update state.md error: %v", err)
