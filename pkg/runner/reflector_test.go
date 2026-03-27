@@ -283,6 +283,54 @@ func TestBuildReflectorPrompt(t *testing.T) {
 	if !contains(prompt, "BLIND is the most important") {
 		t.Error("prompt should highlight BLIND as most important")
 	}
+
+	// Format constraint must be front-loaded — appears before the first artifact section.
+	// This prevents "lost in the middle" failures on long prompts.
+	formatIdx := strings.Index(prompt, "Return ONLY")
+	scoutIdx := strings.Index(prompt, "## Scout Report")
+	if formatIdx < 0 {
+		t.Error("prompt missing 'Return ONLY' format constraint")
+	} else if scoutIdx >= 0 && formatIdx > scoutIdx {
+		t.Errorf("format constraint (pos %d) appears after scout section (pos %d) — must be front-loaded", formatIdx, scoutIdx)
+	}
+}
+
+func TestTruncateArtifact(t *testing.T) {
+	t.Run("short string unchanged", func(t *testing.T) {
+		s := "short"
+		if got := truncateArtifact(s, 100); got != s {
+			t.Errorf("got %q, want %q", got, s)
+		}
+	})
+
+	t.Run("exact length unchanged", func(t *testing.T) {
+		s := strings.Repeat("x", 100)
+		if got := truncateArtifact(s, 100); got != s {
+			t.Errorf("expected unchanged at exact limit")
+		}
+	})
+
+	t.Run("over limit truncated with marker", func(t *testing.T) {
+		s := strings.Repeat("a", 200)
+		got := truncateArtifact(s, 100)
+		if !strings.HasSuffix(got, "\n... (truncated)") {
+			t.Errorf("missing truncation marker: %q", got)
+		}
+		if strings.Contains(got[:100], "... (truncated)") {
+			t.Error("truncation marker must appear after the kept content")
+		}
+		// Kept content must be exactly max bytes long.
+		kept := strings.TrimSuffix(strings.TrimSuffix(got, "\n... (truncated)"), "\n... (truncated)")
+		if len(kept) != 100 {
+			t.Errorf("kept content length = %d, want 100", len(kept))
+		}
+	})
+
+	t.Run("empty string unchanged", func(t *testing.T) {
+		if got := truncateArtifact("", 100); got != "" {
+			t.Errorf("got %q, want empty", got)
+		}
+	})
 }
 
 func TestFormatReflectionEntry(t *testing.T) {

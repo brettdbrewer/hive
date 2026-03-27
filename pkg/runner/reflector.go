@@ -144,10 +144,30 @@ func parseReflectorOutput(content string) map[string]string {
 	return result
 }
 
+// truncateArtifact limits artifact text to max bytes, appending a truncation marker if cut.
+func truncateArtifact(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "\n... (truncated)"
+}
+
 // buildReflectorPrompt assembles the prompt sent to the Reflector agent.
-// Artifacts: scout report, build report, critique, recent reflections, shared context.
+// The output format constraint is front-loaded so the LLM reads it before
+// processing the artifact context (prevents "lost in the middle" failures).
 func buildReflectorPrompt(scout, build, critique, recentReflections, sharedCtx string) string {
 	return fmt.Sprintf(`You are the Reflector. You close each iteration by extracting what was learned.
+
+## Output Format
+
+Return ONLY a JSON object with exactly these four fields — no preamble, no explanation, no markdown code fences. Keep it concise — 10-15 lines total. BLIND is the most important: actively look for absences.
+
+{
+  "cover": "What was accomplished? How does it connect to prior work?",
+  "blind": "What was missed? What is invisible to the current process?",
+  "zoom": "Step back. What is the larger pattern across iterations?",
+  "formalize": "If a new lesson emerged, state it as a numbered principle. Otherwise write: No new lesson."
+}
 
 ## Institutional Knowledge
 %s
@@ -162,20 +182,7 @@ func buildReflectorPrompt(scout, build, critique, recentReflections, sharedCtx s
 %s
 
 ## Recent Reflections (loop/reflections.md)
-%s
-
-## Instructions
-
-Produce a reflection entry as a JSON object with exactly these four fields:
-
-{
-  "cover": "What was accomplished? How does it connect to prior work?",
-  "blind": "What was missed? What is invisible to the current process?",
-  "zoom": "Step back. What is the larger pattern across iterations?",
-  "formalize": "If a new lesson emerged, state it as a numbered principle. Otherwise write: No new lesson."
-}
-
-Return ONLY the JSON object. No preamble, no explanation, no markdown code fences. Keep it concise — 10-15 lines total. BLIND is the most important: actively look for absences.`, sharedCtx, scout, build, critique, recentReflections)
+%s`, sharedCtx, scout, build, critique, recentReflections)
 }
 
 // formatReflectionEntry formats a dated append block for loop/reflections.md.
@@ -201,11 +208,11 @@ func (r *Runner) runReflector(ctx context.Context) {
 	log.Printf("[reflector] tick %d: reflecting", r.tick)
 
 	// Read loop artifacts (all optional — tolerate missing files).
-	scout := readLoopArtifact(r.cfg.HiveDir, "scout.md")
-	build := readLoopArtifact(r.cfg.HiveDir, "build.md")
-	critique := readLoopArtifact(r.cfg.HiveDir, "critique.md")
+	scout := truncateArtifact(readLoopArtifact(r.cfg.HiveDir, "scout.md"), 2000)
+	build := truncateArtifact(readLoopArtifact(r.cfg.HiveDir, "build.md"), 3000)
+	critique := truncateArtifact(readLoopArtifact(r.cfg.HiveDir, "critique.md"), 2000)
 	recentReflections := readRecentReflections(r.cfg.HiveDir)
-	sharedCtx := LoadSharedContext(r.cfg.HiveDir)
+	sharedCtx := truncateArtifact(LoadSharedContext(r.cfg.HiveDir), 4000)
 
 	// Call LLM.
 	prompt := buildReflectorPrompt(scout, build, critique, recentReflections, sharedCtx)

@@ -2972,3 +2972,13 @@ Ready to proceed once you grant write permissions.
 **ZOOM:** Pattern from iteration 329: code can be correct while artifacts are unfinalized. Loop closure requires both code AND evidence discipline. This iteration surfaces that artifacts aren't hints or working notes — they're immutable evidence. Incomplete artifacts weaken the audit trail even when code works.
 
 **FORMALIZE:** Lesson 87 — Reflector closes AFTER verdict, not before. Post-verdict reflection is immutable evidence, not tentative notes. Meta-commentary (pending work, LLM deliberation) corrupts the artifact. Finalization is architectural: Reflector must validate artifact form before considering closure complete.
+
+## 2026-03-27
+
+**COVER:** Builder executed one-third of Scout's coordinated fix: switched Reflector model haiku→sonnet. Correct code, but Critic issued REVISE: build.md documents wrong commit (88072e0 instead of 5641a3b), and two critical fixes absent (prompt reorder to front-load format constraint, artifact size capping). Root cause—buried instruction after 8000+ chars—remains unaddressed. Model switch helps long-context following but doesn't solve the structural problem.
+
+**BLIND:** The process accepted partial delivery against explicit multi-part scope without enforcement. Scout said 'ship 3 fixes in ONE iteration'; Builder shipped 1. No loop gate caught incomplete scope during Build or early Critic review. The artifact error (wrong commit) should have triggered immediate revision, exposing that the gap fix is incomplete. Pattern: partial code fixes proceed while root causes stay unresolved. Lesson 87 (artifact finalization) proved correct—unfinalized artifacts reveal process gaps that code inspection misses.
+
+**ZOOM:** Iterations ~330-332 show a recurring pattern: code can be correct while gaps remain open. Partial delivery on explicitly scoped work gets accepted and pushed forward, creating false closure. The Scout→Builder→Critic chain has no enforcement point that says 'all stated fixes must ship or REVISE.'. Instead, one-third of a three-part fix ships, the Critic flags it, and the cycle repeats. Root causes don't get fixed; they get smaller patches.
+
+**FORMALIZE:** Lesson 88 — Coordinated fixes must ship complete. When Scout explicitly specifies N coordinated fixes for one gap, all N must ship in one iteration or the gap remains open. Partial delivery on the same gap ID under the same iteration creates false closure and masks unresolved root causes. The loop gates must verify scope completeness, not just code correctness.
