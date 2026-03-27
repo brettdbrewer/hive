@@ -702,6 +702,129 @@ func TestCreateTaskSendsKindTask(t *testing.T) {
 	}
 }
 
+// TestEnsureSpaceExisting verifies that ensureSpace returns nil (without creating)
+// when the API responds with 200 OK.
+func TestEnsureSpaceExisting(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && r.URL.Path == "/app/hive" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	if err := ensureSpace("lv_testkey", srv.URL); err != nil {
+		t.Fatalf("ensureSpace() error: %v", err)
+	}
+}
+
+// TestEnsureSpaceCreates verifies that ensureSpace POSTs to /app/new when
+// the space does not exist (404 response).
+func TestEnsureSpaceCreates(t *testing.T) {
+	var createCalled bool
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/app/hive":
+			w.WriteHeader(http.StatusNotFound)
+		case r.Method == "POST" && r.URL.Path == "/app/new":
+			createCalled = true
+			var payload map[string]string
+			json.NewDecoder(r.Body).Decode(&payload)
+			if payload["kind"] != "community" {
+				t.Errorf("create space kind = %q, want %q", payload["kind"], "community")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte(`{"space":{"slug":"hive"}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer srv.Close()
+
+	if err := ensureSpace("lv_testkey", srv.URL); err != nil {
+		t.Fatalf("ensureSpace() error: %v", err)
+	}
+	if !createCalled {
+		t.Error("expected POST /app/new to create space, but it was not called")
+	}
+}
+
+// TestEnsureSpaceCreateError verifies that ensureSpace returns an error when
+// the create POST fails with HTTP 4xx.
+func TestEnsureSpaceCreateError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("forbidden"))
+	}))
+	defer srv.Close()
+
+	err := ensureSpace("bad_key", srv.URL)
+	if err == nil {
+		t.Fatal("expected error for HTTP 403 on create, got nil")
+	}
+}
+
+// TestSyncMindStateSuccess verifies that syncMindState sends a PUT request
+// with the state content and Authorization header.
+func TestSyncMindStateSuccess(t *testing.T) {
+	var gotMethod, gotPath, gotAuth string
+	var gotPayload map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		json.NewDecoder(r.Body).Decode(&gotPayload)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	stateContent := "## Loop State\n\nIteration 42"
+	if err := syncMindState("lv_testkey", srv.URL, stateContent); err != nil {
+		t.Fatalf("syncMindState() error: %v", err)
+	}
+
+	if gotMethod != "PUT" {
+		t.Errorf("method = %q, want %q", gotMethod, "PUT")
+	}
+	if gotPath != "/api/mind-state" {
+		t.Errorf("path = %q, want %q", gotPath, "/api/mind-state")
+	}
+	if gotAuth != "Bearer lv_testkey" {
+		t.Errorf("Authorization = %q, want %q", gotAuth, "Bearer lv_testkey")
+	}
+	if gotPayload["key"] != "loop_state" {
+		t.Errorf("key = %q, want %q", gotPayload["key"], "loop_state")
+	}
+	if gotPayload["value"] != stateContent {
+		t.Errorf("value = %q, want %q", gotPayload["value"], stateContent)
+	}
+}
+
+// TestSyncMindStateError verifies that syncMindState returns an error when
+// the server responds with HTTP 4xx.
+func TestSyncMindStateError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("unauthorized"))
+	}))
+	defer srv.Close()
+
+	err := syncMindState("bad_key", srv.URL, "state content")
+	if err == nil {
+		t.Fatal("expected error for HTTP 401, got nil")
+	}
+}
+
 // TestAssertCritiqueNoTitle verifies that assertCritique returns an error
 // when critique.md exists but contains no heading (no title to extract).
 func TestAssertCritiqueNoTitle(t *testing.T) {

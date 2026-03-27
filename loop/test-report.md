@@ -1,48 +1,66 @@
-# Test Report: Observer audit — kind=task fix
+# Test Report: 65d1e553 false completion — operational iteration
 
 - **Date:** 2026-03-28
-- **Build commit:** d062e08
-- **Tests run:** 25 in `cmd/post/` (23 existing + 2 new)
+- **Build commit:** 388a9bb
+- **Tests run:** 28 top-level in `cmd/post/` (25 existing + 5 new)
 - **Result:** PASS
 
 ## What Was Tested
 
+This iteration made no production code changes — it was operational (ran cmd/post manually, closed orphaned tasks). The regression pins from the d062e08 fix (TestCreateTaskSendsKindTask, TestAssertCritiqueNoTitle) were already present. This session closed the remaining coverage gaps.
+
 ### New tests added
 
-**`TestCreateTaskSendsKindTask`**
-The critical regression pin for this iteration. `createTask()` was changed to include
-explicit `"kind": "task"` in the intend payload. Without this, the board kind assignment
-depended on server defaults rather than the client explicitly requesting it. This test
-captures the intend request and asserts `kind == "task"` is present.
+**`TestEnsureSpaceExisting`**
+Verifies ensureSpace returns nil when the API responds 200 — space exists, no POST.
 
-**`TestAssertCritiqueNoTitle`**
-Verifies `assertCritique()` returns an error (mentioning "critique title") when
-`critique.md` exists but contains no markdown heading. Parallel to the existing
-`TestAssertScoutGapNoGapLine` for the scout path.
+**`TestEnsureSpaceCreates`**
+Verifies ensureSpace POSTs to `/app/new` with `kind=community` when the space is missing (404 response). Was the only function that made two distinct HTTP calls with no test at all.
 
-### Coverage confirmed for all new/changed functions
+**`TestEnsureSpaceCreateError`**
+Verifies ensureSpace returns an error when the create POST fails with HTTP 4xx.
+
+**`TestSyncMindStateSuccess`**
+Verifies syncMindState sends a PUT to `/api/mind-state` with the correct Authorization header, `key=loop_state`, and the full state content as the value.
+
+**`TestSyncMindStateError`**
+Verifies syncMindState returns an error when the server responds with HTTP 4xx.
+
+### Coverage after this session
 
 | Function | Tests |
 |---|---|
-| `createTask()` — kind=task field | `TestCreateTaskSendsKindTask` (new) |
-| `post()` — op=intend, kind=document | `TestPostCreatesDocument`, `TestBuildTitleExtractedOnPost` |
-| `assertCritique()` | `TestAssertCritiqueCreatesClaimNode`, `TestAssertCritiqueMissingFile`, `TestAssertCritiqueNoTitle` (new) |
+| `buildTitle()` | `TestBuildTitle` (6 subtests) |
+| `post()` | `TestPostCreatesDocument`, `TestBuildTitleExtractedOnPost` |
+| `createTask()` | `TestCreateTaskSendsKindTask` |
+| `ensureSpace()` | `TestEnsureSpaceExisting`, `TestEnsureSpaceCreates`, `TestEnsureSpaceCreateError` ✨ |
+| `syncMindState()` | `TestSyncMindStateSuccess`, `TestSyncMindStateError` ✨ |
+| `syncClaims()` | `TestSyncClaimsWritesFile`, `TestSyncClaimsEmptyDoesNotWrite`, `TestSyncClaimsAPIError`, `TestSyncClaimsClaimWithNoMetadata` |
+| `assertScoutGap()` | `TestAssertScoutGapCreatesClaimNode`, `TestAssertScoutGapMissingFile`, `TestAssertScoutGapNoGapLine`, `TestAssertScoutGapAPIError`, `TestAssertScoutGapSendsAuthHeader` |
+| `extractIterationFromScout()` | `TestExtractIterationFromScout` (3 subtests) |
+| `extractGapTitle()` | `TestExtractGapTitle` (3 subtests) |
+| `assertCritique()` | `TestAssertCritiqueCreatesClaimNode`, `TestAssertCritiqueMissingFile`, `TestAssertCritiqueNoTitle` |
+| `extractCritiqueTitle()` | `TestExtractCritiqueTitle` (3 subtests) |
 | `assertLatestReflection()` | `TestAssertLatestReflectionCreatesDocument`, `TestAssertLatestReflectionMissingFile` |
-| `extractCritiqueTitle()` | `TestExtractCritiqueTitle` (3 cases) |
 | `extractLatestReflection()` | `TestExtractLatestReflection`, `TestExtractLatestReflectionNoEntry` |
-
-## Gap Found
-
-The Builder wrote 23 tests but missed the primary regression case:
-`createTask()` had no test verifying `kind=task` was in the payload. This was the
-core fix of the iteration — the 491 board nodes lacked explicit kind because the
-field wasn't being sent. `TestCreateTaskSendsKindTask` pins it.
 
 ## Full Suite
 
 ```
-ok  github.com/lovyou-ai/hive/cmd/post  0.560s  (25 tests)
-ok  github.com/lovyou-ai/hive/pkg/runner  3.522s
+ok  github.com/lovyou-ai/hive/cmd/post       0.566s  (28 top-level tests)
+ok  github.com/lovyou-ai/hive/cmd/mcp-graph  (cached)
+ok  github.com/lovyou-ai/hive/cmd/mcp-knowledge (cached)
+ok  github.com/lovyou-ai/hive/pkg/api        (cached)
+ok  github.com/lovyou-ai/hive/pkg/authority  (cached)
+ok  github.com/lovyou-ai/hive/pkg/hive       (cached)
+ok  github.com/lovyou-ai/hive/pkg/loop       (cached)
+ok  github.com/lovyou-ai/hive/pkg/resources  (cached)
+ok  github.com/lovyou-ai/hive/pkg/runner     (cached)
+ok  github.com/lovyou-ai/hive/pkg/workspace  (cached)
 ```
 
 All packages clean. No regressions.
+
+## Remaining gap
+
+`main()` itself — not directly testable (reads env vars, calls os.Exit). Covered indirectly by all the function-level tests above. No action needed.

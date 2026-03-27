@@ -184,12 +184,17 @@ Check the hive's own data on the board for structural issues:
 
 curl -s -H "Authorization: Bearer %s" -H "Accept: application/json" "https://lovyou.ai/app/%s/board"
 
+Also fetch claims to audit knowledge integrity (claims exist — do not report zero without checking):
+
+curl -s -H "Authorization: Bearer %s" -H "Accept: application/json" "https://lovyou.ai/app/%s/knowledge?tab=claims&limit=50"
+
 Look for:
 1. **Unlinked nodes** — critiques/claims that don't reference the build they review
 2. **Stale data** — open tasks that have been active for days with no progress
 3. **Title compounding** — tasks with "Fix: Fix: Fix:..." prefixes (should be stripped)
 4. **Schema violations** — any field using display names where IDs should be used (Invariant 11)
-5. **Orphaned milestones** — PM milestones still open after their subtasks completed`, apiKey, spaceSlug)
+5. **Orphaned milestones** — PM milestones still open after their subtasks completed
+6. **Claim integrity** — claims with no body, no causes, or stuck in challenged state with no resolution`, apiKey, spaceSlug, apiKey, spaceSlug)
 }
 
 func buildOutputInstruction(spaceSlug, apiKey string) string {

@@ -7,29 +7,32 @@ import (
 
 func TestBuildPart2Instruction(t *testing.T) {
 	cases := []struct {
-		name          string
-		spaceSlug     string
-		apiKey        string
-		wantSkip      bool
-		wantCurl      bool
-		wantKeyInBody bool
-		wantSlugInURL bool
+		name           string
+		spaceSlug      string
+		apiKey         string
+		wantSkip       bool
+		wantCurl       bool
+		wantKeyInBody  bool
+		wantSlugInURL  bool
+		wantClaimsURL  bool
 	}{
 		{
-			name:      "empty apiKey returns skip text, no curl",
-			spaceSlug: "hive",
-			apiKey:    "",
-			wantSkip:  true,
-			wantCurl:  false,
+			name:          "empty apiKey returns skip text, no curl",
+			spaceSlug:     "hive",
+			apiKey:        "",
+			wantSkip:      true,
+			wantCurl:      false,
+			wantClaimsURL: false,
 		},
 		{
-			name:          "set apiKey returns curl with key and slug embedded",
+			name:          "set apiKey returns curl with key and slug embedded, including claims URL",
 			spaceSlug:     "hive",
 			apiKey:        "lv_testkey",
 			wantSkip:      false,
 			wantCurl:      true,
 			wantKeyInBody: true,
 			wantSlugInURL: true,
+			wantClaimsURL: true,
 		},
 	}
 
@@ -54,6 +57,12 @@ func TestBuildPart2Instruction(t *testing.T) {
 			}
 			if tc.wantSlugInURL && !strings.Contains(got, tc.spaceSlug) {
 				t.Errorf("expected slug %q in output, got: %q", tc.spaceSlug, got)
+			}
+			if tc.wantClaimsURL && !strings.Contains(got, "knowledge?tab=claims") {
+				t.Errorf("expected claims URL in output, got: %q", got)
+			}
+			if !tc.wantClaimsURL && strings.Contains(got, "knowledge?tab=claims") {
+				t.Errorf("unexpected claims URL in output, got: %q", got)
 			}
 		})
 	}
