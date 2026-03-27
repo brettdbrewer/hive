@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 )
 
 // PipelineState represents the pipeline's current state.
@@ -173,15 +174,25 @@ func (sm *PipelineStateMachine) Run(ctx context.Context) error {
 			return fmt.Errorf("no agent for state %q", sm.state)
 		}
 
-		// Run the agent.
+		// Run the agent and track duration.
 		log.Printf("[pipeline] ── %s ── (%s)", agent, sm.state)
+		phaseStart := time.Now()
 		sm.runner.cfg.Role = agent
 		sm.runner.cfg.OneShot = true
 		sm.runner.done = false
 		sm.runner.runTick(ctx)
+		phaseDuration := time.Since(phaseStart)
 
 		// Determine the next event based on what happened.
 		event := sm.inferEvent(agent)
+
+		// Record diagnostic for every phase — not just failures.
+		sm.runner.appendDiagnostic(PhaseEvent{
+			Phase:        agent,
+			Outcome:      string(event),
+			CostUSD:      sm.runner.cost.TotalCostUSD,
+			DurationSecs: phaseDuration.Seconds(),
+		})
 		if _, _, err := sm.Transition(event); err != nil {
 			log.Printf("[pipeline] transition error: %v — returning to idle", err)
 			sm.state = StateIdle

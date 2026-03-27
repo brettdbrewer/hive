@@ -9,13 +9,16 @@ import (
 	"time"
 )
 
-// PhaseEvent is a diagnostic event emitted by a runner phase on error or failure.
+// PhaseEvent is a diagnostic event emitted by every pipeline phase.
+// Not just failures — records cost, duration, and outcome for every run.
+// The Observer uses this to detect inefficiency, not just errors.
 type PhaseEvent struct {
 	Phase        string  `json:"phase"`
-	Outcome      string  `json:"outcome,omitempty"`
+	Outcome      string  `json:"outcome,omitempty"`      // "success", "failure", "revise", "skip"
 	Error        string  `json:"error,omitempty"`
 	Preview      string  `json:"preview,omitempty"`
 	CostUSD      float64 `json:"cost_usd"`
+	DurationSecs float64 `json:"duration_secs,omitempty"` // wall clock time for this phase
 	InputTokens  int     `json:"input_tokens,omitempty"`
 	OutputTokens int     `json:"output_tokens,omitempty"`
 	Timestamp    string  `json:"timestamp"`

@@ -148,6 +148,137 @@ func TestSyncClaimsEmptyDoesNotWrite(t *testing.T) {
 	}
 }
 
+// TestExtractGapTitle verifies that extractGapTitle parses the **Gap:** line
+// from scout.md correctly.
+func TestExtractGapTitle(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name: "standard scout format",
+			input: "## SCOUT GAP REPORT — Iteration 354\n\n**Gap:** The hive cannot scale collective decision-making.\n",
+			want: "The hive cannot scale collective decision-making.",
+		},
+		{
+			name:  "no gap line",
+			input: "## SCOUT GAP REPORT\n\nSome content without a gap line.",
+			want:  "",
+		},
+		{
+			name:  "gap with extra whitespace",
+			input: "**Gap:**   Missing quorum logic.   \n",
+			want:  "Missing quorum logic.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractGapTitle([]byte(tt.input))
+			if got != tt.want {
+				t.Errorf("extractGapTitle() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestExtractIterationFromScout verifies iteration number parsing from scout.md.
+func TestExtractIterationFromScout(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "standard format",
+			input: "## SCOUT GAP REPORT — Iteration 354\n",
+			want:  "354",
+		},
+		{
+			name:  "no iteration",
+			input: "## SCOUT GAP REPORT\n",
+			want:  "unknown",
+		},
+		{
+			name:  "iteration in body text",
+			input: "Last updated: Iteration 100\n",
+			want:  "100",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractIterationFromScout([]byte(tt.input))
+			if got != tt.want {
+				t.Errorf("extractIterationFromScout() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestAssertScoutGapCreatesClaimNode verifies that assertScoutGap reads scout.md,
+// extracts the gap, and POSTs op=assert with a claim title and body containing
+// the gap title and iteration number to /app/hive/op.
+func TestAssertScoutGapCreatesClaimNode(t *testing.T) {
+	var received map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/app/hive/op" {
+			http.NotFound(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &received)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"node":{"id":"claim-123"}}`))
+	}))
+	defer srv.Close()
+
+	// Write a temporary scout.md that assertScoutGap will read.
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "loop"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	scoutContent := "## SCOUT GAP REPORT — Iteration 42\n\n**Gap:** Governance lacks quorum logic.\n"
+	if err := os.WriteFile(filepath.Join(tmp, "loop", "scout.md"), []byte(scoutContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	if err := assertScoutGap("lv_testkey", srv.URL); err != nil {
+		t.Fatalf("assertScoutGap() error: %v", err)
+	}
+
+	if received["op"] != "assert" {
+		t.Errorf("op = %q, want %q", received["op"], "assert")
+	}
+	if received["title"] != "Governance lacks quorum logic." {
+		t.Errorf("title = %q, want %q", received["title"], "Governance lacks quorum logic.")
+	}
+	if !strings.Contains(received["body"], "Iteration 42") {
+		t.Errorf("body %q does not contain iteration number", received["body"])
+	}
+	if !strings.Contains(received["body"], "Governance lacks quorum logic.") {
+		t.Errorf("body %q does not contain gap title", received["body"])
+	}
+}
+
+// TestAssertScoutGapMissingFile verifies that assertScoutGap returns an error
+// when scout.md does not exist, without crashing.
+func TestAssertScoutGapMissingFile(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	err := assertScoutGap("lv_testkey", "http://localhost:9999")
+	if err == nil {
+		t.Fatal("expected error for missing scout.md, got nil")
+	}
+}
+
 // TestBuildTitleExtractedOnPost verifies that buildTitle + post produces a
 // feed node whose title comes from build.md (not just "Iteration N").
 func TestBuildTitleExtractedOnPost(t *testing.T) {

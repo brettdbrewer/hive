@@ -97,6 +97,13 @@ func main() {
 		// Non-fatal — post succeeded.
 	}
 
+	// Assert the Scout's gap as a KindClaim node so gaps are searchable
+	// via knowledge_search and survive scout.md being overwritten next iteration.
+	if err := assertScoutGap(apiKey, baseURL); err != nil {
+		fmt.Fprintf(os.Stderr, "assert scout gap: %v\n", err)
+		// Non-fatal — post succeeded.
+	}
+
 	fmt.Printf("posted iteration %s to %s/app/hive/feed\n", iteration, baseURL)
 }
 
@@ -309,6 +316,72 @@ func syncClaims(apiKey, baseURL, outPath string) error {
 
 	fmt.Printf("synced %d claims to %s\n", len(result.Claims), outPath)
 	return nil
+}
+
+// assertScoutGap reads loop/scout.md, extracts the gap title and iteration number,
+// and creates a KindClaim node on the graph via op=assert. This makes Scout gaps
+// searchable via knowledge_search and preserves them across iterations (scout.md
+// is overwritten each iteration; graph nodes are permanent).
+func assertScoutGap(apiKey, baseURL string) error {
+	data, err := os.ReadFile("loop/scout.md")
+	if err != nil {
+		return fmt.Errorf("read scout.md: %w", err)
+	}
+
+	iteration := extractIterationFromScout(data)
+	gapTitle := extractGapTitle(data)
+	if gapTitle == "" {
+		return fmt.Errorf("could not find gap title in scout.md")
+	}
+
+	body := fmt.Sprintf("Iteration %s\n\n%s", iteration, gapTitle)
+
+	payload, _ := json.Marshal(map[string]string{
+		"op":    "assert",
+		"title": gapTitle,
+		"body":  body,
+	})
+	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	fmt.Printf("asserted scout gap as claim: %q (iteration %s)\n", gapTitle, iteration)
+	return nil
+}
+
+// extractIterationFromScout parses "Iteration N" from scout.md header.
+func extractIterationFromScout(data []byte) string {
+	re := regexp.MustCompile(`Iteration (\d+)`)
+	m := re.FindSubmatch(data)
+	if m == nil {
+		return "unknown"
+	}
+	return string(m[1])
+}
+
+// extractGapTitle parses the "**Gap:** ..." line from scout.md.
+func extractGapTitle(data []byte) string {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "**Gap:**") {
+			gap := strings.TrimPrefix(line, "**Gap:**")
+			return strings.TrimSpace(gap)
+		}
+	}
+	return ""
 }
 
 func post(apiKey, baseURL, title, body string) error {
