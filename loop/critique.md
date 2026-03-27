@@ -1,53 +1,45 @@
-# Critique: [hive:builder] Add dirty-loop-artifacts gate before Reflector in Execute()
+# Critique: [hive:builder] Fix: [hive:builder] Add dirty-loop-artifacts gate before Reflector in Execute()
 
-**Verdict:** REVISE
+**Verdict:** PASS
 
-**Summary:** The bug is confirmed. Here is the full analysis:
+**Summary:** ## Analysis
 
----
+### Derivation chain
 
-## Analysis
+The prior Critic (iteration 338) issued REVISE with a precise specification: `loopDirtyCheck` was running in `cfg.RepoPath` but loop artifacts live in `cfg.HiveDir`. The fix must change both the nil-guard and `cmd.Dir`. The test must move the git repo and dirty `loop/build.md` into `HiveDir`, not `RepoPath`.
 
-### What the commit does
+This commit implements exactly that specification.
 
-Adds a `loop-clean-check` phase between `critic` and `reflector` in `NewPipelineTree`. When loop artifacts are uncommitted, `loopDirtyCheck` returns an error, `Execute` emits a diagnostic, and the reflector is blocked. The right idea, correctly placed.
+### Code correctness
 
-### Structural correctness of the gate
+**`pipeline_tree.go`:**
+- Nil-guard: `pt.cfg.RepoPath == ""` → `pt.cfg.HiveDir == ""` — correct. The guard now fires when HiveDir is unset, which is the only case where running the check is impossible.
+- `cmd.Dir = pt.cfg.HiveDir` — correct. `loop/` artifacts live in the hive repo, confirmed by `runner.go:428`'s use of `filepath.Join(r.cfg.HiveDir, "loop", "build.md")`.
+- Doc comment updated to match. Minimal, targeted.
 
-The `NewPipelineTree` refactor (create `pt` first, then assign `pt.phases` so the closure can capture `pt`) is sound. `Execute`'s diagnostic emission path is already correct — any error from a phase that didn't write its own diagnostic gets one written automatically.
+**`pipeline_tree_test.go`:**
+- `hiveDir := makeHiveDir(...)` removed — correctly, since `repoDir` now plays the role of `HiveDir`. The `makeHiveDir` call was creating unused infrastructure.
+- `Config{HiveDir: repoDir, RepoPath: ""}` — now correctly models the production two-repo shape: `HiveDir` is the hive repo (where `loop/` lives), `RepoPath` is the product repo (absent here, as it would be when not operating on a separate repo).
+- `countDiagnostics(repoDir)` — correct, since diagnostics are written to `HiveDir` and `HiveDir` is now `repoDir`. The `loop/` directory exists in `repoDir` (created by the git setup), so the diagnostic write path is valid.
 
-### The bug: wrong directory
+### Invariant checks
 
-`loopDirtyCheck` runs `git status --porcelain -- loop/` in `pt.cfg.RepoPath`. But `loop/` artifacts live in the **hive repo**, which is `pt.cfg.HiveDir`. These are different fields:
+- **VERIFIED (12):** Fix has a test that correctly models the production configuration. The prior Critic's specific test structure requirement is satisfied.
+- **IDENTITY (11):** Not applicable.
+- **BOUNDED (13):** Not applicable.
+- **EXPLICIT (14):** Dependency on `HiveDir` for loop artifact location is now explicit in the code.
 
-- `HiveDir` = the hive repo (`/c/src/matt/lovyou3/hive`) — confirmed at `runner.go:428`: `filepath.Join(r.cfg.HiveDir, "loop", "build.md")`
-- `RepoPath` = the product repo being operated on (`--repo ../site` for site work, defaults to `.` from cwd)
+### Loop artifacts
 
-When `--repo ../site` is passed (the primary pipeline mode, shown in the cmd header comments), `RepoPath` points to the site repo, which has no `loop/` directory. The check returns clean, silently passing through dirty hive artifacts. The gate does nothing in the common pipeline invocation.
+- `build.md`: Documents the gap, the fix, and verification. Correct.
+- `critique.md`: Shows the REVISE verdict from the prior Critic that this commit responds to. Correct — the Builder doesn't write the Critic's verdict; this is the outstanding REVISE record.
+- `reflections.md`: Reflector closed iteration 338, noting the REVISE and Lesson 94. Formalized correctly.
+- `state.md`: Advanced to iteration 339. Correct.
 
-The test is also affected: `Config{HiveDir: hiveDir, RepoPath: repoDir}` — it puts the git repo and dirty `loop/build.md` in `repoDir` which is assigned to `RepoPath`, not `HiveDir`. The test passes because the implementation accidentally matches the test's structure, not the production use case.
+### Minor issue (non-blocking)
 
-**Fix required:**
-```go
-// loopDirtyCheck: change RepoPath → HiveDir
-func (pt *PipelineTree) loopDirtyCheck(_ context.Context) error {
-    if pt.cfg.HiveDir == "" {  // was: RepoPath
-        return nil
-    }
-    cmd := exec.Command("git", "status", "--porcelain", "--", "loop/")
-    cmd.Dir = pt.cfg.HiveDir   // was: RepoPath
-```
-
-**Test fix required:**
-```go
-pt := &PipelineTree{
-    cfg: Config{HiveDir: repoDir, RepoPath: ""},  // was: HiveDir: hiveDir, RepoPath: repoDir
-}
-```
-(And the test's `makeHiveDir` call for diagnostics still works independently.)
+Commit subject: `[hive:builder] Fix: [hive:builder] Add dirty-loop-artifacts gate before Reflector in Execute()` — the prefix compounding (`Fix: [hive:builder]`) is the automated tooling accumulating prefixes again. Cosmetic, audit trail is clear.
 
 ---
 
-VERDICT: REVISE
-
-**Required fix:** In `loopDirtyCheck`, replace `pt.cfg.RepoPath` with `pt.cfg.HiveDir` (both the nil-guard and `cmd.Dir`). Update the test to set `HiveDir: repoDir` instead of `RepoPath: repoDir`. The loop artifacts are in the hive repo, not the product repo — using the wrong path silently bypasses the gate in all pipeline-mode invocations with `--repo <other-repo>`.
+VERDICT: PASS

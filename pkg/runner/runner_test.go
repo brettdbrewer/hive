@@ -177,7 +177,7 @@ func TestBuildArtifactWritten(t *testing.T) {
 	r := New(Config{HiveDir: hiveDir, RepoPath: repoDir})
 
 	task := api.Node{ID: "task-1", Title: "Add feature X", Kind: "task"}
-	r.writeBuildArtifact(task, 0.0042)
+	r.writeBuildArtifact(task, 0.0042, "")
 
 	data, err := os.ReadFile(filepath.Join(hiveDir, "loop", "build.md"))
 	if err != nil {
@@ -189,6 +189,83 @@ func TestBuildArtifactWritten(t *testing.T) {
 	}
 	if !strings.Contains(body, "0.0042") {
 		t.Errorf("build.md does not contain cost:\n%s", body)
+	}
+}
+
+func TestBuildArtifactContainsSummary(t *testing.T) {
+	repoDir := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runGit("init")
+	runGit("config", "user.email", "test@test.com")
+	runGit("config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(repoDir, "file.go"), []byte("package main\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", ".")
+	runGit("commit", "-m", "Add feature Y")
+
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+	r := New(Config{HiveDir: hiveDir, RepoPath: repoDir})
+
+	task := api.Node{ID: "task-2", Title: "Add feature Y", Kind: "task"}
+	summary := "Implemented the new handler and added unit tests covering all branches."
+	r.writeBuildArtifact(task, 0.0010, summary)
+
+	data, err := os.ReadFile(filepath.Join(hiveDir, "loop", "build.md"))
+	if err != nil {
+		t.Fatalf("build.md not written: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, "## What Was Built") {
+		t.Errorf("build.md missing '## What Was Built' section:\n%s", body)
+	}
+	if !strings.Contains(body, summary) {
+		t.Errorf("build.md missing operate summary:\n%s", body)
+	}
+}
+
+func TestBuildArtifactSummaryTruncated(t *testing.T) {
+	repoDir := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repoDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	runGit("init")
+	runGit("config", "user.email", "test@test.com")
+	runGit("config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(repoDir, "file.go"), []byte("package main\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", ".")
+	runGit("commit", "-m", "Add feature Z")
+
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+	r := New(Config{HiveDir: hiveDir, RepoPath: repoDir})
+
+	task := api.Node{ID: "task-3", Title: "Add feature Z", Kind: "task"}
+	longSummary := strings.Repeat("x", 3000)
+	r.writeBuildArtifact(task, 0.0, longSummary)
+
+	data, err := os.ReadFile(filepath.Join(hiveDir, "loop", "build.md"))
+	if err != nil {
+		t.Fatalf("build.md not written: %v", err)
+	}
+	if !strings.Contains(string(data), strings.Repeat("x", 2000)) {
+		t.Errorf("build.md should contain 2000 x's (truncated summary)")
+	}
+	if strings.Contains(string(data), strings.Repeat("x", 2001)) {
+		t.Errorf("build.md summary was not truncated to 2000 chars")
 	}
 }
 

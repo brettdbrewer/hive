@@ -334,7 +334,7 @@ func (r *Runner) workTask(ctx context.Context, t api.Node) {
 			return
 		}
 		log.Printf("[builder] task %s DONE: %s", t.ID, t.Title)
-		r.writeBuildArtifact(t, r.cost.TotalCostUSD)
+		r.writeBuildArtifact(t, r.cost.TotalCostUSD, result.Summary)
 
 		// Post cost summary as comment.
 		_ = r.cfg.APIClient.CommentTask(r.cfg.SpaceSlug, t.ID,
@@ -402,7 +402,7 @@ ACTION: ESCALATE
 // ─── Build artifact ──────────────────────────────────────────────────
 
 // writeBuildArtifact writes loop/build.md summarising the completed task.
-func (r *Runner) writeBuildArtifact(t api.Node, costUSD float64) {
+func (r *Runner) writeBuildArtifact(t api.Node, costUSD float64, operateSummary string) {
 	hash := r.gitHash()
 	subject := r.gitSubject()
 	diffStat := r.gitDiffStat()
@@ -410,6 +410,11 @@ func (r *Runner) writeBuildArtifact(t api.Node, costUSD float64) {
 	body := t.Body
 	if len(body) > 300 {
 		body = body[:300] + "..."
+	}
+
+	summary := operateSummary
+	if len(summary) > 2000 {
+		summary = summary[:2000]
 	}
 
 	var b strings.Builder
@@ -420,6 +425,9 @@ func (r *Runner) writeBuildArtifact(t api.Node, costUSD float64) {
 	b.WriteString(fmt.Sprintf("- **Timestamp:** %s\n", time.Now().UTC().Format(time.RFC3339)))
 	if body != "" {
 		b.WriteString(fmt.Sprintf("\n## Task\n\n%s\n", body))
+	}
+	if summary != "" {
+		b.WriteString(fmt.Sprintf("\n## What Was Built\n\n%s\n", summary))
 	}
 	if diffStat != "" {
 		b.WriteString(fmt.Sprintf("\n## Diff Stat\n\n```\n%s\n```\n", diffStat))

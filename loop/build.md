@@ -1,20 +1,30 @@
-# Build: Fix loopDirtyCheck to use HiveDir instead of RepoPath
+# Build: Capture Operate summary in writeBuildArtifact
 
-## Gap Fixed
-`loopDirtyCheck` was checking `cfg.RepoPath` instead of `cfg.HiveDir`. Loop artifacts (`loop/*.md`) live in the hive repo (`HiveDir`), not the product repo (`RepoPath`). When `--repo ../site` is passed, `RepoPath` points to the site repo which has no `loop/` directory — the gate silently passed through dirty hive artifacts. The test also had the same confusion: it put the git repo in `RepoPath`, making it accidentally match the broken implementation.
+- **Commit:** (pending — not yet committed)
+- **Subject:** [hive:builder] Capture Operate summary in writeBuildArtifact
+- **Cost:** $0.0000
+- **Timestamp:** 2026-03-27T00:00:00Z
 
-## Files Changed
+## Task
 
-### `pkg/runner/pipeline_tree.go`
-- `loopDirtyCheck`: changed guard `cfg.RepoPath == ""` → `cfg.HiveDir == ""`
-- `loopDirtyCheck`: changed `cmd.Dir = cfg.RepoPath` → `cmd.Dir = cfg.HiveDir`
-- Updated doc comment accordingly
+In `pkg/runner/runner.go`, change `writeBuildArtifact(t api.Node, costUSD float64)` to accept a third `operateSummary string` parameter. Add a `## What Was Built` section to build.md that includes the summary (truncated to 2000 chars) between the metadata block and the diff stat. In `workTask`, pass `result.Summary` as the third arg at line 337. Add a test in `pkg/runner/runner_test.go` that verifies the summary content appears in build.md output.
 
-### `pkg/runner/pipeline_tree_test.go` (`TestLoopDirtyCheckBlocksReflector`)
-- Changed `Config{HiveDir: hiveDir, RepoPath: repoDir}` → `Config{HiveDir: repoDir, RepoPath: ""}` — the git repo with dirty `loop/build.md` must be in `HiveDir`
-- Changed `countDiagnostics(hiveDir)` → `countDiagnostics(repoDir)` — diagnostics are written to `HiveDir`
-- Removed now-unused `hiveDir := makeHiveDir(...)` variable
+## What Was Built
 
-## Verification
-- `go.exe build -buildvcs=false ./...` — clean
-- `go.exe test ./...` — all pass
+- Changed `writeBuildArtifact` signature to accept `operateSummary string` as third parameter
+- Summary is truncated to 2000 chars if longer
+- Added `## What Was Built` section written after `## Task` and before `## Diff Stat`
+- Updated call site in `workTask` to pass `result.Summary`
+- Added `TestBuildArtifactContainsSummary`: verifies the summary text appears under `## What Was Built`
+- Added `TestBuildArtifactSummaryTruncated`: verifies summaries >2000 chars are truncated
+- Updated `TestBuildArtifactWritten` to pass empty string for backward compatibility
+- Build: `go.exe build -buildvcs=false ./...` — pass
+- Tests: `go.exe test ./pkg/runner/...` — pass (3.587s)
+
+## Diff Stat
+
+```
+pkg/runner/runner.go      | 8 ++++++--
+pkg/runner/runner_test.go | 60 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2 files changed, 66 insertions(+), 2 deletions(-)
+```
