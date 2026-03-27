@@ -54,11 +54,18 @@ func (r *Runner) runPMOperate(ctx context.Context, op decision.IOperator) {
 
 ## Available Repos: %s
 
+## CRITICAL: Check the Director's Intent First
+The board has a PINNED GOAL — the Director's strategic intent. Read it FIRST:
+curl -s -H "Authorization: Bearer %s" -H "Accept: application/json" "https://lovyou.ai/app/%s/board"
+Look for the pinned, urgent goal. Your milestone MUST serve that intent.
+If it doesn't, you're drifting. The Director's intent persists across cycles.
+
 ## Steps
-1. Search knowledge for "backlog" — read it to understand priorities
-2. Search knowledge for "Director mandate" — check if there are binding instructions
-3. Check the board for open tasks: curl -s -H "Authorization: Bearer %s" -H "Accept: application/json" "https://lovyou.ai/app/%s/board"
-4. Check recent git commits: git log --oneline -20
+1. Read the PINNED GOAL on the board — this is the Director's intent
+2. Search knowledge for "backlog" — read it to understand priorities
+3. Search knowledge for "Director mandate" — check if there are binding instructions
+4. Check the board for open tasks: curl -s -H "Authorization: Bearer %s" -H "Accept: application/json" "https://lovyou.ai/app/%s/board"
+5. Check recent git commits: git log --oneline -20
 5. Read diagnostics for pipeline failures: cat loop/diagnostics.jsonl | tail -20
 6. Decide the MOST IMPORTANT thing to build next
 7. Create a milestone on the board:
@@ -72,7 +79,8 @@ func (r *Runner) runPMOperate(ctx context.Context, op decision.IOperator) {
 - Check the Director mandate in the backlog — it may override your preference
 - One direction per milestone, 3-5 specific tasks
 - ALWAYS include Target repo in the directive
-`, repoNames, apiKey, r.cfg.SpaceSlug, apiKey, r.cfg.SpaceSlug)
+- Your milestone MUST serve the pinned goal. If it doesn't, you're drifting.
+`, repoNames, apiKey, r.cfg.SpaceSlug, apiKey, r.cfg.SpaceSlug, apiKey, r.cfg.SpaceSlug)
 
 	result, err := op.Operate(ctx, decision.OperateTask{
 		WorkDir:     r.cfg.HiveDir,
