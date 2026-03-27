@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -24,12 +25,75 @@ func markerCandidates(key string) []string {
 	}
 }
 
+// jsonReflectorOutput is the expected shape when an LLM returns JSON instead of
+// the text-marker format. Field names are lowercase as commonly produced by LLMs.
+type jsonReflectorOutput struct {
+	Cover     string `json:"cover"`
+	Blind     string `json:"blind"`
+	Zoom      string `json:"zoom"`
+	Formalize string `json:"formalize"`
+}
+
+// parseReflectorOutputJSON attempts to parse content as JSON with COVER/BLIND/ZOOM/FORMALIZE
+// fields. Handles flat objects, {"reflection":{...}} wrappers, and prose preambles
+// (by scanning for the first '{' that begins a valid JSON object).
+// Returns nil if no valid JSON with at least COVER present is found.
+func parseReflectorOutputJSON(content string) map[string]string {
+	// Strip markdown code fences.
+	content = strings.TrimSpace(content)
+	if strings.HasPrefix(content, "```") {
+		if nl := strings.IndexByte(content, '\n'); nl >= 0 {
+			content = strings.TrimSpace(content[nl+1:])
+		}
+	}
+	if strings.HasSuffix(content, "```") {
+		content = strings.TrimSpace(content[:len(content)-3])
+	}
+
+	// Scan for each '{' — handles prose preamble before the JSON block.
+	for i, ch := range content {
+		if ch != '{' {
+			continue
+		}
+		sub := content[i:]
+
+		var ref jsonReflectorOutput
+		if err := json.Unmarshal([]byte(sub), &ref); err == nil && ref.Cover != "" {
+			return map[string]string{
+				"COVER":     ref.Cover,
+				"BLIND":     ref.Blind,
+				"ZOOM":      ref.Zoom,
+				"FORMALIZE": ref.Formalize,
+			}
+		}
+
+		var wrapper struct {
+			Reflection jsonReflectorOutput `json:"reflection"`
+		}
+		if err := json.Unmarshal([]byte(sub), &wrapper); err == nil && wrapper.Reflection.Cover != "" {
+			ref = wrapper.Reflection
+			return map[string]string{
+				"COVER":     ref.Cover,
+				"BLIND":     ref.Blind,
+				"ZOOM":      ref.Zoom,
+				"FORMALIZE": ref.Formalize,
+			}
+		}
+	}
+	return nil
+}
+
 // parseReflectorOutput extracts COVER/BLIND/ZOOM/FORMALIZE sections from
-// reflector LLM output. Tries all format variants per key and picks the
-// earliest-occurring match. The same candidate set is used for boundary
+// reflector LLM output. Tries JSON first, then text-marker formats. Picks the
+// earliest-occurring match per key. The same candidate set is used for boundary
 // detection so sections using any variant are correctly terminated.
 // Returns a map of section name → trimmed content.
 func parseReflectorOutput(content string) map[string]string {
+	// Try JSON first — handles LLM responses that return raw JSON objects or
+	// {"reflection":{...}} wrappers instead of the text-marker format.
+	if result := parseReflectorOutputJSON(content); result != nil {
+		return result
+	}
 	keys := []string{"COVER", "BLIND", "ZOOM", "FORMALIZE"}
 	result := map[string]string{}
 
@@ -159,15 +223,16 @@ func (r *Runner) runReflector(ctx context.Context) {
 		}
 	}
 	if emptySections {
-		raw := resp.Content()
-		if len(raw) > 500 {
-			raw = raw[:500]
+		preview := resp.Content()
+		if len(preview) > 500 {
+			preview = preview[:500]
 		}
-		log.Printf("[reflector] empty sections in response: %s", raw)
+		log.Printf("[reflector] empty sections in response: %s", preview)
 		usage := resp.Usage()
 		r.appendDiagnostic(PhaseEvent{
 			Phase:        "reflector",
 			Outcome:      "empty_sections",
+			Preview:      preview,
 			CostUSD:      usage.CostUSD,
 			InputTokens:  usage.InputTokens,
 			OutputTokens: usage.OutputTokens,

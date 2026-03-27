@@ -434,8 +434,6 @@ In `site/handlers/handlers_test.go` (or a new `hive_test.go`), add a test that v
 - Tests pass
 - Deploys via `./ship.sh "iter N: add /hive civilization build page"`
 
-## What the Scout Should Focus On Next
-
 ## Fix: Architect parse failure loses diagnostic context and likely misses LLM output formats
 
 **Target repo:** hive
@@ -479,3 +477,27 @@ Add `Preview string \`json:"preview,omitempty"\`` to `PhaseEvent`. Use this for 
 - All 4 tasks ship with tests
 - `go test ./pkg/runner/...` passes
 - A future Architect parse failure will have the LLM preview captured in `diagnostics.jsonl` for PM/Scout diagnosis
+
+## What the Scout Should Focus On Next
+
+## Fix Reflector `empty_sections` Failures — Add Preview Capture and JSON Output
+
+**Target repo:** hive
+
+**Priority:** P0 — the loop cannot close without the Reflector. Reflections aren't being captured, state.md isn't advancing, and lessons are being lost. The Reflector has failed 7 times in the last 24 hours with `empty_sections`, including after multiple fix attempts (iters 325-329). The root cause is still unknown because we can't see what the LLM actually returned.
+
+**Context:** Recent work (iters 327-329) added `Preview` to `PhaseEvent` and set it in the Architect's failure diagnostic — but the Reflector's `appendDiagnostic` call in `pkg/runner/reflector.go:168-175` does NOT set `Preview`. We're logging a 500-char truncation to the console, which vanishes. The diagnostic event has the field but it's empty. We can't debug what we can't see.
+
+**Root cause hypothesis:** The Reflector LLM output uses a format that `parseReflectorOutput` doesn't recognise. The parser handles `**COVER:**`, `## COVER:`, `COVER:` etc — but the LLM may be using something like `### COVER` (no colon), or nesting the content inside a markdown block, or preceding it with a lengthy preamble that shifts the section indexes.
+
+**Tasks for the Scout to create:**
+
+1. **Add `Preview` to Reflector's failure diagnostic** — In `pkg/runner/reflector.go`, set `Preview: resp.Content()` (or a reasonable truncation, e.g. 2000 chars) in the `appendDiagnostic` call on the `empty_sections` path. Mirror exactly what was done for the Architect in the same file. Without this, every future failure is invisible.
+
+2. **Switch Reflector to JSON output format** — Follow the same approach used for the Architect (`parseArchitectSubtasks`): update `buildReflectorPrompt` to ask for JSON output (`{"cover": "...", "blind": "...", "zoom": "...", "formalize": "..."}`), add a JSON parser that tries JSON first and falls back to the current text parser. This eliminates marker format ambiguity entirely. The text parser can remain as the fallback.
+
+3. **Add regression tests** — In `pkg/runner/reflector_test.go`, add test cases for: (a) valid JSON input, (b) JSON with wrapper key e.g. `{"reflection": {...}}`, (c) prose preamble before the JSON block, (d) the existing text-marker formats still work via fallback. Mirror the pattern in `pkg/runner/architect_test.go`.
+
+4. **Verify the loop closes** — After shipping, check that `loop/reflections.md` gets a new entry and `state.md` advances the iteration counter. The loop is not fixed until it actually closes.
+
+**Files to read first:** `pkg/runner/reflector.go`, `pkg/runner/reflector_test.go`, `pkg/runner/architect.go` (for the JSON pattern to copy), `loop/reflections.md` (to confirm no entries since iter 329 — evidence the fix is needed).

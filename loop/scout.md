@@ -1,36 +1,31 @@
-Looking at the codebase state, recent commits, and Scout report in scout.md, I can now write my gap report.
+Now I have all the context I need to write the gap report. Here's what I've found:
 
-## GAP REPORT — Iteration 327
+## GAP REPORT — Current Iteration
 
-**Gap:** Architect role loses substantive LLM context on parse failures, preventing diagnosis of format mismatches in task plans.
+**Gap:** The Reflector phase is silently failing with no diagnostic visibility, blocking the autonomous loop from closing.
 
 **Evidence:**
-1. **Recent failure in diagnostics:** `2026-03-26T22:20:17Z, phase=architect, outcome=failure, cost=$0.3082, output_tokens=1282, error="no subtasks parsed from plan"`. The LLM produced 1,282 output tokens—a substantial plan response—but the parser returned zero tasks and the LLM content is lost.
-2. **Diagnostic loss pattern:** Currently, when `parseArchitectSubtasks` returns empty, only a generic error string is logged to stderr (not captured in diagnostic). The 1,282 tokens of actual LLM output is ephemeral—gone after the run. The Architect phase can't diagnose what went wrong without seeing what the LLM actually wrote.
-3. **Parser robustness gap:** The reflector parser issues (iterations 323-326) showed that LLM output formats vary widely (`**COVER:**` vs `**COVER**:` vs heading formats, case-insensitive, etc.). The Architect parser likely has similar blind spots—it's missing at least one format the LLM frequently uses, evidenced by the 1,282-token output producing zero tasks.
-4. **Missing error recovery:** Unlike the Reflector (which now has 7 marker candidates and handles multiple formats), the Architect parser has a single rigid format expectation. No JSON fallback, no alternative parsing strategies.
+1. **Loop stalled:** The "Current Directive" in `state.md` (line 487) reports the Reflector has failed 7 times in 24 hours with `empty_sections` errors, preventing `reflections.md` from being written and `state.md` from advancing.
+2. **Diagnostic gap:** The Architect phase recently added a `Preview` field to `PhaseEvent` (commit 942c08c) to capture LLM output on parse failures. The Reflector's `appendDiagnostic` call in `pkg/runner/reflector.go:168-175` **does not set this field**, leaving Reflector failures invisible. When `parseReflectorOutput` fails, the actual LLM response (which might diagnose the root cause) is lost to stderr.
+3. **Parser brittleness:** The Reflector parser handles multiple marker formats (`**COVER:**`, `## COVER:`, `COVER:` etc.) but likely misses a format variant the LLM is using. Without seeing the actual LLM output, we can't diagnose which format variant is breaking.
+4. **Previous Scout already identified this:** The `state.md` directive lists 4 concrete tasks (add Preview, switch to JSON, add tests, verify closure) but the most recent Builder iteration (ce363bb) addressed the Architect instead, leaving the Reflector issue unresolved.
 
 **Impact:**
-- When Architect fails, the loop can't diagnose why (parse error vs. LLM producing low-quality output vs. parser missing a format variant)
-- Scout can't improve the Architect prompt without visibility into what the LLM actually generated  
-- Same symptom repeats indefinitely: Builder runs Architect → parse fails → diagnostics show only "no subtasks" → no actionable feedback
+- The autonomous loop **cannot close** — Reflector failures mean no reflections are captured, no lessons are recorded, and the loop iteration counter doesn't advance
+- Without diagnostic visibility, every failure is a guess-and-check cycle
+- The loop is blocked indefinitely until the Reflector is fixed
 
 **Scope:**
-- **Code:** `pkg/runner/architect.go` — `parseArchitectSubtasks()`, task format expectations
-- **Code:** `pkg/runner/diagnostic.go` — need ability to capture LLM preview in diagnostics
-- **Tests:** `pkg/runner/architect_test.go` — parser edge cases
-- **Infrastructure:** Two immediate needs: (1) capture LLM response preview on parse failures, (2) add JSON output format support + alternative parsing strategies
+- **Code:** `pkg/runner/reflector.go` — `appendDiagnostic()` call and `parseReflectorOutput()` function
+- **Code:** `pkg/runner/reflector_test.go` — parser variant coverage
+- **Infrastructure:** `loop/reflections.md` — verification target (should have entries after this fix ships)
 
 **Suggestion:**
-Fix the Architect parser to match the Reflector's robustness strategy from iterations 323-326:
+This is exactly what the previous Scout specified as P0. The highest-priority fix is:
 
-1. **Capture LLM response preview** in `PhaseEvent` diagnostic when parse fails (first 1000 chars, currently logged but lost)
-2. **Add JSON format support** — try `json.Unmarshal` on normalized content before strict parser, handles `[{"title": "...", ...}]` and wrapper formats
-3. **Add regression tests** covering formats the LLM likely outputs: prose with em-dash separators, JSON arrays, preamble+tasks, mixed formats
-4. **Add `Preview` field** to `PhaseEvent` struct for diagnostic capture
+1. **Mirror the Architect's fix:** Add `Preview` field capture to Reflector's `appendDiagnostic` call (2-3 lines of code)
+2. **Add JSON fallback** like the Architect has — try JSON parsing first, fall back to text markers (10-15 lines of new parser logic)
+3. **Add regression tests** covering JSON and existing text formats (3-4 test cases)
+4. **Verify closure** — after shipping, confirm `reflections.md` gets a new entry and `state.md` iteration advances
 
-This closes the visibility gap that lets Architect failures become invisible. It brings Architect to feature parity with Reflector on parser robustness.
-
----
-
-**This is the single highest-priority infrastructure gap for the hive repository after Reflector stabilization. Architect failures have zero diagnostic context.**
+The previous Scout's directive is actionable and correct. The gap is real, it's blocking the loop, and it has a proven solution (the Architect's approach).

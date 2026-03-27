@@ -164,6 +164,64 @@ func TestParseReflectorOutput(t *testing.T) {
 		}
 	})
 
+	t.Run("flat JSON object", func(t *testing.T) {
+		input := `{"cover":"Shipped the Goal entity pipeline.","blind":"No integration tests added.","zoom":"Entity iterations converging.","formalize":"Lesson 56: test each entity kind once."}`
+
+		got := parseReflectorOutput(input)
+
+		if !strings.Contains(got["COVER"], "Goal entity pipeline") {
+			t.Errorf("COVER = %q, want 'Goal entity pipeline'", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "integration tests") {
+			t.Errorf("BLIND = %q, want 'integration tests'", got["BLIND"])
+		}
+		if !strings.Contains(got["ZOOM"], "converging") {
+			t.Errorf("ZOOM = %q, want 'converging'", got["ZOOM"])
+		}
+		if !strings.Contains(got["FORMALIZE"], "Lesson 56") {
+			t.Errorf("FORMALIZE = %q, want 'Lesson 56'", got["FORMALIZE"])
+		}
+	})
+
+	t.Run("wrapper JSON reflection field", func(t *testing.T) {
+		input := `{"reflection":{"cover":"Shipped the auth fix.","blind":"No rollback plan.","zoom":"Auth hardening theme.","formalize":"No new lesson."}}`
+
+		got := parseReflectorOutput(input)
+
+		if !strings.Contains(got["COVER"], "auth fix") {
+			t.Errorf("COVER = %q, want 'auth fix'", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "rollback") {
+			t.Errorf("BLIND = %q, want 'rollback'", got["BLIND"])
+		}
+		if !strings.Contains(got["ZOOM"], "hardening") {
+			t.Errorf("ZOOM = %q, want 'hardening'", got["ZOOM"])
+		}
+		if got["FORMALIZE"] != "No new lesson." {
+			t.Errorf("FORMALIZE = %q, want 'No new lesson.'", got["FORMALIZE"])
+		}
+	})
+
+	t.Run("prose preamble before JSON block", func(t *testing.T) {
+		input := "Here is my reflection for this iteration.\n\n" +
+			`{"cover":"Closed the event loop.","blind":"Memory store not tested.","zoom":"Infrastructure maturing.","formalize":"Lesson 57: close the loop before adding features."}`
+
+		got := parseReflectorOutput(input)
+
+		if !strings.Contains(got["COVER"], "event loop") {
+			t.Errorf("COVER = %q, want 'event loop'", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "Memory store") {
+			t.Errorf("BLIND = %q, want 'Memory store'", got["BLIND"])
+		}
+		if !strings.Contains(got["ZOOM"], "maturing") {
+			t.Errorf("ZOOM = %q, want 'maturing'", got["ZOOM"])
+		}
+		if !strings.Contains(got["FORMALIZE"], "Lesson 57") {
+			t.Errorf("FORMALIZE = %q, want 'Lesson 57'", got["FORMALIZE"])
+		}
+	})
+
 	t.Run("mixed formats boundary detection", func(t *testing.T) {
 		// COVER uses **COVER:**, BLIND uses ## BLIND: — tests that the boundary
 		// for COVER is found even though BLIND uses a different format.
@@ -416,6 +474,7 @@ func TestRunReflectorEmptySectionsDiagnostic(t *testing.T) {
 	}
 
 	var found bool
+	var foundEvent PhaseEvent
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
 		var e PhaseEvent
@@ -424,6 +483,7 @@ func TestRunReflectorEmptySectionsDiagnostic(t *testing.T) {
 		}
 		if e.Phase == "reflector" && e.Outcome == "empty_sections" {
 			found = true
+			foundEvent = e
 			break
 		}
 	}
@@ -432,6 +492,9 @@ func TestRunReflectorEmptySectionsDiagnostic(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("no PhaseEvent with phase=reflector outcome=empty_sections in diagnostics.jsonl:\n%s", data)
+	}
+	if foundEvent.Preview == "" {
+		t.Errorf("PhaseEvent.Preview must be non-empty so PM can diagnose the format failure without re-running")
 	}
 
 	// The early return must prevent reflections.md from being written.
