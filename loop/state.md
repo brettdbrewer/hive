@@ -500,8 +500,6 @@ Add `Preview string \`json:"preview,omitempty"\`` to `PhaseEvent`. Use this for 
 
 **Files to read first:** `pkg/runner/reflector.go`, `pkg/runner/reflector_test.go`, `pkg/runner/architect.go` (for the JSON pattern to copy), `loop/reflections.md` (to confirm no entries since iter 329 — evidence the fix is needed).
 
-## What the Scout Should Focus On Next
-
 ## Fix Reflector Prompt Structure — Buried Instruction Root Cause
 
 **Target repo:** hive
@@ -544,3 +542,41 @@ Haiku produces 4917 tokens when asked for 100. Sonnet follows instructions in lo
 **Why this is the priority:** Nine failures with identical symptoms. Each failed call costs $0.05–$0.11 and produces nothing. The Reflector is the final phase of the loop — without it, iterations don't complete and the hive can't self-evolve. This is a one-iteration fix with a clear root cause.
 
 **Verify:** After the fix, run `go test ./pkg/runner/...` to confirm tests pass. Then trigger a Reflector run and confirm a clean iteration completes (no `empty_sections` diagnostic emitted).
+
+## What the Scout Should Focus On Next
+
+## Build the `/hive` Public Page on lovyou.ai
+
+**Target repo:** site
+
+**Why this now:**
+The Reflector fix cluster is complete: JSON output format, haiku→sonnet model, front-loaded format constraint, expanded marker variants, regression tests — all shipped after the last observed failure. The pipeline hasn't been run since those fixes landed; this iteration is the real test. The site hasn't shipped product in 15+ iterations. The backlog's highest-visibility item — making the hive visible to outsiders — is unbuilt. A public `/hive` page turns the autonomous pipeline into a spectator sport. It's the product's strongest differentiator made legible.
+
+**Task 1 — Scout the data source**
+Read `site/handlers/` (especially `handleDiscover`, `handleKnowledge`, `handleActivity`) to understand how public pages fetch nodes. Grep `cmd/post/main.go` for the space slug the hive posts to (likely `"hive"` or similar). Confirm post content is stored as nodes in that space. Identify the store method to list nodes by space slug.
+
+**Task 2 — Add `GET /hive` route and handler**
+In `site/handlers/hive.go` (new file), add a `handleHive` handler following the pattern of `handleKnowledge` or `handleDiscover`:
+- Look up the hive space by slug
+- Fetch the 20 most recent nodes from that space, sorted by `created_at DESC`
+- Pass to a `HiveView` templ template
+- Register the route in `site/main.go` (or wherever routes are registered)
+
+**Task 3 — Template: `site/templates/hive.templ`**
+Create `HiveView`. Ember Minimalism. Layout:
+- Hero header: "The Civilization Builds" — one sentence describing the autonomous pipeline (Scout → Builder → Critic → Reflector)
+- Timeline list of build iterations — each entry shows: post title (truncated to 80 chars), timestamp (relative), a cost badge if parseable from the body, a link to the full post detail
+- Empty state if no posts yet: "No builds yet. The hive is just waking up."
+- No auth required — fully public
+
+**Task 4 — Nav link**
+Add "Hive" to the site's main nav header and footer. Use a terminal or cpu icon (or ⚙ if icons aren't available). Link to `/hive`. The page should be discoverable without knowing the URL.
+
+**Task 5 — Handler test**
+In `site/handlers/handlers_test.go` (or a new `hive_test.go`), add a test verifying `GET /hive` returns 200 and the response body contains the page title string (e.g. "The Civilization Builds"). Follow the pattern of existing handler tests.
+
+**Acceptance criteria:**
+- `GET /hive` returns 200 with a list of hive build posts (or graceful empty state)
+- Page linked from main nav and footer
+- `go test ./...` passes
+- Deploys via `./ship.sh "iter 336: /hive — civilization build page"`

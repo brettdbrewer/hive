@@ -1,46 +1,56 @@
+Perfect. Now I have the full context. Let me write the Scout's gap report.
+
 ---
 
-## GAP REPORT
+# GAP REPORT — Iteration 336
 
-**Gap:** Reflector fails reliably on long artifacts due to "lost in the middle" — format instruction buried after 8000+ chars of context, causing LLM to enter essay mode instead of returning JSON. Nine consecutive failures with no recovery.
+**Gap:** The Builder's artifact discipline during REVISE cycles is creating systematic audit trail corruption — `build.md` consistently describes stale commits instead of the actual fix commits, three iterations in a row.
 
 **Evidence:**
 
-1. **state.md explicitly documents this** — Section "Fix Reflector Prompt Structure — Buried Instruction Root Cause" identifies root cause and proposes 4 specific tasks
-2. **Repeated failures in diagnostics:**
-   - Nine consecutive `empty_sections` outcomes (iterations ~330-332)
-   - Output tokens: 4554–4917 (verbose prose, not compact JSON)
-   - Each costs $0.05–$0.11 with zero output
-3. **Code inspection confirms the issue:**
-   - `pkg/runner/reflector.go:150-178` — format instruction ("Return ONLY the JSON object") is at the END of `buildReflectorPrompt`, after sharedCtx (8000+ chars) + scout + build + critique
-   - No artifact capping in `runReflector` (lines 204-211) — all read as-is
-   - Model is still "haiku" in `pkg/runner/runner.go:23` despite needing sonnet for long contexts
+1. **Critic explicitly documented the pattern** (Iteration 335 critique):
+   - "This is the third consecutive iteration where `build.md` describes the wrong commit"
+   - Iteration 335's `build.md` claims to describe commit `035dc32` but embeds diff stats from file `reflector_test.go`, which doesn't exist in that commit
+   - The file actually describes commit `6279036` (the real work), not the file's stated commit
+
+2. **Code inspection** — `pkg/runner/builder.go`:
+   - When the Critic issues REVISE, the Builder applies fixes and commits new work
+   - The Builder likely regenerates `build.md` from the original task context, not from the new commit
+   - This causes `build.md` to retain the original (failed) commit hash while the diff stat includes the new (fixed) code
+
+3. **Systemic impact** — CLAUDE.md Section "The artifacts ARE the loop":
+   - "Every phase MUST write its artifact file...without them, the process didn't happen"
+   - The audit trail is the mechanism for the Reflector to review what shipped (Lesson 68: "absence of feedback infrastructure is a system defect")
+   - Lesson 43: "NEVER skip artifact writes" — this isn't skipping, it's writing false content, which is worse
+
+4. **Related lessons flagged as critical**:
+   - Lesson 68: "Feedback loop infrastructure is a critical path blocker...The loop depends on measurement to reflect on itself"
+   - Lesson 70: "Loop artifact validation must check content completeness, not just file existence...Corrupted artifacts are worse than missing ones"
 
 **Impact:**
 
-- **Loop is blocked.** The Reflector is the final phase. Without it: `reflections.md` doesn't advance, `state.md` iteration counter doesn't increment, lessons aren't captured
-- **Unrecoverable state.** Previous Architect/Tester/Critic fixes are shipworthy but can't deploy because the Reflector can't close the iteration
-- **Cost hemorrhage.** Nine failures × $0.07 avg = $0.63 wasted with nothing to show. Pattern will repeat on next pipeline run
-- **No self-evolution.** System can't learn (BLIND is unwritten) and can't step back (ZOOM is unwritten)
+- **Audit trail becomes untraceable** — future iterations can't determine what actually shipped or why. The Reflector's COVER section reads a corrupted history.
+- **Loop can't self-correct** — The system measures success via artifacts. Corrupted measurement means the loop is blind to its own operation.
+- **Violates VERIFIED invariant** — No visibility into which code changes correspond to which commits. Test coverage becomes unmappable to actual work.
+- **Degrades post tool output** — `cmd/post` reads `build.md` to publish iteration summaries; corrupted metadata spreads to the public feed.
 
 **Scope:**
 
-| File | Changes | Lines |
-|------|---------|-------|
-| `pkg/runner/reflector.go` | Front-load format, cap artifacts, add Preview (done in iter 332 but underlying prompt still broken) | 150-211 |
-| `pkg/runner/runner.go` | Switch "reflector" model haiku → sonnet | 23 |
-| `pkg/runner/reflector_test.go` | Add tests for constraint placement, artifact capping | new |
+| File | Issue | Lines |
+|------|-------|-------|
+| `pkg/runner/builder.go` | REVISE flow doesn't update `build.md` commit hash/diff to reflect the new fix commit | ~line 200-250 (estimate) |
+| `pkg/hive/agentdef.go` | Builder agent prompt during REVISE — may not include instructions to regenerate artifact with new commit data | SystemPrompt builder section |
+| `pkg/runner/runner.go` | REVISE verdict handling — needs to pass new commit context to Builder's artifact regeneration | ~line 180+ |
+| Test coverage | No test verifies `build.md` content matches the commit it claims to describe | new test needed |
 
 **Suggestion:**
 
-Three coordinated fixes in ONE iteration (blocks nothing else):
+Three coordinated fixes:
 
-1. **Reorder `buildReflectorPrompt`**: Move format instruction to line 150 (before sharedCtx), then include artifacts. LLM reads the rule before context.
+1. **Fix Builder REVISE flow**: When Critic issues REVISE, Builder fixes code → commits → **MUST update `build.md` with new commit hash, subject, timestamp, and regenerated diff stat**. Don't preserve the original commit reference.
 
-2. **Cap artifacts in `runReflector`** before building prompt: `scout` ≤2000, `build` ≤3000, `critique` ≤2000, `sharedCtx` ≤4000. Truncate with "..." if needed.
+2. **Add validation gate**: Before Builder considers REVISE complete, verify `build.md` contains the new commit hash (not the REVISE-triggering commit). Add this check to the Builder's internal post-fix validation.
 
-3. **Change model**: `"reflector": "sonnet"` in roleModel. Cost per Reflector call: ~$0.04 (instead of ~$0.02), but happens 1/4 ticks. Acceptable cost for reliability.
+3. **Add test coverage**: In `pkg/runner/builder_test.go` or `reflector_test.go`, add a regression test: simulate a REVISE cycle (fixture with a failed build → fix → re-commit), verify the resulting `build.md` describes the fix commit, not the original.
 
-4. **Test coverage**: Verify format is front-loaded (string position check), verify artifact truncation doesn't drop content mid-sentence, verify JSON parsing handles edge cases.
-
-This matches the priority in state.md exactly and is high-confidence (9 failures with documented root cause, not speculation). After this ships, the loop closes cleanly and we can move to the next product feature (Public Hive Activity page, `/hive` on lovyou.ai).
+This is a structural issue in the Builder agent itself (lives in the hive repo), blocks loop integrity (Lesson 68 critical-path), and is explicitly flagged by the Critic for next-iteration fixing.
