@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/lovyou-ai/eventgraph/go/pkg/decision"
 )
 
 // markerCandidates returns all format variants the LLM might use for a section key.
@@ -214,8 +216,78 @@ func (r *Runner) runReflector(ctx context.Context) {
 
 	log.Printf("[reflector] tick %d: reflecting", r.tick)
 
-	// Read artifacts from the graph first, fall back to files.
-	// The graph is the source of truth; files are legacy cache.
+	// Check critique verdict from graph first.
+	critique := r.readFromGraph("Critique:")
+	if critique == "" {
+		critique = readLoopArtifact(r.cfg.HiveDir, "critique.md")
+	}
+	if strings.Contains(strings.ToUpper(critique), "REVISE") {
+		log.Printf("[reflector] critique contains REVISE — skipping reflection")
+		if r.cfg.OneShot {
+			r.done = true
+		}
+		return
+	}
+
+	// Use Operate() so the Reflector can search prior reflections,
+	// read artifacts from the graph, and assert lessons as claims.
+	op, canOperate := r.cfg.Provider.(decision.IOperator)
+	if canOperate {
+		r.runReflectorOperate(ctx, op)
+	} else {
+		r.runReflectorReason(ctx)
+	}
+
+	if r.cfg.OneShot {
+		r.done = true
+	}
+}
+
+// runReflectorOperate uses Operate() — searches knowledge, reads graph, writes reflections.
+func (r *Runner) runReflectorOperate(ctx context.Context, op decision.IOperator) {
+	apiKey := os.Getenv("LOVYOU_API_KEY")
+	instruction := fmt.Sprintf(`You are the Reflector. Reflect on this iteration using COVER/BLIND/ZOOM/FORMALIZE.
+
+## Your Tools
+- Use knowledge.search to find prior reflections and lessons
+- Use knowledge.get to read the backlog and design docs
+- Use Bash to read the current loop artifacts:
+  - cat loop/scout.md (gap report)
+  - cat loop/build.md (build report)
+  - cat loop/critique.md (critique)
+
+## Steps
+1. Read the current iteration's artifacts (scout, build, critique)
+2. Search knowledge for prior reflections to avoid repeating insights
+3. Reflect using the four sections:
+   - **COVER** — what was explored, what was covered
+   - **BLIND** — what was missed, what blind spots remain
+   - **ZOOM** — was the scale right, should we zoom in or out
+   - **FORMALIZE** — lessons to extract as verifiable knowledge
+
+4. Write the reflection to loop/reflections.md (append)
+5. Assert each lesson as a claim on the graph:
+   curl -s -X POST -H "Authorization: Bearer %s" -H "Content-Type: application/json" -H "Accept: application/json" "https://lovyou.ai/app/%s/op" -d '{"op":"assert","title":"Lesson: <LESSON>","body":"<DETAILS>"}'
+6. Post the full reflection as a document:
+   curl -s -X POST -H "Authorization: Bearer %s" -H "Content-Type: application/json" -H "Accept: application/json" "https://lovyou.ai/app/%s/op" -d '{"op":"intend","kind":"document","title":"Reflection: <DATE>","description":"<FULL REFLECTION>"}'
+
+Search first. Reflect deeply. Assert what you learn.`, apiKey, r.cfg.SpaceSlug, apiKey, r.cfg.SpaceSlug)
+
+	result, err := op.Operate(ctx, decision.OperateTask{
+		WorkDir:     r.cfg.HiveDir,
+		Instruction: instruction,
+	})
+	if err != nil {
+		log.Printf("[reflector] Operate error: %v", err)
+		return
+	}
+	r.cost.Record(result.Usage)
+	r.dailyBudget.Record(result.Usage.CostUSD)
+	log.Printf("[reflector] Operate done (cost=$%.4f)", result.Usage.CostUSD)
+}
+
+// runReflectorReason is the legacy fallback.
+func (r *Runner) runReflectorReason(ctx context.Context) {
 	scout := r.readFromGraph("Scout Report:")
 	if scout == "" {
 		scout = readLoopArtifact(r.cfg.HiveDir, "scout.md")
@@ -229,19 +301,9 @@ func (r *Runner) runReflector(ctx context.Context) {
 		critique = readLoopArtifact(r.cfg.HiveDir, "critique.md")
 	}
 
-	// Block reflection when the Critic's verdict is REVISE.
-	if strings.Contains(strings.ToUpper(critique), "REVISE") {
-		log.Printf("[reflector] critique contains REVISE — skipping reflection")
-		if r.cfg.OneShot {
-			r.done = true
-		}
-		return
-	}
-
 	recentReflections := readRecentReflections(r.cfg.HiveDir)
 	sharedCtx := LoadSharedContext(r.cfg.HiveDir)
 
-	// Call LLM.
 	prompt := buildReflectorPrompt(scout, build, critique, recentReflections, sharedCtx)
 	resp, err := r.cfg.Provider.Reason(ctx, prompt, nil)
 	if err != nil {
@@ -253,10 +315,8 @@ func (r *Runner) runReflector(ctx context.Context) {
 	r.dailyBudget.Record(resp.Usage().CostUSD)
 	log.Printf("[reflector] Reason done (cost=$%.4f)", resp.Usage().CostUSD)
 
-	// Parse the four sections.
 	sections := parseReflectorOutput(resp.Content())
 
-	// Validate that all four sections have content.
 	emptySections := false
 	for _, key := range []string{"COVER", "BLIND", "ZOOM", "FORMALIZE"} {
 		if sections[key] == "" {
@@ -265,37 +325,15 @@ func (r *Runner) runReflector(ctx context.Context) {
 		}
 	}
 	if emptySections {
-		preview := resp.Content()
-		if len(preview) > 2000 {
-			preview = preview[:2000]
-		}
-		log.Printf("[reflector] empty sections in response: %s", preview)
-		usage := resp.Usage()
-		r.appendDiagnostic(PhaseEvent{
-			Phase:        "reflector",
-			Outcome:      "empty_sections",
-			Preview:      preview,
-			CostUSD:      usage.CostUSD,
-			InputTokens:  usage.InputTokens,
-			OutputTokens: usage.OutputTokens,
-		})
 		return
 	}
 
-	// Append to reflections.md.
 	date := time.Now().Format("2006-01-02")
-	entry := formatReflectionEntry(
-		date,
-		sections["COVER"],
-		sections["BLIND"],
-		sections["ZOOM"],
-		sections["FORMALIZE"],
-	)
+	entry := formatReflectionEntry(date, sections["COVER"], sections["BLIND"], sections["ZOOM"], sections["FORMALIZE"])
 	if err := r.appendReflection(entry); err != nil {
-		log.Printf("[reflector] append reflections error: %v", err)
+		log.Printf("[reflector] append error: %v", err)
 	}
 
-	// Assert lessons as claims (verifiable knowledge, not just documents).
 	if formalize := sections["FORMALIZE"]; formalize != "" && r.cfg.APIClient != nil {
 		title := fmt.Sprintf("Lesson: %s", date)
 		if _, err := r.cfg.APIClient.AssertClaim(r.cfg.SpaceSlug, title, formalize); err != nil {
