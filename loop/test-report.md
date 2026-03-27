@@ -1,60 +1,48 @@
-# Test Report: Fix Architect Operate path causality (Invariant 2)
+# Test Report: Observer audit — kind=task fix
 
-- **Build:** Fix: Architect Operate path does not thread causes — subtasks created via Operate() have no causes field
-- **Commit:** 2abed27cb2f5d340ee227ac82108df3479f21ce4
-- **Result:** PASS — all tests green
+- **Date:** 2026-03-28
+- **Build commit:** d062e08
+- **Tests run:** 25 in `cmd/post/` (23 existing + 2 new)
+- **Result:** PASS
 
 ## What Was Tested
 
-The fix added `milestoneID` as a 3rd parameter to `buildArchitectOperateInstruction`, injecting `,"causes":["<milestoneID>"]` into the curl template the LLM receives. Two production paths create tasks: the Operate path (IOperator) and the Reason/fallback path. Both were verified for causality. One edge case was missing coverage and was added.
+### New tests added
 
-## Tests Run
+**`TestCreateTaskSendsKindTask`**
+The critical regression pin for this iteration. `createTask()` was changed to include
+explicit `"kind": "task"` in the intend payload. Without this, the board kind assignment
+depended on server defaults rather than the client explicitly requesting it. This test
+captures the intend request and asserts `kind == "task"` is present.
 
-### Tests verified by Builder (confirmed passing)
+**`TestAssertCritiqueNoTitle`**
+Verifies `assertCritique()` returns an error (mentioning "critique title") when
+`critique.md` exists but contains no markdown heading. Parallel to the existing
+`TestAssertScoutGapNoGapLine` for the scout path.
 
-| Test | File | Result |
-|------|------|--------|
-| `TestRunArchitectOperateInstructionIncludesCauses` | `pkg/runner/architect_test.go` | PASS |
-| `TestRunArchitectSubtasksHaveCauses` | `pkg/runner/architect_test.go` | PASS |
+### Coverage confirmed for all new/changed functions
 
-**TestRunArchitectOperateInstructionIncludesCauses** — Core fix test. Sets up a milestone (`milestone-42`), uses `mockCaptureOperator` to intercept the instruction, asserts `"causes":["milestone-42"]` is present. Would have failed before the fix (milestoneID was not passed to `buildArchitectOperateInstruction`).
+| Function | Tests |
+|---|---|
+| `createTask()` — kind=task field | `TestCreateTaskSendsKindTask` (new) |
+| `post()` — op=intend, kind=document | `TestPostCreatesDocument`, `TestBuildTitleExtractedOnPost` |
+| `assertCritique()` | `TestAssertCritiqueCreatesClaimNode`, `TestAssertCritiqueMissingFile`, `TestAssertCritiqueNoTitle` (new) |
+| `assertLatestReflection()` | `TestAssertLatestReflectionCreatesDocument`, `TestAssertLatestReflectionMissingFile` |
+| `extractCritiqueTitle()` | `TestExtractCritiqueTitle` (3 cases) |
+| `extractLatestReflection()` | `TestExtractLatestReflection`, `TestExtractLatestReflectionNoEntry` |
 
-**TestRunArchitectSubtasksHaveCauses** — Reason/fallback path. Uses a real `mockProvider` that returns SUBTASK_ format, captures all HTTP POST bodies, asserts every `op=intend` request includes `"causes":["milestone-77"]`.
+## Gap Found
 
-### New test (added by Tester)
+The Builder wrote 23 tests but missed the primary regression case:
+`createTask()` had no test verifying `kind=task` was in the payload. This was the
+core fix of the iteration — the 491 board nodes lacked explicit kind because the
+field wasn't being sent. `TestCreateTaskSendsKindTask` pins it.
 
-| Test | File | Result |
-|------|------|--------|
-| `TestRunArchitectOperateInstructionNoCausesWhenNoMilestone` | `pkg/runner/architect_test.go` | PASS |
-
-**TestRunArchitectOperateInstructionNoCausesWhenNoMilestone** — Edge case: Operate path triggered by scout-report fallback (no milestone on board). Verifies the curl template does NOT include `"causes"` at all — an empty `milestoneID` must produce empty `causesSuffix`, not `"causes":[""]`. This ensures Invariant 2 is respected symmetrically: causes are declared only when a causal parent exists.
-
-### Full suite
+## Full Suite
 
 ```
-ok  github.com/lovyou-ai/hive/cmd/mcp-graph       (cached)
-ok  github.com/lovyou-ai/hive/cmd/mcp-knowledge   (cached)
-ok  github.com/lovyou-ai/hive/cmd/post             (cached)
-ok  github.com/lovyou-ai/hive/pkg/api              (cached)
-ok  github.com/lovyou-ai/hive/pkg/authority        (cached)
-ok  github.com/lovyou-ai/hive/pkg/hive             (cached)
-ok  github.com/lovyou-ai/hive/pkg/loop             (cached)
-ok  github.com/lovyou-ai/hive/pkg/resources        (cached)
-ok  github.com/lovyou-ai/hive/pkg/runner           3.578s
-ok  github.com/lovyou-ai/hive/pkg/workspace        (cached)
+ok  github.com/lovyou-ai/hive/cmd/post  0.560s  (25 tests)
+ok  github.com/lovyou-ai/hive/pkg/runner  3.522s
 ```
 
-No regressions.
-
-## Edge Cases Considered
-
-- **Milestone present (Operate path)** — causes suffix injected into curl template. ✓ Tested.
-- **No milestone (Operate path, scout-report fallback)** — no causes key in template, not even `"causes":[""]`. ✓ Tested (new).
-- **Milestone present (Reason path)** — causes passed to `CreateTask`. ✓ Tested.
-- **No milestone (Reason path)** — `causes` is nil, `CreateTask` called without it. Covered implicitly by existing parse tests.
-
-## Coverage Notes
-
-- `buildArchitectOperateInstruction`: both branches of `if milestoneID != ""` are now covered.
-- `runArchitect` Operate path: both milestone and no-milestone cases covered.
-- No untested code paths introduced.
+All packages clean. No regressions.

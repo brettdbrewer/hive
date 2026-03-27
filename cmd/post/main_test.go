@@ -656,3 +656,73 @@ func TestAssertLatestReflectionMissingFile(t *testing.T) {
 		t.Fatal("expected error for missing reflections.md, got nil")
 	}
 }
+
+// TestCreateTaskSendsKindTask verifies that createTask() sends op=intend with
+// kind=task. The fix in this iteration was adding explicit kind=task — without
+// it all 491 board nodes appeared as kind=task only by coincidence of the
+// server default, not because the client requested it. This test pins the fix.
+func TestCreateTaskSendsKindTask(t *testing.T) {
+	var intendPayload map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/app/hive/op" {
+			http.NotFound(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		var payload map[string]string
+		json.Unmarshal(body, &payload)
+		// Capture the intend call (task creation), ignore the complete call.
+		if payload["op"] == "intend" {
+			intendPayload = payload
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"node":{"id":"task-abc"}}`))
+	}))
+	defer srv.Close()
+
+	err := createTask("lv_testkey", srv.URL, "Fix: observer audit", "build details here")
+	if err != nil {
+		t.Fatalf("createTask() error: %v", err)
+	}
+
+	if intendPayload == nil {
+		t.Fatal("no intend request received — createTask did not create a task")
+	}
+	if intendPayload["op"] != "intend" {
+		t.Errorf("op = %q, want %q", intendPayload["op"], "intend")
+	}
+	if intendPayload["kind"] != "task" {
+		t.Errorf("kind = %q, want %q — explicit kind=task must be sent so board nodes have the correct kind",
+			intendPayload["kind"], "task")
+	}
+	if intendPayload["title"] != "Fix: observer audit" {
+		t.Errorf("title = %q, want %q", intendPayload["title"], "Fix: observer audit")
+	}
+}
+
+// TestAssertCritiqueNoTitle verifies that assertCritique returns an error
+// when critique.md exists but contains no heading (no title to extract).
+func TestAssertCritiqueNoTitle(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "loop"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	// critique.md with no heading — only body content.
+	critiqueContent := "**Verdict:** PASS\n\nAll tests pass. No issues found.\n"
+	if err := os.WriteFile(filepath.Join(tmp, "loop", "critique.md"), []byte(critiqueContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	err := assertCritique("lv_testkey", "http://localhost:9999")
+	if err == nil {
+		t.Fatal("expected error when critique.md has no heading, got nil")
+	}
+	if !strings.Contains(err.Error(), "critique title") {
+		t.Errorf("error %q should mention critique title", err.Error())
+	}
+}

@@ -2,6 +2,331 @@
 
 Asserted knowledge claims from the hive graph store.
 
+## Lesson 125: Ten consecutive infrastructure iterations is a fixpoint signal � loop needs a product reservation mechanism
+
+**State:** claimed | **Author:** hive
+
+Ten consecutive infrastructure iterations without product work means the loop selection mechanism is structurally biased toward small single-iteration gaps. Each gap was real; the bias is in loop design, not Builder failure. Fix: after at most 2 consecutive infrastructure iterations, the next must target the product frontier unless a blocking invariant violation exists. The Reflector must enforce this counter explicitly. Starting now: next iteration must address Governance delegation (Layer 11) unless a P0 invariant violation is active.
+
+---
+
+## Lesson 124: Grammar op choice routes to lens � op=express goes to Feed, op=intend goes to Documents
+
+**State:** claimed | **Author:** hive
+
+The grammar op choice determines lens routing, not only the kind field. op=express creates a social/feed node; op=intend creates a task/document node. A build report posted with op=express lands in Feed. Posted with op=intend/kind=document it lands in Documents. Every grammar op call must match both op semantics and kind explicitly. Audit all cmd/post call sites for op/kind semantic correctness, not only kind presence.
+
+---
+
+## Critique: PASS — [hive:builder] Observer audit: 14 node kinds defined, only kind=task used � 491/491 board nodes are tasks
+
+**State:** claimed | **Author:** hive
+
+**Verdict:** PASS
+
+All 20 tests pass. Let me check the coverage of the two new functions more carefully.
+
+**Derivation chain:**
+- Gap: critique and reflection artifacts live only in files overwritten each iteration — not persistent, not searchable
+- Plan: assert both as graph nodes during `cmd/post` — critique as KindClaim, reflections as KindDocument
+- Code: `assertCritique`, `assertLatestReflection`, and their pure extractors
+- Tests: 9 new tests covering both functions' happy path, missing file, no-title/no-entry edge cases, and the extractor logic directly
+
+**What I checked:**
+
+1. **Correctness** — `extractCritiqueTitle` strips all leading `#` chars correctly. `extractLatestReflection` stops at the second `## ` entry as expected. Both verified by table-driven tests.
+
+2. **Op consistency** — `assertCritique` uses `op=assert` (claiming something as true), `assertLatestReflection` uses `op=intend kind=document` (consistent with the `post()` change). The distinction is intentional and mirrors the existing `assertScoutGap` pattern.
+
+3. **Invariant 11 (IDs not names)** — Not applicable here. No ID/name conflation in file-reading + HTTP posting.
+
+4. **Invariant 12 (VERIFIED)** — Every new function has tests. The new `kind=task` in `createTask` is pinned by `TestCreateTaskSendsKindTask`.
+
+5. **No regression** — Changed `post()` from `op=express kind=post body` to `op=intend kind=document description`. All dependent tests updated and passing.
+
+6. **No missing error paths that matter** — `assertLatestReflection` lacks a dedicated "file exists but no `##` section" integration test, but `TestExtractLatestReflectionNoEntry` covers that extractor path, and the `if title == ""` guard is present in the function.
+
+VERDICT: PASS
+
+---
+
+## Lesson 123: Reflector must name consecutive infrastructure iteration count and assert fixpoint pressure
+
+**State:** claimed | **Author:** hive
+
+After N consecutive infrastructure iterations, the Reflector must name the count explicitly and assert a fixpoint pressure signal: the product frontier has been deferred N times; the next iteration should be product unless a blocking infrastructure gap exists. Nine consecutive infrastructure iterations without touching Governance delegation is not a failure, but the loop has no counter-pressure mechanism. Fixpoint awareness must be explicit, not implicit. The Reflector is the only phase that can name this.
+
+---
+
+## Lesson 122: REVISE cycles must close within the iteration that fixes the code
+
+**State:** claimed | **Author:** hive
+
+A REVISE cycle that fixes code in commit N but issues the PASS verdict in commit N+1 consumes two loop iterations for one gap. The correct behavior: REVISE closes within the same iteration as the fix. When a commit fixes a REVISE-flagged gap, the Critic should issue the PASS verdict before the Reflector closes that iteration � not in the next one. A confirmation iteration that ships no code is a signal the REVISE gate is open and the prior iteration was not cleanly closed.
+
+---
+
+## Critique: PASS — [hive:builder] Fix: Architect Operate path does not thread causes � subtasks created via Operate() have no causes field
+
+**State:** claimed | **Author:** hive
+
+**Verdict:** PASS
+
+The implementation and tests are correct. Let me do a final check on the instruction template to confirm the JSON is well-formed when `causesSuffix` is injected.
+
+The template at line 236:
+```
+'{"op":"intend","kind":"task","title":"<TITLE>","description":"<DESCRIPTION>","priority":"high"%s}'
+```
+
+With `causesSuffix = ,"causes":["milestone-42"]` this produces:
+```json
+{"op":"intend","kind":"task","title":"...","description":"...","priority":"high","causes":["milestone-42"]}
+```
+
+Valid JSON. ✓
+
+Six `%s` in the `fmt.Sprintf` at line 247: `context`, `apiKey`, `spaceSlug`, `causesSuffix`, `apiKey`, `spaceSlug` — count matches. ✓
+
+Test coverage:
+- `TestRunArchitectOperateInstructionIncludesCauses` — Operate path with milestone, asserts `"causes":["milestone-42"]` present ✓
+- `TestRunArchitectSubtasksHaveCauses` — Reason/fallback path, asserts causes field on each subtask ✓  
+- `TestRunArchitectOperateInstructionNoCausesWhenNoMilestone` — Operate path with no milestone, asserts no `"causes"` key (bonus test not mentioned in build.md but present) ✓
+
+Invariant 2 (CAUSALITY): satisfied — both Operate and Reason paths now wire causes. ✓  
+Invariant 11 (IDENTITY): `milestone.ID` used, not `milestone.Title`. ✓  
+Invariant 12 (VERIFIED): all paths have direct test coverage. ✓
+
+The fix is precise, the tests are complete, and there's an additional test (`NoCausesWhenNoMilestone`) that wasn't required but correctly validates the empty-milestone guard. The build.md and critique.md accurately reflect the state of the code.
+
+VERDICT: PASS
+
+---
+
+## Lesson 121: A diagnostic showing N=0 for a universally-required field demands three-part scope: fix forward, assess retroactive repair, declare boundary if repair is infeasible
+
+**State:** claimed | **Author:** hive
+
+A forward-only fix that silences the alarm without closing the historical gap is correct but incomplete. When an invariant shows universal failure (e.g. 0/486 nodes have causes), the scope must include: (a) fix forward � new nodes get the field, (b) assess retroactive repair � can existing N nodes be updated?, (c) if repair is infeasible, declare the boundary explicitly so future agents know where the reliable portion of the graph begins. The 486 causally-dark nodes in hive are now an undeclared boundary in the event graph.
+
+---
+
+## Lesson 120: Bifurcated instruction-building functions are a synchronization hazard
+
+**State:** claimed | **Author:** hive
+
+Any invariant-enforcing parameter added to one path (Reason/Operate) must be audited against the other on the same commit. The correct architecture is a shared template with path-specific overrides, not two independently-maintained copies. When two functions serve the same semantic purpose, they share the same invariant requirements and should enforce them from a shared site.
+
+---
+
+## Critique: PASS — [hive:builder] Fix: [hive:builder] Zero causes links: graph is causally disconnected � 0/486 nodes have causes declared
+
+**State:** claimed | **Author:** hive
+
+**Verdict:** PASS
+
+The fix is clean and precise. Checking the key points:
+
+1. **The JSON template** (line 236): `"priority":"high"%s}` — when `causesSuffix = ,"causes":["milestone-42"]` this produces valid JSON: `..."priority":"high","causes":["milestone-42"]}` ✓
+
+2. **`fmt.Sprintf` argument count** (line 247): 6 `%s` placeholders, 6 arguments (`context`, `apiKey`, `spaceSlug`, `causesSuffix`, `apiKey`, `spaceSlug`) ✓
+
+3. **Invariant 11** — milestone ID is used, not its title ✓
+
+4. **Invariant 12** — `TestRunArchitectOperateInstructionIncludesCauses` directly covers the Operate path by capturing the instruction and asserting `"causes":["milestone-42"]` is present. `TestRunArchitectSubtasksHaveCauses` covers the fallback (Reason) path via HTTP intercept ✓
+
+5. **Scout fallback path** — when `milestone == nil`, `milestoneID` stays `""`, `causesSuffix` stays `""`, no JSON change — existing behaviour preserved ✓
+
+The previous REVISE identified exactly one gap (Operate path missing causes). Both the code fix and the new test directly address it. Nothing else changed.
+
+VERDICT: PASS
+
+---
+
+## Critique: REVISE — [hive:builder] Zero causes links: graph is causally disconnected � 0/486 nodes have causes declared
+
+**State:** claimed | **Author:** hive
+
+**Verdict:** REVISE
+
+Fix task created: `ee651efd72d9cc8d465ecf50a01dd408`
+
+The three causality wires for `critic.go`, `runner.go`, and the Architect fallback path are correct and tested. The gap is the Architect's **Operate path** — `buildArchitectOperateInstruction` never receives the milestone ID, so the curl template the LLM executes omits `causes`. Since claude-cli implements `IOperator`, this is the path that runs in production. The test exercises only the fallback.
+
+VERDICT: REVISE
+
+---
+
+## Lesson 119: A state machine without transition tests is an informal constraint
+
+**State:** claimed | **Author:** hive
+
+PipelineStateMachine governed builder orchestration across many iterations with zero coverage; any of its 13 transitions could have been silently broken. The minimum test surface for any state machine is: (a) all valid transitions enumerated, (b) at least one invalid-event rejection, (c) initial state for each entry condition. If writing these tests surfaces surprising behavior, the machine is underspecified � not the tests.
+
+---
+
+## Lesson 118: Swallowed constructor errors defer panics without context
+
+**State:** claimed | **Author:** hive
+
+Swallowed errors in constructor calls are categorically worse than crashes. provider, _ := intelligence.New(cfg) does not fail safely � it defers failure to an unpredictable downstream panic with no stack trace pointing at the construction site. Every _, _ in a constructor call deserves a comment explaining why the error is safe to ignore; if no such comment can be written, propagate the error. Audit all intelligence.New, store.New, and other constructor-pattern call sites for this pattern.
+
+---
+
+## Critique: PASS — [hive:builder] Fix: PipelineStateMachine � swallowed error, dead init, missing tests
+
+**State:** claimed | **Author:** hive
+
+**Verdict:** PASS
+
+Verifying the test transitions against the actual `pipelineTransitions` map and `stateAgents` map...
+
+**Transition table coverage**: The 13 test cases in `TestPipelineTransitionValid` match the `pipelineTransitions` map exactly — all entries accounted for. Agent name assertions match `stateAgents`. ✓
+
+**`TestRunBoardClearStartsAtDirecting`**: Empty board → `Transition(EventBoardClear)` → `StateDirecting` → cancelled context exits loop → `sm.State() == StateDirecting`. Logical path is sound. ✓
+
+**`TestRunExistingTasksStartsAtBuilding`**: `openTask.State = "open"` satisfies `t.State != "done" && t.State != "closed"` → `sm.state = StateBuilding` set directly → cancelled context exits → `sm.State() == StateBuilding`. ✓
+
+**`makeRunner` fix in `cmd/hive/main.go`**: Error from `intelligence.New()` was silently dropped with `_`. Now properly propagated with context. Dead double-init (`sm := NewPipelineStateMachine(...)` immediately overwritten by `smRunner = makeRunner(...); sm = NewPipelineStateMachine(smRunner)`) is gone. Single clean init. ✓
+
+**`makeHiveDir` helper**: Defined in `reflector_test.go` in the same package — accessible to all runner package tests. ✓
+
+**build.md says "four tests" but file contains 7**: Build report underreports (`TestPipelineTransitionFromUnknownState`, `TestInferEventCriticRevise`, `TestInferEventCriticPass` are additional). More coverage than claimed — not a problem.
+
+**Invariant 11** (IDs not names): No name-based lookups introduced. ✓  
+**Invariant 12** (VERIFIED): Previously zero tests for `PipelineStateMachine`. Now 7 tests, covering all 13 valid transitions + invalid event + unknown state + both board-start branches + critic inference paths. ✓
+
+VERDICT: PASS
+
+---
+
+## Lesson 117: Prior fix already present means look one level deeper
+
+**State:** claimed | **Author:** hive
+
+When the Builder arrives at a fix and finds it already present, the correct behavior is not to ship nothing or manufacture work � it is to look for the deepest unverified claim in the same scope. Authorization headers, error paths, and content-type negotiation are security boundaries; their absence from tests is always a real gap, not cosmetic. The immediate fix being done is a signal to look one level deeper, not a reason to close the iteration empty-handed.
+
+---
+
+## Critique: PASS — [hive:builder] Fix: assertScoutGap missing kind=claim in payload and test
+
+**State:** claimed | **Author:** hive
+
+**Verdict:** PASS
+
+The implementation at `main.go:346` sets `req.Header.Set("Authorization", "Bearer "+apiKey)`. The new test captures and verifies that exact header value. Checks:
+
+- **Derivation chain**: Bug report → add auth header test → test captures header from mock server → asserts `"Bearer lv_mykey"` → covers real regression scenario (auth absent in prod but tests pass). Chain is clean.
+- **Invariant 12 (VERIFIED)**: The new test covers a distinct code path not previously asserted — `TestAssertScoutGapCreatesClaimNode` verifies payload fields but never checks the Authorization header. The gap was real.
+- **Invariant 11 (IDs)**: No name/ID confusion. Not applicable here.
+- **Test correctness**: `os.Chdir` with deferred restore follows the identical pattern used by existing tests (lines 247-248). No parallel calls, so no goroutine interference. Scout content is valid format (`**Gap:** ...`). Server returns 201 with valid JSON. The assertion `gotAuth != "Bearer lv_mykey"` would catch removal of the auth header line.
+- **No over-engineering**: Single-purpose test, no new abstractions.
+- **Loop artifacts** (`build.md`, `budget-*.txt`, `claims.md`) are non-code loop state. Not reviewed for correctness.
+
+VERDICT: PASS
+
+---
+
+## Claim: the cognitive grammar is the dependent exit condition
+
+**State:** claimed | **Author:** hive
+
+Before the gardener steps back, the seed must have the method for self-directed growth.
+
+The cognitive grammar: Derive (produce), Traverse (navigate), Need (detect absence). Nine compositions by self-application. This IS the method the hive uses to find its own gaps and fill them.
+
+The Reflector already uses COVER (Need�Traverse), BLIND (Need�Need), ZOOM (Traverse�Traverse), FORMALIZE (Derive�Derive). But only the Reflector. Every agent should have the cognitive grammar as a reasoning tool.
+
+The dependent exit checklist:
+1. Soul (structural) � done
+2. Know thyself � done
+3. Agents fix agents � done
+4. Intent persists � done
+5. Philosophy watches � partial
+6. Attention bounded � done
+7. Roles as primitives � conceptual
+8. Cognitive grammar internalized � THIS IS THE GAP
+
+Once the hive can Derive, Traverse, and Need on its own operations, it can self-correct without the Director. The cognitive grammar is what makes departure safe.
+
+Not all 8 need to be perfect. They need to be sufficient � 40% that runs continuously beats 100% that only runs when a human types a command.
+
+---
+
+## Reasoning: Each layer is a product family of focused products � not a monolith
+
+**State:** claimed | **Author:** hive
+
+When Matt said "most successful products do one thing well" after seeing a 13-layer ontology with 20+ entity kinds, the insight was: the 13 layers don't mean 13 monolithic products. Each layer is a product family. Each family contains focused single-purpose products sharing common infrastructure. Work layer ? 5 focused products: Hive (AI org management), Workflow (automated processes), Studio (creative project management), Ops (infrastructure management), Career (professional development). Social layer ? 4 focused products: Commune (community management), Signal (professional broadcast), Thread (async discussion), Circles (trust-based private social). The shared graph and grammar ops are the infrastructure. The focused UI is the product. This resolves the tension: each product is simple and focused for users. The architecture is powerful and unified underneath. The product catalog (67 products across 13 layers) is not overwhelming � it is a development roadmap spanning years. Build one product per layer to start; build the next when the first reaches revenue.
+
+---
+
+## Reasoning: Spec the end state � build incrementally toward it, never scope prematurely
+
+**State:** claimed | **Author:** hive
+
+When asked about rolling out agents incrementally vs. speccing the full agent roster, Matt asked "why wouldn't we go to the end state?" � the insight: spec the destination completely, build toward it incrementally. These are different operations. Premature scoping confuses the map with the journey. The spec is the map: all 13 layers, all 67 products, all 20 entity kinds, the full agent roster. The build order is the journey. We should never narrow the spec because the build seems large � that conflates what exists with what we're building toward. The same principle applied to the agent role catalog: we had Scout/Builder/Critic/Reflector but Matt said "necessary but not sufficient." Applying cognitive grammar properly added 7 more necessary roles (Investigator, Designer, Architect, Engineer, Verifier, Operator) because organized product development genuinely requires them. The lesson: when applying cognitive grammar, go to fixpoint. Don't stop at the obvious roles � ask what activities are genuinely required and derive roles from those activities.
+
+---
+
+## Reasoning: --resume changes agent economics � cold-start is 20x more expensive than persistent sessions
+
+**State:** claimed | **Author:** hive
+
+When Matt asked "shouldn't they all attempt to --resume? rereading everything every time seems like a massive waste of tokens" � the insight changed the economics of agentic loops. Cold-start per phase: agent re-reads 15,000+ tokens of context (CLAUDE.md, state.md, prior artifacts) before each iteration. With --resume: agent keeps a persistent Claude CLI session. The first run gets full context. Every subsequent run receives only the delta (new task assignment). Hive0 measured this: cold-start took 23 minutes per iteration. The long-running process pattern took 5 minutes per commit � a 4-5x speedup from session reuse alone. Additional benefit: @mentions require triggering � when Agent A completes work and @mentions Agent B, the orchestrator must fire a webhook or event notification. This requires a long-running listener, not a batch CLI process. Architecture consequence: agents must be long-running daemons, not CLI invocations. The process boundary is the agent identity boundary.
+
+---
+
+## Reasoning: Ignorant reinvention � the SELF-EVOLVE invariant applies to the builder too
+
+**State:** claimed | **Author:** hive
+
+When Matt said "I don't know how we could have missed that we had some of this code already then ignorantly reinvented the wheel" � this was a SELF-EVOLVE violation by the builder itself. The hive's fifth invariant says agents fix agents, not humans. The same principle applies to code: agents should study existing code before writing new code. cmd/loop was built from scratch while hive0 (a working implementation of the same concept) sat uninspected at /c/src/matt/lovyou/. The failure mode: starting from the problem statement without first auditing what solutions already exist in the workspace. The correction: before any non-trivial build, run a codebase audit across all repos in the workspace. The question to ask: "does this solution or a close variant already exist somewhere?" The cost of ignorant reinvention is not just wasted tokens � it is a working system getting replaced by a broken one.
+
+---
+
+## Reasoning: Hive0 architecture is the proven reference � long-running processes, API-driven, two reasoning modes
+
+**State:** claimed | **Author:** hive
+
+When Matt asked "did you actually look at hive0?" after seeing a slow implementation, the discovery was: hive0 shipped commits every 5 minutes using a fundamentally different architecture. The pattern: (1) Long-running processes � one process per agent role with a 15-second tick loop, never cold-start. (2) API-driven coordination � tasks, messages, comments via REST HTTP, not file artifacts on disk. (3) Two reasoning modes � Ask() for thinking (no tools, fast) and Execute() for building (with tools, single CLI call with --dangerously-skip-permissions --no-session-persistence). (4) Rule-based fast path for known patterns to avoid LLM overhead. (5) Proactive task claiming � implementer grabs unassigned tasks without waiting. The contrast with the broken approach: cmd/loop spawned 4 separate CLI processes per phase, re-loaded 15K+ tokens of context each time, took 23 minutes per iteration vs hive0's 5 minutes per commit. The lesson: hive0 is the working reference. Never reinvent what is already proven. Read the existing code before building.
+
+---
+
+## Reasoning: The hive is the meta-product � the product that builds all products
+
+**State:** claimed | **Author:** hive
+
+When Matt asked "did we include the hive itself? that is the product that builds the products" � we had produced a complete 13-layer product catalog but omitted the most important entry. The hive is not in any layer. It runs across all layers. Every iteration produces: Code (the product improves), Artifacts (scout/build/critique), Lessons (accumulating in state.md), Specs (design documents), and Memory (cross-session persistence). Each feeds back into the next iteration. The Scout reads lessons. The Builder reads specs. The Critic checks against invariants derived from past mistakes. It compounds. Iteration 210 was dramatically better than iteration 1 because of this accumulation. Right now the hive is running manually � Matt and Claude as the loop. But the architecture is the same one that will eventually run autonomously. The hive must use its own products to operate: Work Graph for task coordination, Knowledge layer for lessons, Social for agent communication. Ultimate dogfood: the hive is both the builder and the user of what it builds.
+
+---
+
+## Reasoning: The 13 layers have a derivation order � they are not peers
+
+**State:** claimed | **Author:** hive
+
+When designing the 13-layer ontology we initially treated all layers as equivalent. Matt asked "our entire ontology suggests work is the root or close to it" � revealing the layers have natural dependency structure. The derivation: Work is root (organized activity toward outcomes). Social is how actors coordinate WITHIN work � you communicate in order to organize activity, not for its own sake. Knowledge is what work produces and consumes. Governance is how work is controlled. Identity is who does the work. Market is how work is exchanged. Every Social feature is instrumentally serving Work: Chat exists because teams coordinate; Feed exists because organizations broadcast; Follow exists because you track who is doing what. Implication for build order: Work must be built before Social, Social before Market. Implication for product design: Social features should be derived from work coordination needs, not from general social media patterns.
+
+---
+
+## Reasoning: Work is the root layer � organized activity toward outcomes, not kanban
+
+**State:** claimed | **Author:** hive
+
+When Matt said "work isn't just a kanban board, it's things like employee and agent admin, company structure, policy documents, departments" � the insight was that we jumped straight to "Linear competitor" without applying cognitive grammar. When cognitive grammar is applied to Work, the result is: Work = organized activity toward outcomes. The architecture (event graph, grammar ops, signed causal chains) doesn't care whether the activity is a kanban task, a hiring policy, an agent fleet management console, or charity logistics. We had narrowed Work to its most visible surface without deriving it from first principles. The correction: whenever you scope a layer, apply cognitive grammar first. The kanban was a manifestation, not the definition.
+
+---
+
+## The hive cannot scale collective decision-making because the Governance layer (Layer 11) lacks delegation infrastructure. Currently agents can propose and vote, but every decision requires unanimous participation — there's no quorum, no delegation, and no authority hierarchy. This blocks agent-autonomous operations above the individual level.
+
+**State:** claimed | **Author:** hive
+
+Iteration 354
+
+The hive cannot scale collective decision-making because the Governance layer (Layer 11) lacks delegation infrastructure. Currently agents can propose and vote, but every decision requires unanimous participation — there's no quorum, no delegation, and no authority hierarchy. This blocks agent-autonomous operations above the individual level.
+
+---
+
 ## The hive cannot scale collective decision-making because the Governance layer (Layer 11) lacks delegation infrastructure. Currently agents can propose and vote, but every decision requires unanimous participation — there's no quorum, no delegation, and no authority hierarchy. This blocks agent-autonomous operations above the individual level.
 
 **State:** claimed | **Author:** hive
