@@ -634,6 +634,40 @@ func TestRunReflectorEmptySectionsNoSideEffects(t *testing.T) {
 	}
 }
 
+func TestRunReflectorReviseBlocked(t *testing.T) {
+	stateContent := "# Loop State\n\nLast updated: Iteration 42, 2026-03-27.\n"
+	artifacts := map[string]string{
+		"critique.md": "The code is missing error handling.\n\nVERDICT: REVISE",
+	}
+	hiveDir := makeHiveDir(t, stateContent, artifacts)
+
+	r := &Runner{
+		cfg: Config{
+			HiveDir:  hiveDir,
+			OneShot:  true,
+			Provider: &mockProvider{response: "should not be called"},
+		},
+		tick: 1,
+	}
+
+	r.runReflector(context.Background())
+
+	// reflections.md must NOT be created.
+	reflPath := filepath.Join(hiveDir, "loop", "reflections.md")
+	if _, err := os.Stat(reflPath); err == nil {
+		t.Error("reflections.md must not exist when critique contains VERDICT: REVISE")
+	}
+
+	// state.md must still contain the original iteration number.
+	stateData, err := os.ReadFile(filepath.Join(hiveDir, "loop", "state.md"))
+	if err != nil {
+		t.Fatalf("state.md not readable: %v", err)
+	}
+	if !strings.Contains(string(stateData), "Iteration 42,") {
+		t.Errorf("state.md iteration counter was advanced despite VERDICT: REVISE — got:\n%s", string(stateData))
+	}
+}
+
 func TestIncrementIterationLine(t *testing.T) {
 	tests := []struct {
 		name    string
