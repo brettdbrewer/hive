@@ -183,8 +183,17 @@ func (r *Runner) runTick(ctx context.Context) {
 		r.runMonitor(ctx)
 	case "reflector":
 		r.runReflector(ctx)
+	case "spawner":
+		r.runSpawner(ctx)
 	default:
-		log.Printf("[%s] tick %d: no handler for role", r.cfg.Role, r.tick)
+		// Any agent in agents/ can be invoked by name.
+		prompt := LoadRolePrompt(r.cfg.HiveDir, r.cfg.Role)
+		if prompt != "" {
+			log.Printf("[%s] tick %d: invoking as dynamic agent", r.cfg.Role, r.tick)
+			_, _ = r.InvokeAgent(ctx, r.cfg.Role, "Perform your role. Check the board, search knowledge, and act.")
+		} else {
+			log.Printf("[%s] tick %d: no handler for role", r.cfg.Role, r.tick)
+		}
 	}
 }
 
