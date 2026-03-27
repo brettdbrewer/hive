@@ -287,7 +287,6 @@ func TestPipelineTreeReflectorSkippedOnRevise(t *testing.T) {
 	r := New(Config{HiveDir: hiveDir})
 	pt := NewPipelineTree(r)
 
-	// Isolate the real reflector phase (which contains the REVISE gate).
 	var reflectorPhase Phase
 	for _, p := range pt.phases {
 		if p.Name == "reflector" {
@@ -305,3 +304,4 @@ func TestPipelineTreeReflectorSkippedOnRevise(t *testing.T) {
 		t.Errorf("diagnostics written when reflector should have been skipped cleanly")
 	}
 }
+

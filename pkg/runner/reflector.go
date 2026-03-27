@@ -221,8 +221,8 @@ func (r *Runner) runReflector(ctx context.Context) {
 	if critique == "" {
 		critique = readLoopArtifact(r.cfg.HiveDir, "critique.md")
 	}
-	if strings.Contains(strings.ToUpper(critique), "REVISE") {
-		log.Printf("[reflector] critique contains REVISE — skipping reflection")
+	if parseVerdict(critique) == "REVISE" {
+		log.Printf("[reflector] critique verdict is REVISE — skipping reflection")
 		if r.cfg.OneShot {
 			r.done = true
 		}

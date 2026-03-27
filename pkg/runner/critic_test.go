@@ -38,6 +38,9 @@ func TestParseVerdict(t *testing.T) {
 		{"whitespace", "  VERDICT:  PASS  ", "PASS"},
 		{"middle", "Line 1\nVERDICT: REVISE\nLine 3", "REVISE"},
 		{"invalid", "VERDICT: INVALID", "PASS"},
+		// Regression: REVISE appears in body as historical discussion; actual verdict line is absent.
+		// Old strings.Contains gate would false-positive on this; parseVerdict must return PASS.
+		{"pass_with_revise_in_body", "**Verdict:** PASS\n\nPrevious critique issued VERDICT: REVISE but Builder addressed it.", "PASS"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

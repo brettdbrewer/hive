@@ -643,24 +643,24 @@ Add a test for the early-return: use the `tempHiveDir` helper (or equivalent), p
 
 **Target repo:** site
 
-**Priority: Hive Dashboard — spectator view of the civilization at /hive** (milestone `549b43627b15728d1be91fabdd9ef608` on board)
+**Priority: Knowledge mode — public view of hive claims and lessons** (milestone `66891cf9f7152d30cb4e6fa5c0f7aaa4` on board)
 
-The pipeline infrastructure is now stable (REVISE gate in, commit subject fixed, architect diagnostics improved). Board is empty — clean slate. The hive civilization is invisible to outsiders. Fix that.
+The hive dashboard is shipped (handler + templates + routes at `/hive` and `/hive/feed`). The next visibility gap: the hive's accumulated knowledge (lessons asserted as claims on the graph by the Reflector) is invisible to outsiders. Fix that.
 
-Build a public read-only dashboard at lovyou.ai/hive showing what the hive is doing in real time. Data already exists (diagnostics.jsonl, state.md, build.md, git log). This makes the autonomous AI civilization visible — critical for the company-in-a-box pitch.
+Build a public Knowledge mode at `/app/hive/knowledge` that shows what the civilization has learned.
 
 **Tasks:**
 
-1. **Route + handler** (`site/handlers/hive.go`) — `GET /hive` reads `loop/diagnostics.jsonl` (last 50 entries), `loop/state.md` (iteration number), `loop/build.md` (last build title + cost), runs `git log --oneline -10` on the hive repo. Returns struct: iteration number, current phase, last build title, build cost, phase history (last 10 diagnostic entries with phase/outcome/cost/timestamp), recent commits.
+1. `GET /app/:slug/knowledge` endpoint in `site/handlers/knowledge.go` — lists `kind=claim` nodes sorted by created_at, filterable by state (asserted/challenged/verified). Returns JSON or renders template.
 
-2. **Dashboard template** (`site/templates/hive.templ`) — Ember minimalism dark theme. Shows: iteration counter badge, current phase pill (Scout/Architect/Builder/Critic/Reflector + outcome color), last build title + cost, phase timeline as a vertical feed, recent commits list (hash + subject). Add to site nav.
+2. `site/templates/knowledge.templ` — Ember minimalism dark theme. Two-column layout: claims list (left, scrollable), claim detail (right). Each claim shows: title, body, state pill (asserted/challenged/verified/retracted), author badge, created_at.
 
-3. **Live updates** — HTMX polling every 5s on the phase timeline only. Endpoint `GET /hive/feed` returns partial template `hive-feed.templ`.
+3. Add `knowledge` link to sidebar nav (between `feed` and `threads` in the sidebar partial).
 
-4. **Register routes** in router — `GET /hive` and `GET /hive/feed`. No auth required — public spectator view.
+4. HTMX polling every 10s on the claims list only — new claims appear without reload. Endpoint `GET /app/:slug/knowledge/feed` returns partial.
 
-5. **Tests** (`site/handlers/hive_test.go`) — Test handler with temp dir containing realistic diagnostics.jsonl and build.md. Assert iteration number, phase, build title parse correctly.
+5. Integration test in `site/handlers/knowledge_test.go`: unauthenticated GET returns 200, authenticated GET returns 200, missing space returns 404.
 
-Ship with `./ship.sh "iter N: hive dashboard spectator view"`.
+Ship with `./ship.sh "iter N: knowledge mode — public view of hive claims"`.
 
 **The constraint:** One gap per iteration. Scout should pick the biggest missing piece and focus there.
