@@ -183,7 +183,7 @@ SUBTASK_PRIORITY: <high|medium>
 SUBTASK_DESCRIPTION: <2-3 sentences, specific files and changes>`, sharedCtx, repoCtx, scoutReport)
 }
 
-// normalizeArchitectResponse strips markdown code fences from LLM output
+// normalizeArchitectResponse strips markdown formatting from LLM output
 // so the parsers see clean content regardless of how the model wrapped it.
 func normalizeArchitectResponse(content string) string {
 	content = strings.TrimSpace(content)
@@ -198,6 +198,14 @@ func normalizeArchitectResponse(content string) string {
 	if strings.HasSuffix(content, "```") {
 		content = strings.TrimSpace(content[:len(content)-3])
 	}
+	// Strip bold markers from SUBTASK_ prefixes: **SUBTASK_TITLE:** → SUBTASK_TITLE:
+	content = strings.ReplaceAll(content, "**SUBTASK_TITLE:**", "SUBTASK_TITLE:")
+	content = strings.ReplaceAll(content, "**SUBTASK_PRIORITY:**", "SUBTASK_PRIORITY:")
+	content = strings.ReplaceAll(content, "**SUBTASK_DESCRIPTION:**", "SUBTASK_DESCRIPTION:")
+	// Also handle without trailing colon in bold: **SUBTASK_TITLE**:
+	content = strings.ReplaceAll(content, "**SUBTASK_TITLE**:", "SUBTASK_TITLE:")
+	content = strings.ReplaceAll(content, "**SUBTASK_PRIORITY**:", "SUBTASK_PRIORITY:")
+	content = strings.ReplaceAll(content, "**SUBTASK_DESCRIPTION**:", "SUBTASK_DESCRIPTION:")
 	return content
 }
 
