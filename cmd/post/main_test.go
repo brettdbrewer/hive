@@ -561,6 +561,47 @@ func TestAssertCritiqueMissingFile(t *testing.T) {
 	}
 }
 
+// TestAssertCritiqueCarriesTaskNodeIDasCause verifies that assertCritique passes
+// the task node ID as the causes field, so the critique is causally linked to
+// the build task it reviews (Invariant 2: CAUSALITY).
+func TestAssertCritiqueCarriesTaskNodeIDasCause(t *testing.T) {
+	var received map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/app/hive/op" {
+			http.NotFound(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &received)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"node":{"id":"critique-999"}}`))
+	}))
+	defer srv.Close()
+
+	origDir, _ := os.Getwd()
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "loop"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	critiqueContent := "# Critique: Fix: causes=[] on all critique nodes\n\n**Verdict:** PASS\n"
+	if err := os.WriteFile(filepath.Join(tmp, "loop", "critique.md"), []byte(critiqueContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	os.Chdir(tmp)
+	defer os.Chdir(origDir)
+
+	taskNodeID := "task-node-abc123"
+	if err := assertCritique("lv_testkey", srv.URL, []string{taskNodeID}); err != nil {
+		t.Fatalf("assertCritique() error: %v", err)
+	}
+
+	if received["causes"] != taskNodeID {
+		t.Errorf("causes = %q, want %q (task node ID must be declared as cause)", received["causes"], taskNodeID)
+	}
+}
+
 // TestExtractLatestReflection verifies that extractLatestReflection returns
 // the first ## section from reflections.md (the most recent entry).
 func TestExtractLatestReflection(t *testing.T) {
@@ -685,7 +726,7 @@ func TestCreateTaskSendsKindTask(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := createTask("lv_testkey", srv.URL, "Fix: observer audit", "build details here")
+	_, err := createTask("lv_testkey", srv.URL, "Fix: observer audit", "build details here")
 	if err != nil {
 		t.Fatalf("createTask() error: %v", err)
 	}

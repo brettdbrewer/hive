@@ -88,7 +88,10 @@ func main() {
 	}
 
 	// Create task on Board and mark complete.
-	if err := createTask(apiKey, baseURL, title, string(build)); err != nil {
+	// taskNodeID is used as a cause for the critique claim so every critique is
+	// causally linked to the specific build task it reviews (Invariant 2: CAUSALITY).
+	taskNodeID, err := createTask(apiKey, baseURL, title, string(build))
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "task: %v\n", err)
 		// Non-fatal — document post succeeded.
 	}
@@ -112,8 +115,16 @@ func main() {
 		// Non-fatal — post succeeded.
 	}
 
-	// Assert the critique verdict as a KindClaim node.
-	if err := assertCritique(apiKey, baseURL, causeIDs); err != nil {
+	// Assert the critique verdict as a KindClaim node, causally linked to the
+	// task node it reviews. This satisfies Invariant 2: a critique of a build
+	// must cite the build task as its cause, not just the build document.
+	var taskCauseIDs []string
+	if taskNodeID != "" {
+		taskCauseIDs = []string{taskNodeID}
+	} else {
+		taskCauseIDs = causeIDs // fall back to build doc ID if task creation failed
+	}
+	if err := assertCritique(apiKey, baseURL, taskCauseIDs); err != nil {
 		fmt.Fprintf(os.Stderr, "assert critique: %v\n", err)
 		// Non-fatal — post succeeded.
 	}
@@ -191,7 +202,10 @@ func syncMindState(apiKey, baseURL, state string) error {
 	return nil
 }
 
-func createTask(apiKey, baseURL, title, description string) error {
+// createTask creates a task on the Board and marks it complete.
+// Returns the task node ID so callers can use it as a cause for subsequent
+// claims (Invariant 2: CAUSALITY — a critique of a task must cite that task).
+func createTask(apiKey, baseURL, title, description string) (string, error) {
 	// Create task (intend op with kind=task).
 	payload, _ := json.Marshal(map[string]string{
 		"op":          "intend",
@@ -206,13 +220,13 @@ func createTask(apiKey, baseURL, title, description string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("intend: HTTP %d: %s", resp.StatusCode, b)
+		return "", fmt.Errorf("intend: HTTP %d: %s", resp.StatusCode, b)
 	}
 
 	// Parse response to get node ID.
@@ -223,13 +237,14 @@ func createTask(apiKey, baseURL, title, description string) error {
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil || result.Node.ID == "" {
 		// Can't complete without ID, but task was created.
-		return nil
+		return "", nil
 	}
+	taskNodeID := result.Node.ID
 
 	// Complete the task.
 	completePayload, _ := json.Marshal(map[string]string{
 		"op":      "complete",
-		"node_id": result.Node.ID,
+		"node_id": taskNodeID,
 	})
 	req2, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(completePayload))
 	req2.Header.Set("Authorization", "Bearer "+apiKey)
@@ -238,15 +253,15 @@ func createTask(apiKey, baseURL, title, description string) error {
 
 	resp2, err := http.DefaultClient.Do(req2)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp2.Body.Close()
 
 	if resp2.StatusCode >= 400 {
 		b, _ := io.ReadAll(resp2.Body)
-		return fmt.Errorf("complete: HTTP %d: %s", resp2.StatusCode, b)
+		return "", fmt.Errorf("complete: HTTP %d: %s", resp2.StatusCode, b)
 	}
-	return nil
+	return taskNodeID, nil
 }
 
 // buildTitle extracts the title from the first line of build.md.

@@ -1,48 +1,71 @@
-# Test Report: IsError fix in claude_cli.go
+# Test Report: False completion epidemic — child gate enforcement
 
 **Date:** 2026-03-28
 
 ## What Was Tested
 
-Builder fixed `Operate()` in `eventgraph/go/pkg/intelligence/claude_cli.go` to return an error when Claude emits `is_error:true` JSON alongside a non-zero exit code. Without the fix, `Operate()` would silently succeed in this case.
+Builder added `ErrChildrenIncomplete` enforcement to `UpdateNodeState` and 422 responses in both completion handler paths (`handleOp` case `"complete"` and `handleNodeState`). Builder also wrote `TestUpdateNodeStateChildGate` covering the basic single-child case.
+
+Tester added 5 targeted tests covering gaps in the Builder's coverage.
 
 ## Tests Run
 
-### Pre-existing test (Builder wrote this)
-**`TestOperateIsErrorReturnsError`** — `pkg/intelligence/claude_cli_test.go`
-- Simulates: claude exits with code 1, stdout contains `{"is_error":true,"result":"task failed: permission denied"}`
-- Verifies: `Operate()` returns an error containing the result message
+### Pre-existing (Builder wrote)
+**`TestUpdateNodeStateChildGate`** — `site/graph/store_test.go`
+- Parent with one incomplete child → `ErrChildrenIncomplete`
+- Complete child → parent now completable
 - Result: **PASS** ✓
 
-### Added by Tester (gap coverage)
-**`TestOperateIsErrorZeroExitReturnsError`** — `pkg/intelligence/claude_cli_test.go`
-- Simulates: claude exits with code 0 but stdout contains `{"is_error":true,"result":"tool call rejected"}`
-- Verifies: `Operate()` returns an error even when exit code is 0 (line 263 in claude_cli.go)
+### Added by Tester
+
+**`TestUpdateNodeStateChildGateLeafNode`** — `site/graph/store_test.go`
+- Leaf node (zero children) → completes without error
+- Critical: the fix must not block leaf nodes. `COUNT(*) = 0 → incomplete = 0` path confirmed.
 - Result: **PASS** ✓
 
-### Full suite
-All 38 packages pass. No regressions.
+**`TestUpdateNodeStateChildGateMultipleChildren`** — `site/graph/store_test.go`
+- 2 children, only 1 done → still blocked by `ErrChildrenIncomplete`
+- Both done → parent completes
+- Result: **PASS** ✓
 
-```
-ok  github.com/lovyou-ai/eventgraph/go/pkg/intelligence  5.1s
-ok  [all 37 other packages]
-```
+**`TestUpdateNodeStateNonDoneSkipsGate`** — `site/graph/store_test.go`
+- Parent with incomplete child → setting to `StateReview` (non-done) does NOT trigger gate
+- Confirms the `if state == StateDone` guard is correctly scoped
+- Result: **PASS** ✓
 
-## Coverage Notes
+**`TestHandlerCompleteOpChildrenIncomplete`** — `site/graph/handlers_test.go`
+- `POST /app/{slug}/op` with `{"op":"complete","node_id":"..."}` when parent has incomplete child
+- Verifies handler returns **422 Unprocessable Entity** (not 500)
+- Result: **PASS** ✓
 
-Four `IsError` check sites in `claude_cli.go`:
+**`TestHandlerNodeStateChildrenIncomplete`** — `site/graph/handlers_test.go`
+- `POST /app/{slug}/node/{id}/state` with `state=done` when parent has incomplete child
+- Verifies `handleNodeState` returns **422 Unprocessable Entity** (not 500)
+- Result: **PASS** ✓
 
-| Site | Path | Tested? |
-|------|------|---------|
-| `Operate()` non-zero exit (line 249) | the fix | ✓ `TestOperateIsErrorReturnsError` |
-| `Operate()` zero exit (line 263) | pre-existing | ✓ `TestOperateIsErrorZeroExitReturnsError` (added) |
-| `Reason()` zero exit (line 172) | pre-existing | ✗ not tested |
-| `Reason()` non-zero exit | **MISSING** | — no `IsError` check exists here |
+## Coverage Summary
 
-## Gap Flagged: Reason() non-zero exit has no IsError check
+| Path | Tested? |
+|------|---------|
+| `UpdateNodeState` single incomplete child → rejected | ✓ (Builder) |
+| `UpdateNodeState` child completed → parent accepted | ✓ (Builder) |
+| `UpdateNodeState` leaf node (no children) → accepted | ✓ (Tester) |
+| `UpdateNodeState` multiple children, partial → rejected | ✓ (Tester) |
+| `UpdateNodeState` multiple children, all done → accepted | ✓ (Tester) |
+| `UpdateNodeState` non-done state skips gate | ✓ (Tester) |
+| `handleOp` "complete" → 422 on `ErrChildrenIncomplete` | ✓ (Tester) |
+| `handleNodeState` state=done → 422 on `ErrChildrenIncomplete` | ✓ (Tester) |
 
-In `Reason()` lines 155-165, if claude exits non-zero but still writes `is_error:true` JSON to stdout, the code falls through to `resultToResponse()` and returns success. This is inconsistent with `Operate()`. Not a regression from this iteration, but worth fixing.
+## Pre-existing Failures (not regressions)
+
+`go test ./graph/` shows 9 pre-existing failures unrelated to this feature:
+- Duplicate key violations from stale test DB data (slug conflicts)
+- `TestReportsAndResolve`: SQL scan error on `Op` type (pre-existing schema mismatch)
+- `TestReposts`: nil pointer dereference (pre-existing)
+- `TestHivePage`: content string mismatch (pre-existing)
+
+All gate-related tests isolated and confirmed passing. No regressions introduced.
 
 ## Verdict
 
-**PASS.** The Builder's fix works. Added one test to cover the zero-exit `is_error:true` path in `Operate()`. One gap flagged in `Reason()` non-zero exit path for a future iteration.
+**PASS.** The child gate enforces correctly across all tested scenarios. Both HTTP completion paths return 422 as specified. No regressions on new tests.

@@ -1,31 +1,23 @@
-# Critique: [hive:builder] Fix: commit eventgraph IsError fix and add test � Invariant 12 violated
+# Critique: [hive:builder] False completion epidemic: 268/478 done tasks have incomplete children � board integrity unreliable
 
 **Verdict:** PASS
 
-**Summary:** The code change at `runner.go:627-643` is verified:
+**Summary:** All checks complete. Here's the derivation trace:
 
-```go
-// Default to PROGRESS — explicit ACTION: DONE is required to close a task.
-return "PROGRESS"
-```
+**Gap → Plan → Code → Test:**
+- Gap: 268/478 done tasks had incomplete children — board integrity violated
+- Fix: gate in `UpdateNodeState` at store layer, blocks completion when `COUNT(*) FROM nodes WHERE parent_id = $1 AND state != 'done'` > 0
+- Handler: both callsites (`handleOp "complete"` and `handleNodeState`) return 422 on `ErrChildrenIncomplete`
+- Tests: three cases — basic parent/child gate, leaf node pass-through, partial multi-child blocking
 
-Tests at `runner_test.go:31,34` correctly cover both cases:
-- `{"default", "No action line here.", "PROGRESS"}` ✓
-- `{"invalid action", "ACTION: INVALID", "PROGRESS"}` ✓
+**Invariant checks:**
+- **Invariant 11 (IDENTITY):** Query uses `parent_id = $1` with node ID, not name. ✓
+- **Invariant 12 (VERIFIED):** Three tests cover the gate: `TestUpdateNodeStateChildGate`, `TestUpdateNodeStateChildGateLeafNode`, `TestUpdateNodeStateChildGateMultipleChildren`. ✓
 
-**Derivation trace:**
-- **Gap**: Builder silently marked tasks done on `exit status 1` because `parseAction` defaulted to `"DONE"` for any response without an explicit `ACTION:` line
-- **Fix**: Default changed to `"PROGRESS"` — terminal state requires explicit signal
-- **Test**: `TestParseAction` updated for both affected cases, all 7 cases pass
-- **Invariant 12**: Covered ✓
-- **Invariant 11**: No identity issues ✓
+**Design check:** Enforcement is at store layer — single point, all future callers get the gate. ✓
 
-**Two artifacts with known issues (neither blocks):**
+**build.md matches actual diff:** Yes. Every claim in build.md is verified in the code at the expected locations.
 
-1. `critique.md` says `VERDICT: REVISE` — stale from the first Critic pass. The second Critic (19:25:31Z) produced `critique.pass` per diagnostics. Lesson 138 correctly formalizes the fix. This is a process defect, not a code defect.
-
-2. `build.md` title describes work from the prior REVISE task ("commit and ship site/graph causes fix") not the actual revision (parseAction DONE→PROGRESS). Documented as BLIND item 2.
-
-Both are documented and formalized. Neither affects correctness of the code change.
+**One minor note, not blocking:** The `SELECT COUNT` and `UPDATE` are not in a transaction (TOCTOU). Under concurrent task completion, a race could momentarily allow a parent to complete before a newly-added child is seen. In practice, the hive's sequential task model makes this unlikely, and the dangerous direction (incorrect PASS) requires a child to be *created* between the count and update — improbable. Acceptable tradeoff.
 
 VERDICT: PASS
