@@ -222,6 +222,33 @@ func TestParseReflectorOutput(t *testing.T) {
 		}
 	})
 
+	t.Run("long prose 4000+ chars before JSON block", func(t *testing.T) {
+		// Regression: scan-for-first-'{' path must handle large prose preambles without
+		// losing the JSON block buried deep in the response.
+		sentence := "This iteration we explored the structure of the event graph and the composition grammar. The scout identified a gap in the Work layer. The builder addressed it by adding new entity kinds. "
+		preamble := strings.Repeat(sentence, 25) // ~4650 chars
+		if len(preamble) < 4000 {
+			t.Fatalf("test setup error: preamble is only %d chars, need 4000+", len(preamble))
+		}
+		jsonBlock := `{"cover":"Closed the event loop.","blind":"Memory store not tested.","zoom":"Infrastructure maturing.","formalize":"Lesson 57: close the loop before adding features."}`
+		input := preamble + "\n\n" + jsonBlock
+
+		got := parseReflectorOutput(input)
+
+		if !strings.Contains(got["COVER"], "event loop") {
+			t.Errorf("COVER = %q, want 'event loop'", got["COVER"])
+		}
+		if !strings.Contains(got["BLIND"], "Memory store") {
+			t.Errorf("BLIND = %q, want 'Memory store'", got["BLIND"])
+		}
+		if !strings.Contains(got["ZOOM"], "maturing") {
+			t.Errorf("ZOOM = %q, want 'maturing'", got["ZOOM"])
+		}
+		if !strings.Contains(got["FORMALIZE"], "Lesson 57") {
+			t.Errorf("FORMALIZE = %q, want 'Lesson 57'", got["FORMALIZE"])
+		}
+	})
+
 	t.Run("mixed formats boundary detection", func(t *testing.T) {
 		// COVER uses **COVER:**, BLIND uses ## BLIND: — tests that the boundary
 		// for COVER is found even though BLIND uses a different format.
@@ -292,6 +319,16 @@ func TestBuildReflectorPrompt(t *testing.T) {
 		t.Error("prompt missing 'Return ONLY' format constraint")
 	} else if scoutIdx >= 0 && formatIdx > scoutIdx {
 		t.Errorf("format constraint (pos %d) appears after scout section (pos %d) — must be front-loaded", formatIdx, scoutIdx)
+	}
+
+	// Format constraint must precede the very first ## section header in the prompt,
+	// not just ## Scout Report. This confirms the constraint is front-loaded before
+	// ALL context, including Institutional Knowledge.
+	firstHeaderIdx := strings.Index(prompt, "\n## ")
+	if firstHeaderIdx < 0 {
+		t.Error("prompt has no ## section headers")
+	} else if formatIdx >= 0 && formatIdx > firstHeaderIdx {
+		t.Errorf("format constraint (pos %d) appears after first ## header (pos %d) — must be front-loaded before all context sections", formatIdx, firstHeaderIdx)
 	}
 }
 

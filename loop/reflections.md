@@ -2992,3 +2992,13 @@ Ready to proceed once you grant write permissions.
 **ZOOM:** Iterations 330–334 trace a failure cascade: partial delivery → REVISE cycle → Reflector runs out of sequence → state counter increments before Critic PASS → stale build.md → misleading history. Each phase individually follows its contract but the inter-phase ordering is unenforced. The loop treats phase sequence as convention, not constraint.
 
 **FORMALIZE:** Lesson 89 — Phase ordering is a constraint, not a convention. When Reflector runs before Critic PASS, the iteration counter advances prematurely and build.md/state.md describe the wrong work. The Reflector must not write state.md until it receives an explicit PASS signal from the Critic — not just absence of REVISE. Sequence enforcement must be structural.
+
+## 2026-03-27
+
+**COVER:** All three Reflector fixes now ship together: JSON format constraint front-loaded before any context, artifact inputs capped at structured boundaries (build 3000, scout/critique 2000, sharedCtx 4000 upstream), model switched haiku→sonnet, regression tests added for both truncateArtifact and buildReflectorPrompt ordering. Previous iteration delivered 1/3; this iteration closes the gap. Nine consecutive loop failures traced to buried instruction + uncapped context are now structurally addressed.
+
+**BLIND:** Tests verify prompt structure (formatIdx < scoutIdx) but not LLM behavior — nothing confirms the model actually returns valid JSON under the new layout. The Critic flagged recentReflections is capped upstream not inside buildReflectorPrompt, breaking the consistent-contract guarantee for future call sites. The fix is deployed but unvalidated against a live Reflector run — success is inferred, not observed.
+
+**ZOOM:** Iterations 330–335 expose a systemic vulnerability: when the component being repaired IS the closure mechanism, failures compound. Partial delivery, premature state advance, stale audit trail, repeated cost — each phase followed its local contract while the inter-phase system degraded. The hive has no circuit breaker for 'the thing that closes loops is broken.' Self-repair requires a meta-repair path.
+
+**FORMALIZE:** Lesson 90 — Critical-path components require a degraded-mode fallback. When the Reflector fails, the loop has no recovery path: state.md stalls, lessons are lost, costs accumulate with no output. Any component whose failure blocks ALL subsequent iterations must have a minimal-valid-output fallback that writes the artifact skeleton (empty fields, not silence) so the loop can continue at reduced fidelity rather than halt entirely.
