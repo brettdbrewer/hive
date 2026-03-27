@@ -1,13 +1,16 @@
 # Test Report: Invariant 2 — causes field always present on claims
 
 **Date:** 2026-03-28
-**Iteration:** 370
+**Iteration:** 370 follow-up (post-ship verification)
 
 ## What Was Tested
 
 The fix for the CAUSALITY invariant violation: `/knowledge` API was returning claims
-with the `causes` key entirely absent. Changes are in `site/graph/store.go` and
-`site/graph/handlers.go` (working directory, not yet committed to site repo).
+with the `causes` key entirely absent. Changes are committed in `site/graph/store.go`
+and `site/graph/handlers.go` at `d9c1ea6` (iter 371: fix causes field).
+
+The previous test report noted one untested edge case: multiple causes. This run
+adds `TestAssertOpMultipleCauses` and confirms all 7 tests pass.
 
 ## Tests Run
 
@@ -24,56 +27,34 @@ DATABASE_URL=postgres://site:site@localhost:5433/site?sslmode=disable \
 | `TestKnowledgeAuthed` | PASS |
 | `TestAssertOpReturnsCauses` | PASS |
 | `TestKnowledgeClaimsCausesFieldPresent` | PASS |
+| `TestAssertOpMultipleCauses` | **PASS (new)** |
 | `TestKnowledgeMissingSpace` | PASS |
 | `TestKnowledgeClaims` | PASS |
 
-**All 6 pass.** The two critical new tests:
+**All 7 pass.** The new test:
 
-- `TestAssertOpReturnsCauses` — sends `op=assert` with a `causes` field (a node ID),
-  verifies the response JSON includes `causes: [id]`, then fetches `/knowledge` and
-  confirms the claim appears with the correct causes array.
-
-- `TestKnowledgeClaimsCausesFieldPresent` — sends `op=assert` with no causes, decodes
-  the raw response JSON as `map[string]json.RawMessage`, and asserts the `causes` key
-  is present (not omitted via omitempty). Does the same for every claim returned by
-  `/knowledge`.
-
-### hive/pkg/runner — Full suite (all in-process, no DB needed)
-
-```
-go test ./pkg/runner/
-```
-
-All 78 tests pass. No regressions.
-
-## Pre-existing Failures (not caused by this change)
-
-Running `go test ./graph/` without filtering shows 12 additional failures:
-
-- **Duplicate slug violations** (`TestListHiveActivity`, `TestGetHiveCurrent*`, mind_test.go tests)
-  — tests use hard-coded slugs without nonce. Pre-existing leftover state in test DB.
-- **`TestReportsAndResolve`** — schema scan mismatch (`Op` column scanned as string).
-  Pre-existing (confirmed by reverting with `git stash` and re-running).
-- **`TestReposts`** — nil pointer dereference. Pre-existing.
-- **`TestHandlerCreateSpace`** — returns not-found. Pre-existing.
-- **`TestHivePage`** — body doesn't contain 'Civilization Engine'. Pre-existing.
-- **`TestNewUserJourney`** — expects 1 conversation, gets 2. Pre-existing.
-
-Verified: all failures reproduce identically on the committed code (`git stash` →
-same failures → `git stash pop`). None are caused by the causes fix.
+- `TestAssertOpMultipleCauses` — creates two cause nodes, sends `op=assert` with
+  `"causes":"id1,id2"` (comma-separated, because `populateFormFromJSON` decodes JSON
+  as `map[string]string` — arrays not supported), verifies the response has both
+  causes, then fetches `/knowledge` and confirms both causes appear on the claim.
 
 ## Coverage Assessment
 
-The two new tests cover:
-1. Round-trip store: `CreateNode` with `pq.Array(causes)` → `ListNodes` scan with
-   `pq.Array(&n.Causes)` → JSON marshal without omitempty.
-2. Handler parsing: comma-separated `causes` form field in `assert` op.
-3. Key presence: raw JSON decode confirms the field is always in the wire format.
+All three Invariant 2 dimensions are now covered:
 
-Edge case not tested: multiple causes (the test sends one). The implementation
-splits on comma, so multi-cause would work, but there's no explicit test.
-Not added — the critical invariant (field always present) is covered.
+1. **No causes declared** — `TestKnowledgeClaimsCausesFieldPresent`: field present
+   as empty array, not omitted.
+2. **Single cause** — `TestAssertOpReturnsCauses`: round-trip store → handler → JSON.
+3. **Multiple causes** — `TestAssertOpMultipleCauses`: comma-separated parsing,
+   both causes stored and returned.
+
+## Pre-existing Failures
+
+Same pre-existing failures noted in the previous report (12 tests outside this filter
+that fail due to duplicate slug violations, schema mismatches — all pre-existing,
+none caused by the causes fix).
 
 ## Result
 
-**PASS** — Invariant 2 fix is verified. Ready for @Critic.
+**PASS** — Invariant 2 fix fully verified including the multiple-causes edge case.
+Ready for @Critic.
