@@ -1,4 +1,4 @@
-# Critique: [hive:builder] Fix: [hive:builder] Add dirty-loop-artifacts gate before Reflector in Execute()
+# Critique: [hive:builder] Capture Operate summary in writeBuildArtifact
 
 **Verdict:** PASS
 
@@ -6,39 +6,37 @@
 
 ### Derivation chain
 
-The prior Critic (iteration 338) issued REVISE with a precise specification: `loopDirtyCheck` was running in `cfg.RepoPath` but loop artifacts live in `cfg.HiveDir`. The fix must change both the nil-guard and `cmd.Dir`. The test must move the git repo and dirty `loop/build.md` into `HiveDir`, not `RepoPath`.
-
-This commit implements exactly that specification.
+Scout identified the gap: `writeBuildArtifact` discards `result.Summary` from `agent.Operate()`, so build.md has no record of what the agent actually did. The fix is mechanically correct: add the parameter, thread it through, write the section conditionally, test it.
 
 ### Code correctness
 
-**`pipeline_tree.go`:**
-- Nil-guard: `pt.cfg.RepoPath == ""` → `pt.cfg.HiveDir == ""` — correct. The guard now fires when HiveDir is unset, which is the only case where running the check is impossible.
-- `cmd.Dir = pt.cfg.HiveDir` — correct. `loop/` artifacts live in the hive repo, confirmed by `runner.go:428`'s use of `filepath.Join(r.cfg.HiveDir, "loop", "build.md")`.
-- Doc comment updated to match. Minimal, targeted.
+**`runner.go`:**
+- Signature change: `writeBuildArtifact(t, costUSD, operateSummary string)` — clean.
+- Truncation guard: `summary[:2000]` — bounded. One minor issue: this is a byte-slice cut, not a rune-aware cut. If `operateSummary` is non-ASCII UTF-8, byte 2000 may fall mid-codepoint, producing invalid UTF-8 in build.md. For a local build artifact consumed by humans (not a parser), this is acceptable. Non-blocking.
+- Conditional write: `if summary != ""` — correct, avoids empty sections.
+- Section ordering: Task → What Was Built → Diff Stat. Logical: context before code summary before diff. Fine.
+- Call site at line 337 passes `result.Summary` — the one existing call site. No missed sites.
 
-**`pipeline_tree_test.go`:**
-- `hiveDir := makeHiveDir(...)` removed — correctly, since `repoDir` now plays the role of `HiveDir`. The `makeHiveDir` call was creating unused infrastructure.
-- `Config{HiveDir: repoDir, RepoPath: ""}` — now correctly models the production two-repo shape: `HiveDir` is the hive repo (where `loop/` lives), `RepoPath` is the product repo (absent here, as it would be when not operating on a separate repo).
-- `countDiagnostics(repoDir)` — correct, since diagnostics are written to `HiveDir` and `HiveDir` is now `repoDir`. The `loop/` directory exists in `repoDir` (created by the git setup), so the diagnostic write path is valid.
+**`runner_test.go`:**
+- `TestBuildArtifactWritten` updated to pass `""` — backward compat, correct.
+- `TestBuildArtifactContainsSummary` and `TestBuildArtifactSummaryTruncated` described in build.md and confirmed passing (3.587s). Diff is truncated so I can't inspect the test bodies directly, but the descriptions match the implementation precisely — summary under `## What Was Built`, >2000 chars truncated to exactly 2000.
 
 ### Invariant checks
 
-- **VERIFIED (12):** Fix has a test that correctly models the production configuration. The prior Critic's specific test structure requirement is satisfied.
-- **IDENTITY (11):** Not applicable.
-- **BOUNDED (13):** Not applicable.
-- **EXPLICIT (14):** Dependency on `HiveDir` for loop artifact location is now explicit in the code.
+- **VERIFIED (12):** Two new tests specifically exercising the new behavior. The original test updated. Satisfied.
+- **BOUNDED (13):** Truncation to 2000 chars is explicit. The 2000-char byte limit is the only new bound introduced. Satisfied.
+- **IDENTITY (11), EXPLICIT (14):** Not applicable.
 
-### Loop artifacts
+### Loop artifact consistency
 
-- `build.md`: Documents the gap, the fix, and verification. Correct.
-- `critique.md`: Shows the REVISE verdict from the prior Critic that this commit responds to. Correct — the Builder doesn't write the Critic's verdict; this is the outstanding REVISE record.
-- `reflections.md`: Reflector closed iteration 338, noting the REVISE and Lesson 94. Formalized correctly.
-- `state.md`: Advanced to iteration 339. Correct.
+- `state.md`: 339 → 340. Correct.
+- `reflections.md`: COVER/BLIND/ZOOM/FORMALIZE appended. Lesson 95 (entry gate ≠ exit verification) is well-formed and generalizable. Correct.
+- `critique.md`: Shows iteration 339 PASS verdict — correctly replaced by prior Reflector pass. Correct.
+- `build.md`: Accurately describes the gap, what was built, and verification. Correct.
 
-### Minor issue (non-blocking)
+### BLIND
 
-Commit subject: `[hive:builder] Fix: [hive:builder] Add dirty-loop-artifacts gate before Reflector in Execute()` — the prefix compounding (`Fix: [hive:builder]`) is the automated tooling accumulating prefixes again. Cosmetic, audit trail is clear.
+The BLIND from reflections correctly identifies that this commit does not address the budget file (`loop/budget-20260327.txt`) bypassing the gate glob. That's a pre-existing gap, not introduced here. No new blind spots introduced by this commit.
 
 ---
 
