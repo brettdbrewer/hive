@@ -1,63 +1,57 @@
-# Build: Add join_team/leave_team ops and show team members in TeamsView
+# Build Report — Iter 345 Fix: Critic Issues
 
-## Task
+**Date:** 2026-03-27
+**Gap:** Three issues flagged by Critic on iter 345 (join_team/leave_team ops)
 
-Mirror of the role membership work, for teams. Add team membership ops, store methods, op handlers, and update the TeamsView to show member counts and Join/Leave buttons.
+---
 
-## What Was Built
+## Issues Fixed
 
-### `site/graph/store.go`
+### Issue 1 — Invariant 11: `user_name` removed from `node_members`
 
-1. **New constants** — Added `OpJoinTeam = "join_team"` and `OpLeaveTeam = "leave_team"` in a new `// Node membership ops` const block.
+**Problem:** `user_name TEXT NOT NULL DEFAULT ''` was stored in `node_members` and captured at join time. Mutable display names captured at write time diverge from the user's current name.
 
-2. **New schema table** — Added `node_members` table at the end of the schema DDL:
-   ```sql
-   CREATE TABLE IF NOT EXISTS node_members (
-       node_id    TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-       user_id    TEXT NOT NULL,
-       user_name  TEXT NOT NULL DEFAULT '',
-       joined_at  TIMESTAMPTZ DEFAULT NOW(),
-       PRIMARY KEY (node_id, user_id)
-   );
-   CREATE INDEX IF NOT EXISTS idx_node_members_user ON node_members(user_id);
-   ```
+**Fix:**
+- Removed `user_name` column from `CREATE TABLE node_members` definition
+- Added `ALTER TABLE node_members DROP COLUMN IF EXISTS user_name;` migration for existing databases
+- Changed `JoinNodeMember(ctx, nodeID, userID, userName)` → `JoinNodeMember(ctx, nodeID, userID)` — no name stored
+- Updated `ListTeamMembers` to `LEFT JOIN users u ON u.id = nm.user_id` and `COALESCE(u.name, nm.user_id)` — name resolved at query time from the authoritative users table
+- Updated handler call in `handlers.go` to drop the `actor` (display name) argument
+- Updated `store_test.go` to remove the `"Alice"` argument from `JoinNodeMember` calls
 
-3. **New types and methods**:
-   - `NodeMember` struct (`UserID`, `UserName`)
-   - `JoinNodeMember(ctx, nodeID, userID, userName)` — INSERT ON CONFLICT DO NOTHING
-   - `LeaveNodeMember(ctx, nodeID, userID)` — DELETE
-   - `IsNodeMember(ctx, nodeID, userID) bool`
-   - `NodeMemberCount(ctx, nodeID) int`
-   - `ListTeamMembers(ctx, spaceID, teamID) ([]NodeMember, error)` — JOIN nodes to enforce space_id, LIMIT 100
+**Files changed:**
+- `site/graph/store.go` — schema, `JoinNodeMember`, `ListTeamMembers`
+- `site/graph/handlers.go` — `JoinNodeMember` call in `OpJoinTeam` case
+- `site/graph/store_test.go` — `TestNodeMembership`
 
-### `site/graph/handlers.go`
+---
 
-4. **New op cases** — Added `case OpJoinTeam` and `case OpLeaveTeam` in the op switch (before `"kick"`):
-   - `join_team`: requires auth + space membership; calls `JoinNodeMember`, records op, redirects to `/teams`
-   - `leave_team`: self or space owner can remove; accepts optional `user_id` param for owner removing others; calls `LeaveNodeMember`, records op, redirects to `/teams`
+### Issue 2 — Duplicate heading in `state.md`
 
-5. **Updated `handleTeams`** — After listing teams, builds `memberCounts map[string]int` and `isMember map[string]bool` per-team using `NodeMemberCount` and `IsNodeMember`. Passes both maps to `TeamsView`.
+**Problem:** Lines 642–644 had two consecutive `## What the Scout Should Focus On Next` headings (one empty, one with stale Organize Mode content describing work already completed by iter 345).
 
-### `site/graph/views.templ` + `views_templ.go`
+**Fix:** Collapsed to a single heading. Updated the content to reflect the actual next focus: remaining Organize Mode tasks (assign_role/revoke_role, role badges, handler-level tests) rather than repeating the completed join_team/leave_team work.
 
-6. **Updated `TeamsView` signature** — Added `memberCounts map[string]int` and `isMember map[string]bool` parameters.
+**File changed:**
+- `hive/loop/state.md`
 
-7. **Updated team cards** — Each card now:
-   - Shows a member count badge (person icon + count) in the footer
-   - Shows a **Join** button (brand-colored) for non-members who are logged in
-   - Shows a **Leave** button (muted) for current members
-   - Changed card from `<a>` wrapper to `<div>` with inner `<a>` on the title (so Join/Leave forms work correctly)
+---
 
-### `site/graph/store_test.go`
+### Issue 3 — Deploy
 
-8. **New `TestNodeMembership` test** — Covers: initial non-membership, join, duplicate join (idempotent), `ListTeamMembers`, leave, and count verification throughout.
+Deploy requires `flyctl` authentication not available in this session. Ops agent / human operator must run:
+
+```bash
+cd site && ./ship.sh "iter 345 fix: drop user_name from node_members, fix state.md duplicate heading"
+```
+
+---
 
 ## Verification
 
 ```
-templ generate: ✓ (16 updates)
-go build -buildvcs=false ./...: ✓
-go test ./...: ✓ (all pass including TestNodeMembership)
+go.exe build -buildvcs=false ./...   → exit 0
+go.exe test ./...                    → ok github.com/lovyou-ai/site/graph 0.108s
 ```
 
-ACTION: DONE
+All tests pass including `TestNodeMembership`.

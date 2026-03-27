@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 345, 2026-03-27.
+Last updated: Iteration 347, 2026-03-27.
 
 ## Current System State
 
@@ -641,28 +641,11 @@ Add a test for the early-return: use the `tempHiveDir` helper (or equivalent), p
 
 ## What the Scout Should Focus On Next
 
-## What the Scout Should Focus On Next: Organize Mode — Role and Team Membership
+**Target:** Fix the Critic's flagged issues from iter 345 (join_team/leave_team) and confirm a successful deploy.
 
-**Target repo:** site
+Task 3 (join_team / leave_team ops) is done. The remaining work from the Organize Mode cluster:
+- **Task 1+2**: `assign_role` / `revoke_role` ops — store method, handler, UI button in the Roles lens. Show member list on role card.
+- **Task 4**: Role badges on user profiles within space context.
+- **Handler-level tests** for the new op dispatch (auth checks, redirect behavior, owner-can-remove path) — flagged by Critic iter 345.
 
-**Why this now:**
-Role (iter 222), Team (iter 223), and Policy (iter 225) entity kinds exist in the site. Nodes can be created. But none have membership ops — users can't be assigned to roles, added to teams, or have roles/teams mean anything. These are phantom entities: structurally present, functionally inert. Lesson 15 applies: "Close the CRUD loop before adding new features."
-
-The Organize mode is the foundation for everything in the company-in-a-box vision. Without role assignment, you can't delegate authority. Without team membership, you can't route tasks to a team. The entities exist — the Scout's job is to discover exactly what's missing and task it out.
-
-**What the Scout should find and task:**
-
-1. **Read the existing handlers and templates** — `site/graph/handlers.go` for `handleRoles` and `handleTeams`, and the corresponding templ files. What exists? Can a user currently be assigned to a role? Can a user join a team? The Scout must read code, not assume.
-
-2. **Check the ops table** — `site/graph/store.go` or equivalent. What ops exist for `kind=role` and `kind=team`? Are there `assign_role`, `revoke_role`, `join_team`, `leave_team` op types defined? Or is it just the node creation?
-
-3. **Tasks to create:**
-   - **Task 1**: `assign_role` op — store method, handler, UI button in the Roles lens. Owner or role-creator can assign a space member to a role. Show member list on the role detail/card.
-   - **Task 2**: `revoke_role` op — mirror of assign. Role detail shows members with revoke button (owner-only).
-   - **Task 3**: `join_team` / `leave_team` ops — member can join a team (like `join` for spaces), owner can remove. Team card shows member count + member list.
-   - **Task 4**: Role badges on user profiles within space context — when viewing a user's profile in a space, show their roles in that space.
-   - **Task 5**: Tests (store + handler level) + deploy.
-
-**The constraint:** One gap per iteration. Scout should pick the biggest missing piece — likely the membership ops themselves (Task 1+2 together, or Task 3 alone) — and focus there. Don't bundle all five tasks into one iteration.
-
-**The test:** A space owner should be able to: create a role, assign a member to it, see the member listed under the role, and revoke the assignment. That's the closed loop.
+**The constraint:** One gap per iteration. Scout should pick the biggest missing piece and focus there.
