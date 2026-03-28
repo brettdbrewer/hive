@@ -1,30 +1,30 @@
-# Build: Fix: hardcoded one-time upgradeTaskPriority call permanently in main()
+# Build Report — Close orphaned subtasks when parent completes
 
-- **Commit:** 077c4c1decbc4789720e69e86277bf3b8ecf0347
-- **Subject:** [hive:builder] Fix: hardcoded one-time upgradeTaskPriority call permanently in main()
-- **Cost:** $0.1181
-- **Timestamp:** 2026-03-28T12:45:30Z
+## Gap
+255 parent tasks were in state=done but had child_count > child_done, leaving zombie subtasks that would never progress. Root cause: `UpdateNodeState` blocked parent completion if children were incomplete (`ErrChildrenIncomplete`), but the hive was ignoring that error (logged only) and marking parents done via other paths — leaving children orphaned.
 
-## Task
+## Changes
 
-The retroactive priority upgrade for task 468e0549 (lines 160-165 in cmd/post/main.go) fires on every invocation of cmd/post � not just once. A magic string ("468e0549") is permanently embedded in the production execution path. This violates the BOUNDED invariant (infinite scope for a one-time ope...
+### `site/graph/store.go`
+- Added `cascadeCloseChildren(ctx, parentID, depth int)` — depth-first recursive method that closes all non-done descendants before the parent completes. Bounded to 50 levels (invariant 13: BOUNDED).
+- Changed `UpdateNodeState` to call `cascadeCloseChildren` when transitioning to `StateDone`, instead of returning `ErrChildrenIncomplete`. A parent can now always complete — its open children are closed automatically.
 
-## What Was Built
+### `site/graph/handlers.go`
+- Removed two now-dead `errors.Is(err, ErrChildrenIncomplete)` checks from the `complete` op handler and the state-change handler. Both returned HTTP 422; that path is no longer reachable.
 
-All tests pass. Removed the hardcoded `upgradeTaskPriority("468e0549", ...)` call from `main()`. The `upgradeTaskPriority` function itself is kept — it's a valid general-purpose helper with test coverage.
+### `site/graph/store_test.go`
+- Updated `TestUpdateNodeStateChildGate`: now verifies that both parent and child become done after calling `UpdateNodeState(parent, done)`.
+- Updated `TestUpdateNodeStateChildGateMultipleChildren`: now verifies the remaining open child is auto-closed when parent completes.
 
-ACTION: DONE
+### `site/cmd/cleanup-orphans/main.go` (new)
+- One-time migration command for the 255 existing orphaned chains.
+- Uses a recursive CTE to find all non-done descendants of done parents and closes them in a single `UPDATE`.
+- Usage: `DATABASE_URL=postgres://... go run ./cmd/cleanup-orphans/`
 
-## Diff Stat
+## Verification
+- `go build -buildvcs=false ./...` — clean
+- `go test ./...` — all pass (site/graph: 0.122s, site/handlers: 0.493s, hive: all pass)
 
-```
-commit 077c4c1decbc4789720e69e86277bf3b8ecf0347
-Author: hive <hive@lovyou.ai>
-Date:   Sat Mar 28 23:45:30 2026 +1100
-
-    [hive:builder] Fix: hardcoded one-time upgradeTaskPriority call permanently in main()
-
- cmd/post/main.go         | 7 -------
- loop/budget-20260328.txt | 1 +
- 2 files changed, 1 insertion(+), 7 deletions(-)
-```
+## Invariants upheld
+- **BOUNDED (13)**: cascade depth capped at 50.
+- **VERIFIED (12)**: tests updated to cover new cascade behavior.
