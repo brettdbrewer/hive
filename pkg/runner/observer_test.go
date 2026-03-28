@@ -675,6 +675,67 @@ func TestRunObserverReason_OwnCauseTakesPrecedence(t *testing.T) {
 	}
 }
 
+// TestRunObserverReason_HallucinatedCauseIDGetsReplaced verifies that when the LLM
+// returns a TASK_CAUSE node ID that does not exist on the graph (HTTP 404), the
+// fallbackCauseID is used instead. This prevents dangling cause IDs (Lesson 170).
+func TestRunObserverReason_HallucinatedCauseIDGetsReplaced(t *testing.T) {
+	const ghostID = "ghost-node-does-not-exist"
+	const fallback = "real-fallback-claim-id"
+
+	var createBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Node existence check — return 404 for the ghost ID.
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, ghostID) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		// Task creation — capture the body.
+		b, _ := io.ReadAll(r.Body)
+		var m map[string]any
+		if json.Unmarshal(b, &m) == nil {
+			if op, _ := m["op"].(string); op == "intend" {
+				createBody = b
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"op":"intend","node":{"id":"new-task","kind":"task","title":"t","created_at":"","updated_at":""}}`))
+	}))
+	defer srv.Close()
+
+	// LLM returns a hallucinated cause node ID that won't exist on the graph.
+	provider := &mockProvider{response: "TASK_TITLE: Ghost cause gap\nTASK_PRIORITY: high\nTASK_DESCRIPTION: details\nTASK_CAUSE: " + ghostID}
+
+	r := &Runner{
+		cfg: Config{
+			Provider:  provider,
+			APIClient: api.New(srv.URL, "test-key"),
+			SpaceSlug: "hive",
+		},
+	}
+
+	r.runObserverReason(context.Background(), "1 claims exist", fallback)
+
+	if createBody == nil {
+		t.Fatal("no CreateTask request captured")
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(createBody, &fields); err != nil {
+		t.Fatalf("unmarshal CreateTask body: %v", err)
+	}
+	causeList, ok := fields["causes"].([]any)
+	if !ok || len(causeList) == 0 {
+		t.Errorf("CAUSALITY violated: CreateTask missing cause after ghost ID replaced, body=%s", createBody)
+	}
+	if len(causeList) > 0 && causeList[0] != fallback {
+		t.Errorf("causes[0] = %v, want fallback %q — ghost ID must be replaced", causeList[0], fallback)
+	}
+	for _, c := range causeList {
+		if c == ghostID {
+			t.Errorf("ghost cause ID %q leaked into CreateTask — must be replaced by fallback", ghostID)
+		}
+	}
+}
+
 func TestBuildObserverInstruction(t *testing.T) {
 	cases := []struct {
 		name      string

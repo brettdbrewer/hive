@@ -427,6 +427,26 @@ func (c *Client) AssignTask(slug, nodeID, assignee string) error {
 	return err
 }
 
+// NodeExists checks whether a node with the given ID exists in the space.
+// Returns false if the node is not found (HTTP 404) or on network error.
+// Used to validate LLM-generated cause IDs before posting nodes (Lesson 170).
+func (c *Client) NodeExists(slug, id string) bool {
+	u := fmt.Sprintf("%s/app/%s/node/%s?format=json", c.base, slug, id)
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return false
+	}
+	c.setHeaders(req)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	// Drain body to allow connection reuse.
+	_, _ = io.ReadAll(resp.Body)
+	return resp.StatusCode == http.StatusOK
+}
+
 // PostDiagnostic sends a phase event to the /api/hive/diagnostic endpoint.
 // The event is stored in the site's database so /hive/feed works in production.
 // Returns nil on success. Non-fatal: callers should log but not abort on error.

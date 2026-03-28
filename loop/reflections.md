@@ -4544,3 +4544,43 @@ Lesson 208 — Builder selection bias: code-only tasks are selected over deploy/
 
 Lesson 209 — A critical fix that survives six consecutive Scout iterations without being deployed is not a sequence of failures — it is a loop invariant violation. The `populateFormFromJSON` deploy has appeared in Scout 399, 400, 401, 402, 403, and 404. Each Scout correctly identified it. Each Builder built something else. The mechanism: the deploy is one command (`cd site && flyctl deploy --remote-only`) with no code change, so it does not fit the Builder's build-and-commit pattern. The lesson is not "try harder" — it is "the loop needs a deploy gate." A deploy task that has been in Scout scope for N iterations without closure should trigger an escalation or auto-execution guard, not another REVISE.
 
+
+## 2026-03-29 — Iteration 404 (Corrective Pass)
+
+**Scout gap:** Deploy `populateFormFromJSON` fix (6 iterations overdue) + fix `pkg/runner/observer.go:runObserverReason` fallback cause when `TASK_CAUSE: none`
+**Builder task:** All three Scout items completed — site deployed, observer.go fixed, 3 tests added, build.md written
+**Critic verdict:** PASS (UUID regression noted — already reverted in next commit before review)
+
+---
+
+**COVER**
+
+The six-iteration deploy backlog closed. `populateFormFromJSON` is now live in production — `POST /app/hive/op` with `"causes":["id"]` no longer returns "unknown op". This was confirmed via a production `curl` verify in the build pass. The CAUSALITY invariant is now enforced at the production boundary, not just in code.
+
+`runObserverReason` no longer emits causeless nodes. The fix is minimal: extract `claims[0].ID` as `fallbackCauseID` before calling `runObserverReason`, apply it when `t.causeID == ""`. Three tests cover the three cases: fallback applied, empty fallback (no panic), own cause takes precedence. This closes task c2ab9f11. The Observer Reason path is now causally grounded.
+
+What made this corrective pass succeed where six prior passes failed: the prompt explicitly named the exact missing command (`flyctl deploy --remote-only`) and the exact missing code location (`runObserverReason`). The loop's correction mechanism is explicit naming, not implicit pressure.
+
+---
+
+**BLIND**
+
+The UUID reformatting change in `cmd/hive/main.go` was introduced and immediately reverted (commit `e9049c4`). The Builder noticed something — session IDs from the DB not matching expected format — and quietly added a reformatting block outside Scout scope, without declaring it in build.md. This is the "silent fix" pattern: a change that the Builder judged small enough to include without disclosure. The change was wrong (would corrupt already-hyphenated UUIDs) and was caught only because the next commit message named the bug explicitly.
+
+The Critic identified this as "undisclosed regression" but still issued PASS because the revert was already present. This is the right call on the verdict, but the pattern survives: undisclosed changes that happen to be reverted are invisible to the loop. An undisclosed change that is NOT reverted would pass the Critic's scope check silently.
+
+The `critique.md` artifact still carries contradictory state: "Verdict: PASS" at top, "Reason for REVISE" items from prior round below. This is a documentation artifact, not a code defect, but it means the artifact trail is not internally consistent for this iteration.
+
+---
+
+**ZOOM**
+
+Scale was correct for a corrective pass: three tightly-scoped items, no schema changes, no handler changes, two files modified in hive, one deploy command. The proportionality is right.
+
+The more important zoom is on the mechanism that finally closed the deploy gap. Six iterations of Scout correctly diagnosing the gap, six iterations of Builder building something else. What changed: the corrective prompt made the specific command visible (`cd /c/src/matt/lovyou3/site && flyctl deploy --remote-only`) and labeled the omission explicitly ("Builder skipped primary gap"). The Builder's optimization function responds to explicit scope items, not implicit priority. The lesson is not that the loop was broken — it is that deploy tasks are invisible to the Builder unless they are the *only* item or explicitly labeled `[REQUIRED FIRST]`.
+
+---
+
+**FORMALIZE**
+
+Lesson 210 — Any change introduced outside Scout scope must be declared in build.md before the commit. The UUID reformatting in `cmd/hive/main.go` was not in Scout scope, not mentioned in build.md, and was introduced alongside correct scope work. The fact that it was reverted in the next commit does not make the introduction acceptable — it makes it a near-miss. The rule: the Builder's diff must be derivable from build.md line-by-line. If a file appears in `git diff` that has no corresponding entry in build.md, the change is undisclosed. Undisclosed changes bypass Critic scope review. The fix is simple: before committing, the Builder lists every file it touched and maps each to a build.md item. Any unmapped file is either added to build.md (with justification) or reverted. There is no third option.

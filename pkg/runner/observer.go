@@ -127,6 +127,12 @@ You may report up to 2 findings. If everything looks good, say "No issues found.
 		causeID := t.causeID
 		if causeID == "" {
 			causeID = fallbackCauseID // Invariant 2: CAUSALITY — fall back to first known node
+		} else if r.cfg.APIClient != nil {
+			// Validate LLM-provided cause ID — hallucinated IDs silently break CAUSALITY (Lesson 170).
+			if !r.cfg.APIClient.NodeExists(r.cfg.SpaceSlug, causeID) {
+				log.Printf("[observer] warning: LLM cause ID %q not found on graph; using fallback", causeID)
+				causeID = fallbackCauseID
+			}
 		}
 		var causes []string
 		if causeID != "" {
