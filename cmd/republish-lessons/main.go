@@ -19,18 +19,11 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
-const baseURL = "https://lovyou.ai"
-const spaceSlug = "hive"
+var baseURL = "https://lovyou.ai"
 
-// retractedLesson is a lesson to re-assert with a corrected number.
-type retractedLesson struct {
-	shortID string
-	title   string // new title with corrected number
-	body    string // fetched from the retracted claims endpoint
-}
+const spaceSlug = "hive"
 
 func main() {
 	apiKey := os.Getenv("LOVYOU_API_KEY")
@@ -185,9 +178,6 @@ func fetchRetractedClaims(apiKey string) ([]claimNode, error) {
 
 // assertClaim posts a new claim (op=assert) with the given title and body.
 func assertClaim(apiKey, title, body string) error {
-	// Normalize em-dash in title for clean JSON.
-	title = strings.ReplaceAll(title, "—", "\u2014")
-
 	payload, _ := json.Marshal(map[string]string{
 		"op":    "assert",
 		"title": title,
