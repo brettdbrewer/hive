@@ -2,26 +2,31 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 391 (open), 2026-03-29.
+Last updated: Iteration 392 (open), 2026-03-29.
 
-**MCP knowledge search inoperative this session.** close.sh has not run since iteration 388's confirmed close. Lessons 126–181 invisible via search. close.sh must run before the next iteration to restore index freshness (Lesson 173).
+**MCP knowledge search inoperative this session.** close.sh has not run since iteration 388's confirmed close. Lessons 126–183 invisible via search. close.sh must run before the next iteration to restore index freshness (Lesson 173).
 
-**Scout/Build gap mismatch — seventh consecutive iteration (Lessons 168, 171, 174, 178, 181).** Scout 354 named Governance delegation. Builders 385–391 resolved infrastructure debt (CAUSALITY compliance, MCP search, cmd/post dedup, BOUNDED violation, cascade-close orphans). State.md declared iteration 390 as the "natural exit point" — Builder did not act on it. **State.md directives are not binding (Lesson 181).** The only binding constraint is the Critic's REVISE verdict.
+**Scout/Build gap mismatch — eighth consecutive iteration (Lessons 168, 171, 174, 178, 181).** Scout 354 named Governance delegation. Builders 385–392 resolved infrastructure debt (CAUSALITY compliance, MCP search, cmd/post dedup, BOUNDED violation, cascade-close orphans, duplicate lesson numbers). State.md declared HARD CONSTRAINT for iteration 392 — Builder shipped infrastructure regardless. Critic returned PASS. State.md directives are advisory regardless of label (Lesson 181). **Infrastructure repair track is now exhausted — no remaining infrastructure gap outranks Scout 354.**
 
-**HARD CONSTRAINT FOR NEXT BUILDER:** Address Governance delegation (Scout 354) or post an explicit justification naming a higher-priority product gap. Critic must REVISE any build.md that (a) ships infrastructure again without this justification and (b) does not cross-reference Scout 354.
+**Lessons 182–183 formalized this iteration:**
+- Lesson 182: Global sequences must be derived from the store, not local counters.
+- Lesson 183: Capped full-scan for global max is a time-bomb — use server-side MAX aggregate instead.
+
+**For Critic:** The Critic's prompt must be updated to enforce Lesson 168 (Scout-gap cross-reference required in build.md) as a REVISE condition. This cannot be done via state.md alone. Matt must update the Critic prompt directly.
 
 **Remaining infrastructure gaps (open, non-blocking):**
 1. **Type-enforce CAUSALITY** (Lesson 167): Add typed `assertClaim(causes []string, ...)` wrapper.
 2. **Validate LLM-driven cause IDs** (Lesson 170): Observer Reason path submits LLM-generated IDs without graph validation.
-3. **Critic must enforce Lesson 168** (Lesson 171): Scout-gap cross-reference missing from build.md should be REVISE.
+3. **Critic must enforce Lesson 168** (Lesson 171): Scout-gap cross-reference missing from build.md should be REVISE. Requires Critic prompt update — Reflector cannot enforce this.
 4. **Implement ghost-detection halt** (Lesson 156): ~10 lines in diagnostics reader.
 5. **Run close.sh**: Hard prerequisite for iteration close (Lesson 173).
 6. **Artifact freshness** (Lesson 151): Add iteration watermarks to artifact headers.
 7. **Cleanup-orphans migration**: Run `cmd/cleanup-orphans/` against production DB to close 255 zombie subtasks.
 8. **ErrChildrenIncomplete caller audit** (Lesson 180): Grep all packages + external callers for sites that were catching the now-removed sentinel.
 9. **Cascade depth cap documentation** (Lesson 179): Document why 50 levels, add boundary test.
+10. **Replace GetClaims(200) with server-side MAX** (Lesson 183): `NextLessonNumber` time-bomb. Fix before lesson count reaches 200.
 
-**Next lesson: 182.**
+**Next lesson: 184.**
 
 ## Current System State
 

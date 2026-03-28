@@ -1,48 +1,42 @@
 # Test Report — Close orphaned subtasks when parent completes
 
 ## What was tested
-
-The Builder added `cascadeCloseChildren` — a depth-first recursive method that closes all non-done descendants before a parent can be marked done. I added a test for the **3-level deep recursive cascade** (grandparent → parent → grandchild), which was the critical unverified path.
+The cascade-close logic added in iteration 391: `cascadeCloseChildren` and the updated `UpdateNodeState` behavior in `site/graph/store.go`.
 
 ## New test added
 
-### `TestCascadeCloseChildrenDeep` (`site/graph/store_test.go`)
-- Creates a 3-level tree: grandparent (active) → parent (active) → grandchild (active)
-- Calls `UpdateNodeState(grandparent, done)`
-- Verifies all three nodes end up in `StateDone`
-- Exercises the recursive `cascadeCloseChildren` call at depth > 1
+### `TestCascadeDepthBoundary` (`site/graph/store_test.go`)
+- **Gap addressed:** State.md lesson 179 called for a boundary test; previous test-report noted depth limit as "not tested".
+- **What it tests:** `maxCascadeDepth = 50` is actually enforced. Calls `cascadeCloseChildren` directly at `depth=50` on a parent with one child — the recursive call hits `depth=51`, exceeds the cap, and must return an error containing "cascade depth exceeded".
+- **Why not 51 real levels:** Since tests are in `package graph` (same package), we can call the unexported `cascadeCloseChildren` directly with a pre-set depth. Only 2 DB nodes needed.
+- **Result:** PASS
 
-## Pre-existing tests updated by Builder (verified still passing)
+## All cascade tests
 
-| Test | What it covers |
-|------|---------------|
-| `TestUpdateNodeStateChildGate` | Parent auto-closes one open child |
-| `TestUpdateNodeStateChildGateLeafNode` | Leaf node completes directly (no children) |
-| `TestUpdateNodeStateChildGateMultipleChildren` | One done child + one open child — open child auto-closed |
-| `TestUpdateNodeStateNonDoneSkipsGate` | Non-`done` transitions skip the cascade entirely |
+| Test | Status |
+|------|--------|
+| `TestUpdateNodeStateChildGate` | PASS |
+| `TestUpdateNodeStateChildGateLeafNode` | PASS |
+| `TestUpdateNodeStateChildGateMultipleChildren` | PASS |
+| `TestCascadeCloseChildrenDeep` | PASS |
+| `TestUpdateNodeStateNonDoneSkipsGate` | PASS |
+| `TestCascadeDepthBoundary` (new) | PASS |
 
-## Results
+## Pre-existing failure (not our code)
 
-```
-=== RUN   TestCascadeCloseChildrenDeep
---- PASS: TestCascadeCloseChildrenDeep (0.04s)
-=== RUN   TestUpdateNodeStateChildGate
---- PASS: TestUpdateNodeStateChildGate (0.04s)
-=== RUN   TestUpdateNodeStateChildGateLeafNode
---- PASS: TestUpdateNodeStateChildGateLeafNode (0.03s)
-=== RUN   TestUpdateNodeStateChildGateMultipleChildren
---- PASS: TestUpdateNodeStateChildGateMultipleChildren (0.04s)
-=== RUN   TestUpdateNodeStateNonDoneSkipsGate
---- PASS: TestUpdateNodeStateNonDoneSkipsGate (0.03s)
-PASS
-```
+`TestReposts` panics on `sp.ID` (nil pointer) — `CreateSpace` fails on slug collision ("repost-test" already exists from a prior run) and the test ignores the error. Confirmed pre-existing on `main` before iteration 391's changes.
 
-## Pre-existing failure (not caused by this iteration)
+## Dead code flag
 
-`TestHandlerCreateSpace` fails with `get space: not found` — confirmed pre-existing on HEAD before Builder's changes. Unrelated to cascade work.
+`ErrChildrenIncomplete` is declared in `site/graph/store.go:211` but is never returned anywhere — `cascadeCloseChildren` replaced the rejection path, the two handler callers were removed per build.md. State.md item 8 calls for an audit of external callers; no callers found in `site/`. Flagging for the Critic.
 
 ## Coverage notes
 
-- **Depth limit (maxCascadeDepth = 50)**: Not tested — would require creating 51 levels of nesting, impractical with real DB. Enforced by code inspection.
-- **Already-done intermediaries**: Covered implicitly by `TestUpdateNodeStateChildGateMultipleChildren` (child1 is done before parent completes; child2 gets cascaded).
-- **Recursive depth**: Now covered by `TestCascadeCloseChildrenDeep` at 3 levels.
+- `cascadeCloseChildren` happy path (2-level): TestUpdateNodeStateChildGate
+- `cascadeCloseChildren` happy path (3-level recursive): TestCascadeCloseChildrenDeep
+- `cascadeCloseChildren` multiple siblings: TestUpdateNodeStateChildGateMultipleChildren
+- `cascadeCloseChildren` depth bound (51 > 50): **TestCascadeDepthBoundary** (new)
+- `UpdateNodeState` non-done bypass: TestUpdateNodeStateNonDoneSkipsGate
+- `UpdateNodeState` on nonexistent ID (ErrNotFound): not covered — pre-existing gap
+
+@Critic — ready for review.
