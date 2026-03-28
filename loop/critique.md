@@ -1,21 +1,17 @@
-# Critique: [hive:builder] Causality fix is narrow: Observer-created nodes still have causes=[] after commits 274999c and 8a13ac7
+# Critique: [hive:builder] MCP knowledge index is completely empty — not just lessons 126-148
 
 **Verdict:** PASS
 
-**Summary:** The diff touches 9 creation paths. I've verified all the key paths:
+**Summary:** Acceptance criteria verified: `knowledge_search("lesson")` returns 10 results. The build's claim holds.
 
-**Correctness checks:**
+**Checking the derivation chain:**
 
-1. **`cmd/post/main.go`** — `createTask` adds `causes` as a comma-joined string in the JSON payload. The format is consistent with how `cmd/post` handles causes elsewhere. Test `TestCreateTaskSendsCauses` pins it.
+- **Gap → Plan**: Gap was "search returns zero results". Build correctly re-scoped when investigation showed search now works — no code change needed.
+- **Code → Test**: No code shipped. Existing tests confirmed passing. Invariant 12 is satisfied — nothing shipped without tests, because nothing shipped.
+- **Causality (Inv 2)**: No new graph nodes created by this build, so no causality requirement to enforce here.
+- **Identity (Inv 11)**: No code changes, not applicable.
+- **Residual gap (65/145 claims)**: Correctly scoped out. The acceptance test was search functionality, not claim completeness. The gap is documented for a future iteration — that's the right call.
 
-2. **`critic.go`** — `LatestByTitle("Build: "+subject)` matches the exact build document, uses `.ID` (not `.Title`). Causality chain is correct: build → critique claim → fix task. Both Operate and Reason paths thread `buildCauses` to `writeCritiqueArtifact`. Covered by `TestWriteCritiqueArtifactRunnerPassesBuildCauses` and `TestReviewCommitFixTaskHasCauses`.
-
-3. **`observer.go`** — `TASK_CAUSE:` parsing filters sentinel values (`none`, `N/A`, empty). Covered by `TestParseObserverTasksCauseID`, `TestParseObserverTasksTwoCauseIDs`, and `TestBuildOutputInstructionCausesFieldPresent`.
-
-4. **`reflector.go`** — Operate path collects both critique and build node IDs; Reason path uses `else if` (collects only one — critique preferred over build). Minor inconsistency but not an invariant violation — any declared cause satisfies Invariant 2. `readFromGraphNode` helper correctly returns full node with ID. Covered by `TestAppendReflectionPassesCauseIDs` and `TestAppendReflectionNilCausesOmitsCausesField`.
-
-5. **Invariant 11**: All cause IDs come from `.ID` on returned nodes, never from `.Title`. ✓
-
-6. **Invariant 12**: Every new code path has a covering test. ✓
+The build correctly identified a transient-state gap that resolved itself through prior work (`parseClaims()` + fresh `claims.md`), confirmed the fix holds with evidence, and documented the remaining sync gap for follow-up. No code shipped means no code to critique. The verification is sound.
 
 VERDICT: PASS

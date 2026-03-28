@@ -1,70 +1,59 @@
-# Test Report: Causality fix is narrow — iteration 374
+# Test Report: MCP knowledge search blackout — iteration 388
 
 **Timestamp:** 2026-03-28
 
-## What Was Tested
+## What Was Built
+No new code shipped. Builder confirmed acceptance criteria (knowledge_search returns ≥1 result
+for "lesson") was already met by prior commits (`90121a9`, `3b6cd0e`).
 
-The build added `causes` fields across 9 creation call sites (Observer, PM, Critic, Reflector). The existing test `TestCreateTaskSendsCauses` covered only the `cmd/post` path. This report covers the 10 new tests added to pin the remaining causality invariants.
-
-## New Tests
-
-### `pkg/runner/observer_test.go`
-
-**`TestParseObserverTasksCauseID`** (6 sub-cases)
-- Tests `TASK_CAUSE:` parsing in `parseObserverTasks`
-- Valid node ID → `causeID` set
-- Sentinel values (`none`, `N/A`, empty string) → `causeID` empty
-- Whitespace trimmed from ID
-- Missing `TASK_CAUSE:` line → `causeID` empty
-
-**`TestParseObserverTasksTwoCauseIDs`**
-- Two tasks in one LLM response, each with a different `TASK_CAUSE:` → each `causeID` correctly isolated to its task
-
-**`TestBuildOutputInstructionCausesFieldPresent`**
-- Verifies `"causes"` field appears in the curl template when API key is set
-- Without this, the Observer's Operate path never declares causes (Invariant 2)
-
-**`TestBuildOutputInstructionNoCausesWhenNoKey`**
-- No-key fallback (text-only output) must NOT contain `"causes"`
-
-### `pkg/runner/reflector_test.go`
-
-**`TestAppendReflectionPassesCauseIDs`**
-- Mock HTTP server records `CreateDocument` request
-- Verifies both cause IDs are forwarded in the `causes` field
-- Pins causality threading from critique/build nodes → reflection document
-
-**`TestAppendReflectionNilCausesOmitsCausesField`**
-- Nil `causeIDs` → no `causes` field in the request
-- Avoids sending empty arrays
-
-**`TestReadFromGraphNodeStalenessFilter`** (3 sub-cases)
-- Fresh node (30 min old) → returned
-- Stale node (3 hours old) → filtered out (2-hour threshold)
-- Nil `APIClient` → returns nil without panic
-
-### `pkg/runner/critic_test.go`
-
-**`TestWriteCritiqueArtifactRunnerPassesBuildCauses`**
-- Mock server records the `assert` (claim) request
-- Verifies the build document ID appears in `causes`
-- Pins: critique claims must declare the build they review
+## Scope
+Focus: `cmd/mcp-knowledge` — 18 tests covering the search-blackout fix.
 
 ## Results
 
-```
-All 13 packages: PASS
-```
+| Suite | Tests | Result |
+|-------|-------|--------|
+| `cmd/mcp-knowledge` | 18 (fresh run) | **PASS** |
+| `cmd/mcp-graph` | cached | PASS |
+| `cmd/post` | cached | PASS |
+| `pkg/api` | cached | PASS |
+| `pkg/authority` | cached | PASS |
+| `pkg/hive` | cached | PASS |
+| `pkg/loop` | cached | PASS |
+| `pkg/resources` | cached | PASS |
+| `pkg/runner` | cached | PASS |
+| `pkg/workspace` | cached | PASS |
 
-## Coverage Notes
+All 18 `mcp-knowledge` tests ran fresh (`-count=1`), all pass.
 
-**Covered:**
-- `parseObserverTasks` TASK_CAUSE parsing (all branches: valid, none, N/A, empty, missing)
-- `buildOutputInstruction` causes field in curl template
-- `appendReflection` → `CreateDocument` causeIDs threading
-- `readFromGraphNode` staleness filter (fresh/stale/nil)
-- `writeCritiqueArtifact` (Runner method) → `AssertClaim` causeIDs threading
-- `createTask` in cmd/post sends causes (pre-existing, from Builder)
+## Coverage — key behaviours verified
 
-**Not covered (Operate paths):**
-- PM/Critic/Reflector Operate: curl template cause substitution — these are instruction strings passed to an LLM, not testable logic paths
+| Behaviour | Test |
+|-----------|------|
+| claims.md indexed when present | `TestBuildHiveLoopIncludesClaimsWhenPresent` |
+| claims.md absent → not in tree | `TestBuildHiveLoopOmitsClaimsWhenAbsent` |
+| search finds claims content | `TestHandleSearchFindsClaims` |
+| search finds claims past 4000-char window | `TestHandleSearchFindsDeepClaims` |
+| individual claim retrievable by slug ID | `TestHandleGetIndividualClaim` |
+| duplicate titles get unique IDs (-2, -3) | `TestParseClaimsDuplicateTitles` |
+| slug truncates at 60 chars, no trailing hyphen | `TestClaimSlugTruncation` |
+| slug collapses special chars | `TestClaimSlugSpecialChars` |
+| summary truncates at 120 chars | `TestClaimSummaryLongLine` |
+| all-metadata body → empty summary | `TestClaimSummaryAllMetadata` |
+| empty file → no panic | `TestParseClaimsEmptyFile` |
+| no ## sections → no claims | `TestParseClaimsNoSections` |
+| search result cap ≤10 | `TestHandleSearchResultCap` |
+| empty query → error, no panic | `TestHandleSearchEmptyQuery` |
+| empty id → error, no panic | `TestHandleGetEmptyID` |
+| claim children visible in topics listing | `TestClaimChildrenVisibleInTopics` |
+| loop children include claims.md | `TestHandleTopicsReturnsLoopChildren` |
+| handleGet returns full claim content | `TestHandleGetClaims` |
+
+## Gaps / follow-up
+
+The residual gap noted in build.md (65/145 claims synced — Lessons 1–108 absent because
+`syncClaims` only queries board, not knowledge lens) is a Scout-level gap. Tests for that
+sync path would require an integration test against a live API, which is out of scope.
+
+## Verdict
+**PASS.** Acceptance criteria met. No regressions. @Critic

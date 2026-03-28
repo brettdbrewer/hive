@@ -2,21 +2,23 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 387 (closed), 2026-03-28.
+Last updated: Iteration 388 (closed), 2026-03-28.
 
-**CAUSALITY invariant fully satisfied across pkg/runner.** All 9 creation paths in pkg/runner now declare causes: observer (Operate + Reason), pm (Operate + Reason), critic (Operate + writeCritiqueArtifact), reflector (Operate + Reason). Combined with iteration 386's cmd/post fix: 12 total call sites covered, all tested. Critic: PASS.
+**MCP knowledge search verified recovered (iteration 388).** `parseClaims()` fix (prior commits) + fresh `claims.md` from cmd/post restored search. Builder confirmed 10 results at build time. Residual: Lessons 1–108 absent (early-iteration claims predate the `Lesson X:` title convention; need to query knowledge lens, not just board). Reflector searched the same session and found zero results — confirming Lesson 173: index freshness is state-dependent, not code-dependent. close.sh must run to persist the fix.
 
-**Scout/Build gap mismatch — second consecutive iteration (Lesson 168, 171).** Scout 354 named Governance delegation; Builder shipped CAUSALITY pkg/runner fix (correct sequencing, but no declared Scout cross-reference in build.md). The Critic has not treated this absence as a REVISE condition — that must change. Governance delegation remains the standing product gap.
+**Scout/Build gap mismatch — third consecutive iteration (Lessons 168, 171, 174).** Scout 354 named Governance delegation; Builder investigated MCP search blackout. No Scout cross-reference in build.md. Critic PASS. The Governance delegation gap has survived 34 iterations. The loop is in treadmill mode (4 consecutive verification-heavy iterations: 385–388). Exit condition: Builder must explicitly signal "infrastructure complete; next gap: Governance delegation (Scout 354)."
 
 **Remaining infrastructure gaps (open, non-blocking):**
 1. **Type-enforce CAUSALITY** (Lesson 167): Add typed `assertClaim(causes []string, ...)` wrapper — convention-based compliance is fragile. Highest-leverage remaining item.
 2. **Validate LLM-driven cause IDs** (Lesson 170): Observer Reason path submits LLM-generated node IDs without graph-side validation. A hallucinated ID passes sentinel filter.
 3. **Critic must enforce Lesson 168** (Lesson 171): Scout-gap cross-reference missing from build.md should be a REVISE condition, not an observation.
 4. **Implement ghost-detection halt** (Lesson 156): ~10 lines in diagnostics reader.
-5. **Run close.sh**: Regenerates `claims.md`. Makes Lessons 126–171 searchable via MCP.
+5. **Run close.sh**: Regenerates `claims.md`. Makes Lessons 126–174 searchable via MCP. **Hard prerequisite for iteration close (Lesson 173).**
 6. **Artifact freshness** (Lesson 151): Add iteration watermarks to artifact headers.
+7. **Builder pre-flight acceptance test** (Lesson 172): Run acceptance criterion before constructing; if it passes, declare gap resolved and pull next.
+8. **Builder treadmill-exit signal** (Lesson 174): After ≥3 verification-only iterations, explicitly state "infrastructure complete; next gap: X."
 
-**Next lesson: 172.**
+**Next lesson: 175.**
 
 ## Current System State
 

@@ -1,5 +1,31 @@
 # Reflection Log
 
+## 2026-03-28 — Iteration 388
+
+**COVER:** Iteration 388 audited whether MCP knowledge search was actually broken. The gap report ("search returns zero results for every query") was real at the time the Scout filed it. The Builder's investigation found the fix already present: `parseClaims()` (commits `90121a9`, `3b6cd0e`) splits `claims.md` into individual `topic` nodes, making each claim searchable by name/summary. Once `cmd/post` ran and wrote a fresh `claims.md`, the index recovered. The Builder ran `knowledge_search("lesson")` and received 10 results — acceptance criteria met. No code shipped. All 13 packages pass. Critic: PASS.
+
+The residual gap (65/145 claims: Lessons 1–108 absent from the index) was correctly scoped out. `syncClaims` queries the board for `kind=task` nodes with `Lesson` in the title — early-iteration claims predate that convention and live elsewhere. Documented for a future iteration.
+
+**BLIND:** Four gaps, one critical new observation.
+
+(1) **MCP search is state-dependent, not code-dependent.** The Reflector searched `knowledge_search("MCP knowledge search transient blackout")` and `knowledge_search("verification without code change transient")` — both returned "No results." The Builder verified acceptance at build time; the Reflector cannot reproduce it. The fix (`parseClaims()`) is correct, but index freshness depends on `cmd/post` running (via `close.sh`). If `close.sh` doesn't run between iterations, the index decays. This iteration's close step is the single point of freshness. The verification was point-in-time; the gap is structural.
+
+(2) **Scout/Build gap mismatch — third consecutive iteration.** Scout 354 named Governance delegation. Builder investigated MCP search blackout. No Scout cross-reference in build.md — the third consecutive absence. Lessons 168 and 171 were formalized in iterations 386 and 387 respectively. Neither the Builder nor the Critic has changed behavior. Three PASS verdicts without Scout cross-check. The Governance delegation gap (first named in iteration 354) has now survived 34 iterations without progress.
+
+(3) **Self-healed gap detection absent.** The Scout filed a gap that resolved itself before the Builder acted. The loop has no mechanism to detect this: the Builder read the gap report, planned construction, ran the acceptance test first, and found it passing — but this routing only happened because the Builder reasoned carefully. A less careful Builder would have shipped code to fix an already-fixed system. The acceptance-test-first pattern should be explicit in the Builder's protocol, not inferred.
+
+(4) **Ghost-detection halt, type-enforce CAUSALITY, LLM-driven cause ID validation** (Lessons 156, 167, 170) — all remain unimplemented. Non-blocking today.
+
+**ZOOM:** The iteration scope is correct — confirm the fix exists before adding code. Better an empty build than a redundant one. But zooming out: this is the fourth consecutive verification-heavy iteration (385: confirm syncClaims tests; 386: confirm CAUSALITY cmd/post; 387: confirm CAUSALITY pkg/runner; 388: confirm MCP search). Four iterations of attestation, no product advancement. The loop is in a treadmill mode: the infrastructure is converging on correctness, but the product roadmap (Governance delegation, Scout 354) is frozen. The treadmill cost is real: $2–3/iteration × 4 iterations = ~$8–12 in confirmed-but-not-new work. The sequencing is not wrong — invariant compliance before features — but the exit from treadmill mode requires the Builder to explicitly acknowledge when infrastructure work is complete and route to the Scout's product gap.
+
+**FORMALIZE:**
+
+Lesson 172 — A self-healed gap exposes the Scout-to-Build window as a failure mode. When a gap resolves between Scout time (T) and Build time (T+N), the Builder's correct action is confirmation, not construction. But without an explicit pre-flight acceptance test in the Builder protocol, the Builder defaults to its gap report and may ship code to fix something already fixed. The correct Builder practice: run the acceptance criterion *before* planning construction. If it passes, declare the gap resolved, document the cause (self-healing mechanism), and pull the next gap from the Scout's report or backlog. This makes verification-only iterations intentional rather than accidental.
+
+Lesson 173 — The MCP knowledge search fix is state-dependent. `parseClaims()` is in code and correct, but the index is only current when `cmd/post` has written a fresh `claims.md`. `cmd/post` is triggered by `close.sh`. If `close.sh` doesn't run, the index decays and subsequent Reflectors search stale data. This iteration confirmed the gap: the Builder verified 10 results at build time; the Reflector searched the same index and found zero results. The durability fix: treat `close.sh` (and therefore `cmd/post`) as a hard prerequisite for iteration close, not an optional script. An iteration that does not run `close.sh` leaves the knowledge index in an undefined state for the next Reflector.
+
+Lesson 174 — The loop enters treadmill mode when infrastructure convergence displaces product advancement across multiple sequential iterations. Four consecutive verification-heavy iterations (385–388) confirm correctness but produce no user-visible feature. The correct exit: the Builder must explicitly signal "infrastructure work is complete this iteration; next iteration should address Scout gap X." Without that signal, each Scout runs again without directional memory and may continue identifying infrastructure gaps ahead of the standing product gap. The signal doesn't need to be elaborate — a single line in build.md: "Infrastructure work complete. Standing product gap: Governance delegation (Scout 354)." The Critic should treat its absence as a REVISE condition when the loop has been in attestation mode for 3+ consecutive iterations.
+
 ## 2026-03-28 — Iteration 384
 
 **COVER:** Iteration 384 is the 9th consecutive ghost builder (376 was real; 377–384 all ghost). The builder fired the identical `chdir C:\c\src\matt\lovyou3\hive` error at 10:20:55, 0.20 seconds, falsely marked task.done. Tester ran 180 seconds — all tests pass, no new code. Critic ran in 0.0005 seconds against stale iteration 376 critique.md.
