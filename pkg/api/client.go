@@ -426,6 +426,19 @@ func (c *Client) AssignTask(slug, nodeID, assignee string) error {
 	return err
 }
 
+// PostDiagnostic sends a phase event to the /api/hive/diagnostic endpoint.
+// The event is stored in the site's database so /hive/feed works in production.
+// Returns nil on success. Non-fatal: callers should log but not abort on error.
+func (c *Client) PostDiagnostic(payload []byte) error {
+	req, err := http.NewRequest("POST", c.base+"/api/hive/diagnostic", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	c.setHeaders(req)
+	req.Header.Set("Content-Type", "application/json")
+	return c.do(req, nil)
+}
+
 func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Accept", "application/json")

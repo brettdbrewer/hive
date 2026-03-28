@@ -69,13 +69,33 @@ func countDiagnostics(hiveDir string) int {
 	return count
 }
 
-// appendDiagnostic appends a PhaseEvent to loop/diagnostics.jsonl.
-// Silently skips if HiveDir is empty.
+// appendDiagnostic appends a PhaseEvent to loop/diagnostics.jsonl and, if an
+// API client is configured, POSTs it to the site's /api/hive/diagnostic endpoint
+// so the /hive/feed dashboard shows real data in production.
 func (r *Runner) appendDiagnostic(e PhaseEvent) {
-	if r.cfg.HiveDir == "" {
+	if e.Timestamp == "" {
+		e.Timestamp = time.Now().UTC().Format(time.RFC3339)
+	}
+	data, err := json.Marshal(e)
+	if err != nil {
+		log.Printf("[runner] appendDiagnostic marshal: %v", err)
 		return
 	}
-	if err := appendDiagnostic(r.cfg.HiveDir, e); err != nil {
-		log.Printf("[runner] appendDiagnostic: %v", err)
+
+	if r.cfg.HiveDir != "" {
+		path := filepath.Join(r.cfg.HiveDir, "loop", "diagnostics.jsonl")
+		f, ferr := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if ferr != nil {
+			log.Printf("[runner] appendDiagnostic open: %v", ferr)
+		} else {
+			fmt.Fprintf(f, "%s\n", data)
+			f.Close()
+		}
+	}
+
+	if r.cfg.APIClient != nil {
+		if err := r.cfg.APIClient.PostDiagnostic(data); err != nil {
+			log.Printf("[runner] appendDiagnostic post: %v", err)
+		}
 	}
 }

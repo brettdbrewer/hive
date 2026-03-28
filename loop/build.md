@@ -1,45 +1,50 @@
-# Build Report
+# Fix: /hive diagnostics always empty in production — migrate to graph API
 
-**Task:** Run cmd/cleanup-orphans in production to unblock zombie subtasks
-**Iteration context:** state.md item 7 — zombie subtasks blocking done parent task completion
+## What changed
 
-## What was done
-
-Ran the existing `site/cmd/cleanup-orphans/` tool against the production Neon database (via Fly.io secrets).
-
-No code changes were made. The tool already existed and was correct.
-
-## Execution steps
-
-1. Cross-compiled `cmd/cleanup-orphans/` for linux/amd64:
-   ```
-   GOOS=linux GOARCH=amd64 go build -buildvcs=false -o /tmp/cleanup-orphans ./cmd/cleanup-orphans/
-   ```
-
-2. Uploaded binary to the running Fly.io machine via `flyctl ssh sftp put`
-
-3. Ran on the production machine (where DATABASE_URL is set as a Fly secret):
-   ```
-   /cleanup-orphans
-   ```
-
-4. Cleaned up binary from production machine after execution.
-
-## Results
-
-```
-Found 399 parent tasks with orphaned children. Closing all descendants...
-Done. Closed 1106 orphaned subtasks across 399 parent chains.
-```
-
-- **399** parent task chains had orphaned children (more than the 255 estimated in state.md)
-- **1106** zombie subtasks closed in total (recursive — nested orphans caught in one pass)
-
-## Verification
-
-- `go.exe build -buildvcs=false ./...` — PASS
-- `go.exe test ./...` — PASS (auth, graph, handlers packages all pass)
+Migrated `/hive/feed` diagnostics from local file (`loop/diagnostics.jsonl`) to the
+graph database, eliminating the Fly.io production gap where `HIVE_REPO_PATH` was not
+set and the file never shipped to the container.
 
 ## Files changed
 
-None — this was a production data fix via an existing migration tool.
+### `site/graph/store.go`
+- Added `hive_diagnostics` table to the auto-migration schema (`CREATE TABLE IF NOT EXISTS`)
+- Added `AppendHiveDiagnostic(ctx, phase, outcome, costUSD, payload)` — inserts a phase event row
+- Added `ListHiveDiagnostics(ctx, limit)` — queries the last N events newest-first
+
+### `site/graph/handlers.go`
+- Added `POST /api/hive/diagnostic` route (auth-protected via `writeWrap`)
+- Added `handleHiveDiagnostic` handler — parses JSON body, calls `AppendHiveDiagnostic`
+- Updated `handleHiveFeed` — queries DB first, falls back to local file (dev compatibility)
+- Updated `handleHive` — same DB-first pattern for the initial page load
+- Added `"io"` to imports
+
+### `site/graph/hive_test.go`
+- Added `TestPostHiveDiagnostic_StoresAndServes` — round-trip test: POST then GET /hive/feed
+- Added `TestListHiveDiagnostics_Empty` — empty DB returns nil without error
+
+### `hive/pkg/api/client.go`
+- Added `PostDiagnostic(payload []byte)` — POSTs raw JSON to `/api/hive/diagnostic`
+
+### `hive/pkg/runner/diagnostic.go`
+- Updated `Runner.appendDiagnostic` to:
+  1. Still write to `loop/diagnostics.jsonl` when `HiveDir` is set (local dev)
+  2. Also POST via `APIClient.PostDiagnostic` when APIClient is set (production)
+
+## Verification
+
+```
+site: go build -buildvcs=false ./...   pass
+site: go test ./...                    pass (DB tests skip without DATABASE_URL)
+hive: go build -buildvcs=false ./...   pass
+hive: go test ./...                    pass (all runner tests pass)
+```
+
+## How production now works
+
+1. Hive runner emits `PhaseEvent` → `Runner.appendDiagnostic` → POSTs JSON to `POST /api/hive/diagnostic` on lovyou.ai
+2. Site stores row in `hive_diagnostics` table (auto-created on startup)
+3. `GET /hive/feed` → `ListHiveDiagnostics` → renders phase timeline from DB
+
+No `HIVE_REPO_PATH` or Fly volume required.
