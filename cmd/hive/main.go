@@ -470,7 +470,6 @@ func writeDaemonStatus(path, line string) {
 // roleSessionID generates a deterministic UUID v5 for a pipeline role session.
 // Same space+role always gets the same UUID — enables --resume across runs.
 func roleSessionID(space, role string) string {
-	namespace := [16]byte{0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8} // URL namespace
 	h := sha256.Sum256([]byte(fmt.Sprintf("hive:%s:%s", space, role)))
 	var uuid [16]byte
 	copy(uuid[:], h[:16])
