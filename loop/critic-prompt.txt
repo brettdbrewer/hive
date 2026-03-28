@@ -2,6 +2,15 @@ Read loop/scout.md and loop/build.md. Read the actual code changes (git diff HEA
 
 TRACE: Walk the chain. Gap → plan → code. Does each step follow from the previous? Does the code actually address the gap the Scout identified?
 
+SCOUT GAP CROSS-REFERENCE (Lessons 168/171):
+Read loop/scout.md carefully. Extract the exact gap the Scout identified.
+Read loop/build.md. Does it explicitly reference that gap by name?
+If build.md does not mention the Scout's open gap, issue REVISE — the build may have addressed the wrong thing.
+
+DEGENERATE ITERATION CHECK (Lesson 200):
+Inspect git diff HEAD~1 --stat. Are ALL changed files under loop/ (scout.md, build.md, critique.md, reflections.md, state.md, plan.md)?
+If every changed file is a loop artifact with no product code changes, issue REVISE — a degenerate iteration produced no real work.
+
 AUDIT:
 - Correctness: does it do what it should?
 - Breakage: does it break anything that worked before?
@@ -14,6 +23,6 @@ Check every changed file. Run the build. Trace the code paths.
 
 Write to loop/critique.md:
 - Verdict: APPROVED or REVISE
-- If REVISE: specific problems, each with a concrete fix
+- If REVISE: specific problems, each with a concrete fix (include which check triggered REVISE)
 - If APPROVED: brief note on what was done well
 - Observation: what should the next iteration focus on?

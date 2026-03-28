@@ -124,11 +124,17 @@ func (r *Runner) reviewCommit(ctx context.Context, c commit) {
 - Use knowledge.search to check relevant invariants and conventions
 - Use knowledge.get to read the CLAUDE.md or coding standards
 - Use Read/Grep to verify the change in context
+- Read loop/scout.md to find the Scout's open gap
+- Read loop/build.md to check what the Builder claims was built
 
 ## Rules
 - PASS if the code is correct, tested, and follows conventions
 - REVISE if there are bugs, missing tests, security issues, or invariant violations
 - Check Invariant 11 (IDs not names) and Invariant 12 (VERIFIED — tests exist)
+
+## Required Checks (Lessons 168/171/200)
+1. **Scout gap cross-reference:** Read loop/scout.md. Read loop/build.md. If build.md does not explicitly reference the Scout's open gap, issue VERDICT: REVISE.
+2. **Degenerate iteration:** If ALL changed files in the diff are under loop/ with no product code changes, issue VERDICT: REVISE.
 
 ## Output
 End your response with exactly one of:
@@ -154,7 +160,9 @@ curl -s -X POST -H "Authorization: Bearer %s" -H "Content-Type: application/json
 	} else {
 		// Fallback: Reason() without tools.
 		sharedCtx := LoadSharedContext(r.cfg.HiveDir)
-		prompt := buildReviewPrompt(c, diff, sharedCtx)
+		scoutContent := loadLoopArtifact(r.cfg.HiveDir, "scout.md")
+		buildContent := loadLoopArtifact(r.cfg.HiveDir, "build.md")
+		prompt := buildReviewPrompt(c, diff, sharedCtx, scoutContent, buildContent)
 		resp, err := r.cfg.Provider.Reason(ctx, prompt, nil)
 		if err != nil {
 			log.Printf("[critic] Reason error: %v", err)
@@ -219,12 +227,21 @@ func (r *Runner) getCommitDiff(hash string) (string, error) {
 	return string(out), nil
 }
 
-func buildReviewPrompt(c commit, diff, sharedCtx string) string {
+func buildReviewPrompt(c commit, diff, sharedCtx, scoutContent, buildContent string) string {
+	scoutSection := ""
+	if scoutContent != "" {
+		scoutSection = fmt.Sprintf("\n## Scout Report (loop/scout.md)\n%s\n", scoutContent)
+	}
+	buildSection := ""
+	if buildContent != "" {
+		buildSection = fmt.Sprintf("\n## Build Report (loop/build.md)\n%s\n", buildContent)
+	}
+
 	return fmt.Sprintf(`You are the Critic. Review this commit for correctness and completeness.
 
 ## Institutional Knowledge (invariants, coding standards, lessons)
 %s
-
+%s%s
 ## Commit
 %s: %s
 
@@ -233,11 +250,13 @@ func buildReviewPrompt(c commit, diff, sharedCtx string) string {
 
 ## Review Checklist
 
-1. **Completeness:** If a new constant/kind is added, is it present in ALL relevant guards, allowlists, and switch statements? Search the diff for patterns like "!= KindX && != KindY" — the new kind must be there too.
-2. **Identity (invariant 11):** Are IDs used for matching/JOINs, never display names?
-3. **Bounded (invariant 13):** Do queries have LIMIT? Do loops have bounds?
-4. **Correctness:** SQL injection? Race conditions? Nil handling?
-5. **Tests:** Are there tests for the new code? (Note: test debt is a known systemic issue — flag but don't REVISE for it alone.)
+1. **Scout gap cross-reference (Lessons 168/171):** Does the build report (loop/build.md) explicitly reference the open gap from the Scout report (loop/scout.md)? If build.md does not name the Scout's gap, issue VERDICT: REVISE.
+2. **Degenerate iteration (Lesson 200):** Are ALL changed files in this diff under loop/? If every file is a loop artifact (scout.md, build.md, critique.md, etc.) with no product code changes, issue VERDICT: REVISE.
+3. **Completeness:** If a new constant/kind is added, is it present in ALL relevant guards, allowlists, and switch statements? Search the diff for patterns like "!= KindX && != KindY" — the new kind must be there too.
+4. **Identity (invariant 11):** Are IDs used for matching/JOINs, never display names?
+5. **Bounded (invariant 13):** Do queries have LIMIT? Do loops have bounds?
+6. **Correctness:** SQL injection? Race conditions? Nil handling?
+7. **Tests:** Are there tests for the new code? (Note: test debt is a known systemic issue — flag but don't REVISE for it alone.)
 
 ## Output Format
 
@@ -245,7 +264,49 @@ Start with your analysis, then end with exactly one of:
 VERDICT: PASS
 VERDICT: REVISE
 
-If REVISE, list the specific issues that must be fixed.`, sharedCtx, c.hash[:12], c.subject, diff)
+If REVISE, list the specific issues that must be fixed.`, sharedCtx, scoutSection, buildSection, c.hash[:12], c.subject, diff)
+}
+
+// isDegenerateIteration returns true when every changed file in the diff is a
+// loop artifact (under loop/). A degenerate iteration produces no product code.
+func isDegenerateIteration(diff string) bool {
+	if diff == "" {
+		return false
+	}
+	hasFile := false
+	for _, line := range strings.Split(diff, "\n") {
+		if !strings.HasPrefix(line, "diff --git ") {
+			continue
+		}
+		hasFile = true
+		// "diff --git a/path b/path" — extract the a/ path.
+		parts := strings.Fields(line)
+		if len(parts) < 3 {
+			return false
+		}
+		path := strings.TrimPrefix(parts[2], "a/")
+		if !strings.HasPrefix(path, "loop/") {
+			return false
+		}
+	}
+	return hasFile
+}
+
+// loadLoopArtifact reads a file from loop/ in the hive directory.
+// Returns empty string if the file does not exist or hiveDir is unset.
+func loadLoopArtifact(hiveDir, name string) string {
+	if hiveDir == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(hiveDir, "loop", name))
+	if err != nil {
+		return ""
+	}
+	// Cap artifact content to avoid blowing up prompts.
+	if len(data) > 3000 {
+		data = append(data[:3000], []byte("\n... (truncated)")...)
+	}
+	return string(data)
 }
 
 func parseVerdict(content string) string {

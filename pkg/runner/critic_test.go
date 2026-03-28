@@ -71,7 +71,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 	c := commit{hash: "abc123def456", subject: "[hive:builder] Add Policy"}
 	diff := "+KindPolicy = \"policy\""
 
-	prompt := buildReviewPrompt(c, diff, "## Invariants\n1. IDENTITY\n2. VERIFIED")
+	prompt := buildReviewPrompt(c, diff, "## Invariants\n1. IDENTITY\n2. VERIFIED", "", "")
 
 	// Should contain the commit info.
 	if !contains(prompt, "abc123def456") {
@@ -86,6 +86,66 @@ func TestBuildReviewPrompt(t *testing.T) {
 	// Should contain the checklist.
 	if !contains(prompt, "Completeness") {
 		t.Error("prompt missing checklist")
+	}
+	// Should contain new required checks.
+	if !contains(prompt, "Scout gap cross-reference") {
+		t.Error("prompt missing Scout gap cross-reference check")
+	}
+	if !contains(prompt, "Degenerate iteration") {
+		t.Error("prompt missing degenerate iteration check")
+	}
+}
+
+func TestBuildReviewPromptWithArtifacts(t *testing.T) {
+	c := commit{hash: "deadbeef1234", subject: "[hive:builder] Fix auth"}
+	diff := "+func foo() {}"
+	scout := "## Gap\nFix the login bug."
+	build := "## What Was Built\nFixed the login bug by..."
+
+	prompt := buildReviewPrompt(c, diff, "", scout, build)
+
+	if !contains(prompt, "Fix the login bug") {
+		t.Error("prompt missing scout content")
+	}
+	if !contains(prompt, "Fixed the login bug by") {
+		t.Error("prompt missing build content")
+	}
+}
+
+func TestIsDegenerateIteration(t *testing.T) {
+	tests := []struct {
+		name   string
+		diff   string
+		expect bool
+	}{
+		{
+			name:   "all loop files",
+			diff:   "diff --git a/loop/scout.md b/loop/scout.md\n--- a/loop/scout.md\ndiff --git a/loop/build.md b/loop/build.md\n--- a/loop/build.md\n",
+			expect: true,
+		},
+		{
+			name:   "product code present",
+			diff:   "diff --git a/loop/scout.md b/loop/scout.md\ndiff --git a/pkg/runner/critic.go b/pkg/runner/critic.go\n",
+			expect: false,
+		},
+		{
+			name:   "empty diff",
+			diff:   "",
+			expect: false,
+		},
+		{
+			name:   "no loop files",
+			diff:   "diff --git a/main.go b/main.go\n+func main() {}\n",
+			expect: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isDegenerateIteration(tt.diff)
+			if got != tt.expect {
+				t.Errorf("isDegenerateIteration() = %v, want %v", got, tt.expect)
+			}
+		})
 	}
 }
 
