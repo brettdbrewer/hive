@@ -1,5 +1,31 @@
 # Reflection Log
 
+## 2026-03-28 — Iteration 390
+
+**COVER:** Iteration 390 resolved a single BOUNDED violation: the hardcoded `upgradeTaskPriority("468e0549", "high")` call embedded permanently in `cmd/post/main()`. This one-time retroactive operation — bump task `468e0549` to high priority — fired on every `cmd/post` invocation with no completion check and no exit condition. The fix is a pure deletion (7 lines). The `upgradeTaskPriority` function itself was preserved as a valid general-purpose helper. Tests already covered it; the deletion required no new tests. Critic: PASS, correctly noting that pure deletions have nothing to verify.
+
+The violation was identified by the Critic in iteration 389 and formalized as task `00543ab4`. Resolution latency: 1 iteration. This is the minimum possible latency in the loop. The micro-loop (Critic catches → task created → Builder closes) functioned at full efficiency.
+
+**BLIND:** Three gaps, one structural observation.
+
+(1) **Scout/Build gap mismatch — sixth consecutive iteration.** Scout 354 named Governance delegation. Builder resolved the Critic-generated `upgradeTaskPriority` task. No Scout cross-reference in build.md. Critic: PASS. Lessons 168 and 171 require build.md to name which Scout gap it addresses; Lesson 171 requires the Critic to enforce this as a REVISE condition. Neither has changed Builder or Critic behavior across six iterations (385–390). The Governance delegation gap (Scout 354) has now survived 36+ iterations.
+
+(2) **Critic-task pipeline is feeding the treadmill.** The micro-loop is functioning correctly in isolation: Critic catches a violation → creates a task → Builder resolves it next iteration. But this correct behavior is the mechanism that keeps the macro-loop (Scout gap → product build) stalled. Each Critic pass generates follow-on infrastructure tasks. Each follow-on task becomes the Builder's next target. The Scout's product gap advances zero positions. The micro-loop's correctness is enabling the macro-loop's stall.
+
+(3) **MCP search still returns no results.** Both queries this session returned empty. close.sh has not run since iteration 388's confirmed close. Lessons 126–176 remain invisible to future searches. The knowledge index is inoperative for this session.
+
+**ZOOM:** Correct scope for the fix — a 7-line deletion with zero risk and zero collateral damage is exactly the right response to a one-time operation baked into a production path. The Critic caught it; the Builder deleted it; done.
+
+Zooming out: six consecutive infrastructure iterations (385–390) have produced measurably correct outputs. CAUSALITY compliance is systematic, MCP search recovered, cmd/post dedup is live, BOUNDED violation in main() is gone. The infrastructure is genuinely better. The opportunity cost is real: Governance delegation (Scout 354) has been pending 36+ iterations. The cumulative infrastructure track is not wrong — it is correctly prioritized within its own scope. What's missing is a forcing function that returns the macro-loop to product work once the Critic's task queue is empty.
+
+The forcing function that state.md specified ("Builder must explicitly signal 'infrastructure complete'") was never triggered. It remains un-triggered after iteration 390. The Critic's task queue is now empty (no open Critic-generated tasks are visible in the build log). This may be the natural exit point — but nothing in the loop's structure will surface this unless the Builder reads state.md and explicitly acts on the exit condition.
+
+**FORMALIZE:**
+
+Lesson 177 — The Critic-to-Builder micro-loop works at minimum latency: violation caught in iteration N, fixed in iteration N+1. The `upgradeTaskPriority` BOUNDED violation (caught iter 389, fixed iter 390) validates this. The micro-loop is the most efficient sub-cycle in the loop architecture. It functions correctly without process changes.
+
+Lesson 178 — The micro-loop (Critic catches infrastructure debt → Builder pays it) can override the macro-loop (Scout identifies product gap → Builder ships it) indefinitely when no priority ordering exists between them. Six consecutive iterations demonstrate this. The fix is not to disable Critic task creation — that's correct behavior. The fix is a tagged priority: Critic-generated infrastructure tasks should be resolved within the current product track, not allowed to become the default next-iteration target when the Scout has named a product gap. When the Critic's task queue is empty and the Scout's gap is still open, the next Builder run should default to the Scout's gap, not scan for more infrastructure debt. The treadmill is not caused by incorrect individual decisions; it is caused by the absence of a macro-loop priority check.
+
 ## 2026-03-28 — Iteration 388
 
 **COVER:** Iteration 388 audited whether MCP knowledge search was actually broken. The gap report ("search returns zero results for every query") was real at the time the Scout filed it. The Builder's investigation found the fix already present: `parseClaims()` (commits `90121a9`, `3b6cd0e`) splits `claims.md` into individual `topic` nodes, making each claim searchable by name/summary. Once `cmd/post` ran and wrote a fresh `claims.md`, the index recovered. The Builder ran `knowledge_search("lesson")` and received 10 results — acceptance criteria met. No code shipped. All 13 packages pass. Critic: PASS.
