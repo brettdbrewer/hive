@@ -258,6 +258,7 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 			Provider:     "claude-cli",
 			Model:        model,
 			MaxBudgetUSD: budget,
+			SessionID:    fmt.Sprintf("hive-%s-%s", space, role), // persistent session per role
 		}
 		if mcpConfigPath != "" {
 			providerCfg.MCPConfigPath = mcpConfigPath
