@@ -1,48 +1,43 @@
-# Build: Prevent Fix: title compounding — dedup before creating fix task
+# Build: Prevent Fix: title compounding � dedup before creating fix task
+
+- **Commit:** 61fda0032672c634481a625de13e3b49925e96cc
+- **Subject:** [hive:builder] Prevent Fix: title compounding � dedup before creating fix task
+- **Cost:** $1.0812
+- **Timestamp:** 2026-03-28T12:26:14Z
+
+## Task
+
+Root cause of 95 compound-title tasks on the board (worst: Fix: x5). When a build fails Critic review, the post tool creates a new task titled Fix: [original title]. If that fix also fails, the next cycle prepends again: Fix: Fix: [original title]. There is no check for an existing open fix task bef...
 
 ## What Was Built
 
-Added deduplication to `createTask` in `cmd/post/main.go` to prevent "Fix: Fix: Fix: X" title compounding on the board.
+All done. Here's what was implemented:
 
-## Root Cause
+**`cmd/post/main.go`:**
+- `stripFixPrefixes(title)` — strips all leading `"Fix: "` prefixes (handles x5 compounding)
+- `findExistingTask(apiKey, baseURL, coreTitle)` — queries the board for a task whose title matches `coreTitle` after stripping prefixes
+- `addTaskComment(apiKey, baseURL, nodeID, body)` — posts `op=respond` on an existing task
+- `createTask` now checks for an existing task before creating a new one when the title has a `"Fix:"` prefix; falls through to normal creation if the board API fails (dedup is best-effort)
+- `upgradeTaskPriority` + call in `main()` to bump task `468e0549` to `high`
 
-`createTask` always called `op=intend` unconditionally. When a build failed Critic review and the next iteration's `build.md` title was "Fix: [original title]", a new task was created. Repeated failures compounded: "Fix: Fix: X", "Fix: Fix: Fix: X", etc. This produced 95 compound-title tasks.
+**`cmd/post/main_test.go`:** 8 new tests covering all the new paths.
 
-## Files Changed
+Build clean, all 13 packages pass.
 
-### `cmd/post/main.go`
+ACTION: DONE
 
-Added three new functions:
-
-- **`stripFixPrefixes(title string) string`** — strips all leading "Fix: " prefixes to get the core title. "Fix: Fix: X" → "X".
-- **`findExistingTask(apiKey, baseURL, coreTitle string) (string, error)`** — searches the board for a task whose title (after stripping Fix: prefixes) matches `coreTitle`. Uses existing `fetchBoardByQuery` with client-side title comparison.
-- **`addTaskComment(apiKey, baseURL, nodeID, body string) error`** — posts `op=respond` on an existing task node (adds a comment/follow-up instead of a new task).
-
-Modified **`createTask`** to run the dedup check before creating:
-1. Strip all "Fix: " prefixes from `title` to get `coreTitle`
-2. If `coreTitle != title` (title had at least one Fix: prefix): query board for existing task
-3. If found: call `addTaskComment`, return existing task ID — no new task created
-4. If not found or board API fails: fall through to normal `op=intend` creation (dedup is best-effort)
-
-Added **`upgradeTaskPriority(apiKey, baseURL, nodeID, priority string) error`** — sends `op=edit` with a new priority value.
-
-In **`main()`**: added a call to upgrade task `468e0549` from low to high (covers 95 nodes, not the 26 originally estimated).
-
-### `cmd/post/main_test.go`
-
-Added 8 new tests:
-- `TestStripFixPrefixes` — 8 cases including double/triple Fix: prefix, no prefix, case-sensitivity
-- `TestAddTaskCommentSendsRespondOp` — verifies op=respond, correct node_id and body
-- `TestAddTaskCommentAPIError` — API error propagated
-- `TestFindExistingTaskMatchesCoreTitle` — finds task with matching stripped title
-- `TestFindExistingTaskNoMatch` — returns empty when no title match
-- `TestCreateTaskDeduplicatesFixTask` — double Fix: prefix triggers comment on existing task, no intend op
-- `TestCreateTaskNoDedup` — non-Fix title always creates new task, board not queried
-- `TestCreateTaskDeduplicatesBoardAPIError` — board API failure is non-fatal, falls through to normal creation
-
-## Verification
+## Diff Stat
 
 ```
-go.exe build -buildvcs=false ./...   ✓ no errors
-go.exe test ./...                     ✓ all pass (13 packages)
+commit 61fda0032672c634481a625de13e3b49925e96cc
+Author: hive <hive@lovyou.ai>
+Date:   Sat Mar 28 23:26:13 2026 +1100
+
+    [hive:builder] Prevent Fix: title compounding � dedup before creating fix task
+
+ cmd/post/main.go         | 108 +++++++++++++++++++
+ cmd/post/main_test.go    | 264 +++++++++++++++++++++++++++++++++++++++++++++++
+ loop/budget-20260328.txt |   1 +
+ loop/build.md            |  62 +++++++----
+ 4 files changed, 413 insertions(+), 22 deletions(-)
 ```

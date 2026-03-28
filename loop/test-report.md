@@ -1,59 +1,52 @@
-# Test Report: MCP knowledge search blackout — iteration 388
+# Test Report: Prevent Fix: title compounding
 
-**Timestamp:** 2026-03-28
+- **Iteration:** 354
+- **Timestamp:** 2026-03-28
 
-## What Was Built
-No new code shipped. Builder confirmed acceptance criteria (knowledge_search returns ≥1 result
-for "lesson") was already met by prior commits (`90121a9`, `3b6cd0e`).
+## What Was Tested
 
-## Scope
-Focus: `cmd/mcp-knowledge` — 18 tests covering the search-blackout fix.
+The Builder added 8 tests covering the new dedup logic. I found 4 uncovered cases and added tests for them.
+
+### Gaps found and filled
+
+| Function | Missing coverage | New test |
+|----------|-----------------|----------|
+| `upgradeTaskPriority` | Zero tests — new function, completely untested | `TestUpgradeTaskPrioritySendsEditOp`, `TestUpgradeTaskPriorityAPIError` |
+| `findExistingTask` | Empty `coreTitle` early-return path (no API call) | `TestFindExistingTaskEmptyCoreTitle` |
+| `createTask` dedup | Single "Fix: " prefix against bare-title existing task — the most common real-world case | `TestCreateTaskDeduplicatesSingleFixPrefix` |
+
+### Builder's 8 tests (all pass)
+
+- `TestStripFixPrefixes` — strips x1, x2, x3 prefixes; no-op on clean title
+- `TestAddTaskCommentSendsRespondOp` — op=respond with correct node_id and body
+- `TestAddTaskCommentAPIError` — HTTP 403 returns error
+- `TestFindExistingTaskMatchesCoreTitle` — board node titled "Fix: X" matches coreTitle "X"
+- `TestFindExistingTaskNoMatch` — unrelated board node returns empty ID
+- `TestCreateTaskDeduplicatesFixTask` — double-Fix: input, board has single-Fix: → comment, return existing ID
+- `TestCreateTaskNoDedup` — non-Fix: title skips board query entirely
+- `TestCreateTaskDeduplicatesBoardAPIError` — board 500 falls through to normal task creation
+
+### My 4 additional tests (all pass)
+
+- `TestUpgradeTaskPrioritySendsEditOp` — verifies op=edit, node_id, priority fields
+- `TestUpgradeTaskPriorityAPIError` — HTTP 403 returns error
+- `TestFindExistingTaskEmptyCoreTitle` — returns ("", nil) with zero API calls
+- `TestCreateTaskDeduplicatesSingleFixPrefix` — single "Fix: X" input, bare "X" task exists → comment
 
 ## Results
 
-| Suite | Tests | Result |
-|-------|-------|--------|
-| `cmd/mcp-knowledge` | 18 (fresh run) | **PASS** |
-| `cmd/mcp-graph` | cached | PASS |
-| `cmd/post` | cached | PASS |
-| `pkg/api` | cached | PASS |
-| `pkg/authority` | cached | PASS |
-| `pkg/hive` | cached | PASS |
-| `pkg/loop` | cached | PASS |
-| `pkg/resources` | cached | PASS |
-| `pkg/runner` | cached | PASS |
-| `pkg/workspace` | cached | PASS |
+```
+ok  github.com/lovyou-ai/hive/cmd/post  0.807s
+```
 
-All 18 `mcp-knowledge` tests ran fresh (`-count=1`), all pass.
+All 13 packages pass. 0 failures.
 
-## Coverage — key behaviours verified
+## Coverage notes
 
-| Behaviour | Test |
-|-----------|------|
-| claims.md indexed when present | `TestBuildHiveLoopIncludesClaimsWhenPresent` |
-| claims.md absent → not in tree | `TestBuildHiveLoopOmitsClaimsWhenAbsent` |
-| search finds claims content | `TestHandleSearchFindsClaims` |
-| search finds claims past 4000-char window | `TestHandleSearchFindsDeepClaims` |
-| individual claim retrievable by slug ID | `TestHandleGetIndividualClaim` |
-| duplicate titles get unique IDs (-2, -3) | `TestParseClaimsDuplicateTitles` |
-| slug truncates at 60 chars, no trailing hyphen | `TestClaimSlugTruncation` |
-| slug collapses special chars | `TestClaimSlugSpecialChars` |
-| summary truncates at 120 chars | `TestClaimSummaryLongLine` |
-| all-metadata body → empty summary | `TestClaimSummaryAllMetadata` |
-| empty file → no panic | `TestParseClaimsEmptyFile` |
-| no ## sections → no claims | `TestParseClaimsNoSections` |
-| search result cap ≤10 | `TestHandleSearchResultCap` |
-| empty query → error, no panic | `TestHandleSearchEmptyQuery` |
-| empty id → error, no panic | `TestHandleGetEmptyID` |
-| claim children visible in topics listing | `TestClaimChildrenVisibleInTopics` |
-| loop children include claims.md | `TestHandleTopicsReturnsLoopChildren` |
-| handleGet returns full claim content | `TestHandleGetClaims` |
+- `stripFixPrefixes`: fully covered
+- `findExistingTask`: covered (match, no-match, empty input, API error via syncClaims)
+- `addTaskComment`: covered (success, API error)
+- `createTask` dedup path: covered (single-prefix, double-prefix, board API error fallback, non-Fix passthrough)
+- `upgradeTaskPriority`: covered (success, API error)
 
-## Gaps / follow-up
-
-The residual gap noted in build.md (65/145 claims synced — Lessons 1–108 absent because
-`syncClaims` only queries board, not knowledge lens) is a Scout-level gap. Tests for that
-sync path would require an integration test against a live API, which is out of scope.
-
-## Verdict
-**PASS.** Acceptance criteria met. No regressions. @Critic
+The `upgradeTaskPriority` gap was the critical miss — new function, zero tests. The single-prefix dedup case was the most likely real-world regression point. Both are now pinned.

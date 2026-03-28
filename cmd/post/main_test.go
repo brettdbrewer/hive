@@ -2010,3 +2010,119 @@ func TestCreateTaskDeduplicatesBoardAPIError(t *testing.T) {
 		t.Error("expected op=intend fallback when board API fails during dedup check")
 	}
 }
+
+// TestUpgradeTaskPrioritySendsEditOp verifies that upgradeTaskPriority sends
+// op=edit with the correct node_id and priority to /app/hive/op.
+func TestUpgradeTaskPrioritySendsEditOp(t *testing.T) {
+	var received map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/app/hive/op" {
+			http.NotFound(w, r)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &received)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"op":"edit"}`))
+	}))
+	defer srv.Close()
+
+	if err := upgradeTaskPriority("lv_testkey", srv.URL, "node-abc", "high"); err != nil {
+		t.Fatalf("upgradeTaskPriority() error: %v", err)
+	}
+
+	if received["op"] != "edit" {
+		t.Errorf("op = %q, want %q", received["op"], "edit")
+	}
+	if received["node_id"] != "node-abc" {
+		t.Errorf("node_id = %q, want %q", received["node_id"], "node-abc")
+	}
+	if received["priority"] != "high" {
+		t.Errorf("priority = %q, want %q", received["priority"], "high")
+	}
+}
+
+// TestUpgradeTaskPriorityAPIError verifies that upgradeTaskPriority returns an
+// error when the server responds with HTTP 4xx.
+func TestUpgradeTaskPriorityAPIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("forbidden"))
+	}))
+	defer srv.Close()
+
+	err := upgradeTaskPriority("bad_key", srv.URL, "node-abc", "high")
+	if err == nil {
+		t.Fatal("expected error for HTTP 403, got nil")
+	}
+}
+
+// TestFindExistingTaskEmptyCoreTitle verifies that findExistingTask returns
+// ("", nil) immediately when coreTitle is empty — no API call should be made.
+func TestFindExistingTaskEmptyCoreTitle(t *testing.T) {
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	id, err := findExistingTask("lv_testkey", srv.URL, "")
+	if err != nil {
+		t.Fatalf("findExistingTask() error: %v", err)
+	}
+	if id != "" {
+		t.Errorf("findExistingTask() = %q, want empty string for empty coreTitle", id)
+	}
+	if callCount != 0 {
+		t.Errorf("expected 0 API calls for empty coreTitle, got %d", callCount)
+	}
+}
+
+// TestCreateTaskDeduplicatesSingleFixPrefix verifies the most common real-world
+// dedup case: a title with a single "Fix: " prefix matches an existing task
+// whose title is the core title (no prefix). A comment is added, no new task.
+func TestCreateTaskDeduplicatesSingleFixPrefix(t *testing.T) {
+	var opRequests []map[string]string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/app/hive/board":
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"nodes": []map[string]any{
+					{
+						"id":         "task-original",
+						"title":      "Observer audit gap",
+						"state":      "done",
+						"created_at": "2026-03-01T00:00:00Z",
+					},
+				},
+			})
+		case r.Method == "POST" && r.URL.Path == "/app/hive/op":
+			body, _ := io.ReadAll(r.Body)
+			var payload map[string]string
+			json.Unmarshal(body, &payload)
+			opRequests = append(opRequests, payload)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"op":"respond"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	nodeID, err := createTask("lv_testkey", srv.URL, "Fix: Observer audit gap", "build details", nil)
+	if err != nil {
+		t.Fatalf("createTask() error: %v", err)
+	}
+	if nodeID != "task-original" {
+		t.Errorf("createTask() nodeID = %q, want %q — should return existing task ID on dedup", nodeID, "task-original")
+	}
+	if len(opRequests) != 1 || opRequests[0]["op"] != "respond" {
+		t.Errorf("expected 1 op=respond comment, got %d requests: %v", len(opRequests), opRequests)
+	}
+}

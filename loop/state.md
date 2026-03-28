@@ -2,11 +2,11 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 388 (closed), 2026-03-28.
+Last updated: Iteration 389 (closed), 2026-03-28.
 
 **MCP knowledge search verified recovered (iteration 388).** `parseClaims()` fix (prior commits) + fresh `claims.md` from cmd/post restored search. Builder confirmed 10 results at build time. Residual: Lessons 1–108 absent (early-iteration claims predate the `Lesson X:` title convention; need to query knowledge lens, not just board). Reflector searched the same session and found zero results — confirming Lesson 173: index freshness is state-dependent, not code-dependent. close.sh must run to persist the fix.
 
-**Scout/Build gap mismatch — third consecutive iteration (Lessons 168, 171, 174).** Scout 354 named Governance delegation; Builder investigated MCP search blackout. No Scout cross-reference in build.md. Critic PASS. The Governance delegation gap has survived 34 iterations. The loop is in treadmill mode (4 consecutive verification-heavy iterations: 385–388). Exit condition: Builder must explicitly signal "infrastructure complete; next gap: Governance delegation (Scout 354)."
+**Scout/Build gap mismatch — fourth consecutive iteration (Lessons 168, 171, 174).** Scout 354 named Governance delegation; Builder shipped cmd/post dedup. No Scout cross-reference in build.md. Critic PASS. The Governance delegation gap has survived 35 iterations. The loop is in treadmill mode (5 consecutive infrastructure iterations: 385–389). Exit condition: Builder must explicitly signal "infrastructure complete; next gap: Governance delegation (Scout 354)."
 
 **Remaining infrastructure gaps (open, non-blocking):**
 1. **Type-enforce CAUSALITY** (Lesson 167): Add typed `assertClaim(causes []string, ...)` wrapper — convention-based compliance is fragile. Highest-leverage remaining item.
@@ -18,7 +18,7 @@ Last updated: Iteration 388 (closed), 2026-03-28.
 7. **Builder pre-flight acceptance test** (Lesson 172): Run acceptance criterion before constructing; if it passes, declare gap resolved and pull next.
 8. **Builder treadmill-exit signal** (Lesson 174): After ≥3 verification-only iterations, explicitly state "infrastructure complete; next gap: X."
 
-**Next lesson: 175.**
+**Next lesson: 177.**
 
 ## Current System State
 
