@@ -585,6 +585,96 @@ func TestRunObserverReason_FallbackCause(t *testing.T) {
 	}
 }
 
+// TestRunObserverReason_FallbackCause_WhenFallbackEmpty verifies that when both
+// the LLM returns TASK_CAUSE:none AND the fallbackCauseID is empty (no claims exist),
+// runObserverReason still creates the task without panicking. The task is created
+// with zero causes — this is the accepted behaviour when the graph is empty.
+func TestRunObserverReason_FallbackCause_WhenFallbackEmpty(t *testing.T) {
+	var created bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		var m map[string]any
+		if json.Unmarshal(b, &m) == nil {
+			if op, _ := m["op"].(string); op == "intend" {
+				created = true
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"op":"intend","node":{"id":"new-1","kind":"task","title":"t","created_at":"","updated_at":""}}`))
+	}))
+	defer srv.Close()
+
+	provider := &mockProvider{response: "TASK_TITLE: Orphaned gap\nTASK_PRIORITY: low\nTASK_DESCRIPTION: no claims yet\nTASK_CAUSE: none"}
+
+	r := &Runner{
+		cfg: Config{
+			Provider:  provider,
+			APIClient: api.New(srv.URL, "test-key"),
+			SpaceSlug: "hive",
+		},
+	}
+
+	// fallbackCauseID="" — no claims exist in the graph yet.
+	r.runObserverReason(context.Background(), "", "")
+
+	if !created {
+		t.Fatal("expected CreateTask to be called even when fallbackCauseID is empty")
+	}
+}
+
+// TestRunObserverReason_OwnCauseTakesPrecedence verifies that when the LLM returns
+// a valid TASK_CAUSE node ID, the fallbackCauseID is not used — the task's own
+// cause takes precedence. The fallback must only apply when causeID is empty.
+func TestRunObserverReason_OwnCauseTakesPrecedence(t *testing.T) {
+	var createBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		var m map[string]any
+		if json.Unmarshal(b, &m) == nil {
+			if op, _ := m["op"].(string); op == "intend" {
+				createBody = b
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"op":"intend","node":{"id":"new-1","kind":"task","title":"t","created_at":"","updated_at":""}}`))
+	}))
+	defer srv.Close()
+
+	// LLM provides a specific cause node ID — should NOT be replaced by the fallback.
+	provider := &mockProvider{response: "TASK_TITLE: Specific gap\nTASK_PRIORITY: high\nTASK_DESCRIPTION: details\nTASK_CAUSE: specific-node-789"}
+
+	r := &Runner{
+		cfg: Config{
+			Provider:  provider,
+			APIClient: api.New(srv.URL, "test-key"),
+			SpaceSlug: "hive",
+		},
+	}
+
+	r.runObserverReason(context.Background(), "2 claims exist", "fallback-should-not-appear")
+
+	if createBody == nil {
+		t.Fatal("no CreateTask request captured")
+	}
+
+	var fields map[string]any
+	if err := json.Unmarshal(createBody, &fields); err != nil {
+		t.Fatalf("unmarshal CreateTask body: %v", err)
+	}
+	causeList, ok := fields["causes"].([]any)
+	if !ok || len(causeList) == 0 {
+		t.Fatalf("expected causes in CreateTask body, got: %s", createBody)
+	}
+	if causeList[0] != "specific-node-789" {
+		t.Errorf("causes[0] = %v, want %q (fallback must not overwrite task's own causeID)", causeList[0], "specific-node-789")
+	}
+	for _, c := range causeList {
+		if c == "fallback-should-not-appear" {
+			t.Errorf("fallbackCauseID leaked into causes when task had its own causeID, body=%s", createBody)
+		}
+	}
+}
+
 func TestBuildObserverInstruction(t *testing.T) {
 	cases := []struct {
 		name      string

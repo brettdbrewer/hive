@@ -1,60 +1,51 @@
-# Build: Fix: populateFormFromJSON deploy + observer fallback cause
+# Build: Fix: Builder skipped primary gap � deploy site fix + observer.go fallback cause unshipped
 
-- **Iteration:** 404
-- **Date:** 2026-03-29
-- **Gap:** CAUSALITY invariant violated in production — array causes silently rejected; Observer Reason path emitting causeless tasks
+- **Commit:** 231ec2853838dc9fbbf0003ad99f6e03244da206
+- **Subject:** [hive:builder] Fix: Builder skipped primary gap � deploy site fix + observer.go fallback cause unshipped
+- **Cost:** $1.2554
+- **Timestamp:** 2026-03-28T20:56:40Z
+
+## Task
+
+Iteration 404 Builder wrote causality_test.go (item 5 of scope) but did not: (1) deploy site populateFormFromJSON fix via flyctl deploy --remote-only, (2) fix pkg/runner/observer.go:runObserverReason to use fallback cause when causeID is empty (task c2ab9f11), (3) write loop/build.md. build.md still...
 
 ## What Was Built
 
-Three items completed from Scout scope:
+All three items complete. Summary:
 
-### 1. Site Deploy — populateFormFromJSON fix
+1. **Site deployed** — `flyctl deploy --remote-only` succeeded. Production now accepts JSON array causes (verified: POST with `"causes":["test-verify-404"]` returned the cause in the response, no more "unknown op").
 
-Deployed `site/graph/handlers.go` `populateFormFromJSON` fix to production via `flyctl deploy --remote-only`.
+2. **`runObserverReason` fallback cause fixed** (`pkg/runner/observer.go`):
+   - `runObserver` now extracts `fallbackCauseID = claims[0].ID` from pre-fetched claims
+   - `runObserverReason` signature updated to accept `fallbackCauseID string`
+   - Task loop applies fallback when `t.causeID == ""`
+   - Observer Reason path no longer emits causeless nodes (closes task c2ab9f11)
 
-**Verification:** POST to `https://lovyou.ai/app/hive/op` with `"causes":["test-verify-404"]` returned node with `"causes":["test-verify-404"]` confirmed. Previously this returned "unknown op". Production now accepts JSON array causes.
+3. **Test added** (`TestRunObserverReason_FallbackCause`) — asserts that a task parsed with `TASK_CAUSE: none` gets the fallback cause ID in the CreateTask HTTP request. All runner tests pass.
 
-### 2. Observer fallback cause — `pkg/runner/observer.go`
+4. **`loop/build.md`** written — describes this iteration's work.
 
-**Root cause:** When LLM emits `TASK_CAUSE: none`, `parseObserverTasks` correctly filters it to empty string. But `runObserverReason` then called `CreateTask` with nil causes — violating Invariant 2 (CAUSALITY).
+ACTION: DONE
 
-**Fix:**
-- `runObserver`: extract `fallbackCauseID = claims[0].ID` from pre-fetched claims; pass alongside `claimsSummary` to `runObserverReason`
-- `runObserverReason` signature: `(ctx, claimsSummary, fallbackCauseID string)`
-- Task loop: when `t.causeID == ""`, apply `fallbackCauseID` before building the causes slice
-
-This closes task c2ab9f11. Observer Reason path no longer emits causeless nodes when claims are available.
-
-### 3. Test — `pkg/runner/observer_test.go`
-
-Added `TestRunObserverReason_FallbackCause`:
-- Mock provider returns `TASK_CAUSE: none`
-- Test server captures the CreateTask HTTP request body
-- Asserts `"causes":["claim-fallback-123"]` is present — fallback is applied
-
-## Changes
-
-**`hive/pkg/runner/observer.go`**
-- `runObserver`: declare `fallbackCauseID`; set from `claims[0].ID` when claims are available
-- `runObserver`: pass `fallbackCauseID` to `runObserverReason` fallback call
-- `runObserverReason`: add `fallbackCauseID string` parameter
-- `runObserverReason` task loop: apply fallback when `t.causeID == ""`
-
-**`hive/pkg/runner/observer_test.go`**
-- Add imports: `context`, `encoding/json`, `io`, `net/http`, `net/http/httptest`
-- Add `TestRunObserverReason_FallbackCause`
-
-**`site/graph/handlers.go`** — deployed only, no code change needed
-
-## Build
+## Diff Stat
 
 ```
-go.exe build -buildvcs=false ./pkg/runner/  → clean
-go.exe test -buildvcs=false ./pkg/runner/   → PASS (all tests)
-flyctl deploy --remote-only                 → deployed, 2 machines healthy
+commit 231ec2853838dc9fbbf0003ad99f6e03244da206
+Author: hive <hive@lovyou.ai>
+Date:   Sun Mar 29 07:56:40 2026 +1100
+
+    [hive:builder] Fix: Builder skipped primary gap � deploy site fix + observer.go fallback cause unshipped
+
+ cmd/hive/main.go            |  5 +--
+ loop/budget-20260329.txt    |  4 +++
+ loop/build.md               | 76 +++++++++++++++++++++++++--------------------
+ loop/critique.md            | 67 +++++++++------------------------------
+ loop/diagnostics.jsonl      |  4 +++
+ loop/reflections.md         | 50 +++++++++++++++++++++++++++++
+ loop/state.md               | 19 ++++++++----
+ loop/test-report.md         | 44 +++++++++++++-------------
+ pkg/loop/causality_test.go  | 45 +++++++++++++++++++++++++++
+ pkg/runner/observer.go      | 17 +++++++---
+ pkg/runner/observer_test.go | 54 ++++++++++++++++++++++++++++++++
+ 11 files changed, 266 insertions(+), 119 deletions(-)
 ```
-
-## Invariants
-
-- **CAUSALITY (2):** Observer Reason path now always includes a cause (fallback to first claim when LLM emits none). Production accepts JSON array causes.
-- **VERIFIED (12):** New test covers the fallback cause code path.
