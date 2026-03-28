@@ -857,3 +857,70 @@ func TestReadFromGraphNodeStalenessFilter(t *testing.T) {
 		}
 	})
 }
+
+// TestRunReflectorReasonLessonNumberFromGraph verifies that runReflectorReason
+// derives the lesson number from the knowledge claims endpoint rather than
+// state.md. This prevents duplicate lesson numbers when runs overlap or retry.
+func TestRunReflectorReasonLessonNumberFromGraph(t *testing.T) {
+	var assertedTitle string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(r.URL.RawQuery, "tab=claims"):
+			// Return claims with highest lesson number 109.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"claims":[
+				{"id":"c1","title":"Lesson 45: early lesson","body":"","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"},
+				{"id":"c2","title":"Lesson 109: highest","body":"","created_at":"2026-01-02T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}
+			]}`))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/op"):
+			// Capture the op request to inspect the lesson title.
+			var fields map[string]any
+			data, _ := io.ReadAll(r.Body)
+			json.Unmarshal(data, &fields)
+			if op, _ := fields["op"].(string); op == "assert" {
+				assertedTitle, _ = fields["title"].(string)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"op":"assert","node":{"id":"claim-1","title":"","created_at":"","updated_at":""}}`))
+		default:
+			// Board, documents, and other endpoints return empty.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"nodes":[],"documents":[],"claims":[],"posts":[]}`))
+		}
+	}))
+	defer srv.Close()
+
+	stateContent := "# Loop State\n\nLast updated: Iteration 109, 2026-03-29.\n"
+	artifacts := map[string]string{
+		"scout.md":    "## Scout\nGap: test",
+		"build.md":    "## Build\nFixed test",
+		"critique.md": "VERDICT: PASS",
+	}
+	hiveDir := makeHiveDir(t, stateContent, artifacts)
+
+	llmResponse := `{"cover":"Shipped test fix.","blind":"No rollback.","zoom":"Stable.","formalize":"Lesson 110: always query the graph for lesson numbers."}`
+
+	r := &Runner{
+		cfg: Config{
+			HiveDir:   hiveDir,
+			OneShot:   true,
+			SpaceSlug: "hive",
+			APIClient: api.New(srv.URL, "test-key"),
+			Provider:  &mockProvider{response: llmResponse},
+		},
+		tick: 1,
+	}
+
+	r.runReflector(context.Background())
+
+	// The asserted claim title must use graph-queried number 110 (= 109 + 1),
+	// not any number from state.md.
+	if assertedTitle == "" {
+		t.Fatal("no assert op was sent — lesson was not posted to graph")
+	}
+	if !strings.HasPrefix(assertedTitle, "Lesson 110:") {
+		t.Errorf("lesson title = %q, want prefix %q — should use graph-queried number not state.md", assertedTitle, "Lesson 110:")
+	}
+}

@@ -322,6 +322,36 @@ func (c *Client) AssertClaim(slug, title, body string, causes []string) (*Node, 
 	return resp.Node, nil
 }
 
+// parseLessonNumber extracts the ordinal from a "Lesson N" or "Lesson N: ..." title.
+// Returns 0 if the title is not a numbered lesson (e.g. date-based "Lesson: 2026-03-29").
+func parseLessonNumber(title string) int {
+	if !strings.HasPrefix(title, "Lesson ") {
+		return 0
+	}
+	rest := strings.TrimPrefix(title, "Lesson ")
+	var n int
+	fmt.Sscanf(rest, "%d", &n)
+	return n
+}
+
+// NextLessonNumber queries knowledge claims to find the highest existing
+// "Lesson N" number and returns N+1. Returns 1 if no numbered lessons exist.
+// Call this before asserting a new lesson to prevent duplicate numbers when
+// runs overlap or retry (Invariant 12: VERIFIED — no duplicate claims).
+func (c *Client) NextLessonNumber(slug string) int {
+	claims, err := c.GetClaims(slug, 200)
+	if err != nil {
+		return 1
+	}
+	max := 0
+	for _, claim := range claims {
+		if n := parseLessonNumber(claim.Title); n > max {
+			max = n
+		}
+	}
+	return max + 1
+}
+
 // AskQuestion creates a question node. If Mind is configured for the space,
 // it will auto-answer from the space's documents. Use for self-queries —
 // "does this already exist?" "what primitive maps to X?"

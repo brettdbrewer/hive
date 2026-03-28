@@ -266,6 +266,13 @@ func (r *Runner) runReflectorOperate(ctx context.Context, op decision.IOperator)
 		}
 	}
 
+	// Query the graph for the highest existing lesson number to prevent duplicates
+	// when runs overlap or retry. Invariant 12: VERIFIED — no duplicate claims.
+	nextLessonNum := 1
+	if r.cfg.APIClient != nil {
+		nextLessonNum = r.cfg.APIClient.NextLessonNumber(r.cfg.SpaceSlug)
+	}
+
 	instruction := fmt.Sprintf(`You are the Reflector. Reflect on this iteration using COVER/BLIND/ZOOM/FORMALIZE.
 
 ## Your Tools
@@ -286,12 +293,12 @@ func (r *Runner) runReflectorOperate(ctx context.Context, op decision.IOperator)
    - **FORMALIZE** — lessons to extract as verifiable knowledge
 
 4. Write the reflection to loop/reflections.md (append)
-5. Assert each lesson as a claim on the graph (causes links to the iteration artifacts — Invariant 2: CAUSALITY):
-   curl -s -X POST -H "Authorization: Bearer %s" -H "Content-Type: application/json" -H "Accept: application/json" "https://lovyou.ai/app/%s/op" -d '{"op":"assert","title":"Lesson: <LESSON>","body":"<DETAILS>"%s}'
+5. Assert each lesson as a claim on the graph. **Use lesson number %d** (queried from the graph — do NOT read state.md for this number):
+   curl -s -X POST -H "Authorization: Bearer %s" -H "Content-Type: application/json" -H "Accept: application/json" "https://lovyou.ai/app/%s/op" -d '{"op":"assert","title":"Lesson %d: <SHORT DESCRIPTION>","body":"<DETAILS>"%s}'
 6. Post the full reflection as a document (causes links to the iteration artifacts — Invariant 2: CAUSALITY):
    curl -s -X POST -H "Authorization: Bearer %s" -H "Content-Type: application/json" -H "Accept: application/json" "https://lovyou.ai/app/%s/op" -d '{"op":"intend","kind":"document","title":"Reflection: <DATE>","description":"<FULL REFLECTION>"%s}'
 
-Search first. Reflect deeply. Assert what you learn.`, apiKey, r.cfg.SpaceSlug, causesSuffix, apiKey, r.cfg.SpaceSlug, causesSuffix)
+Search first. Reflect deeply. Assert what you learn.`, nextLessonNum, apiKey, r.cfg.SpaceSlug, nextLessonNum, causesSuffix, apiKey, r.cfg.SpaceSlug, causesSuffix)
 
 	result, err := op.Operate(ctx, decision.OperateTask{
 		WorkDir:     r.cfg.HiveDir,
@@ -380,7 +387,10 @@ func (r *Runner) runReflectorReason(ctx context.Context) {
 	}
 
 	if formalize := sections["FORMALIZE"]; formalize != "" && r.cfg.APIClient != nil {
-		title := fmt.Sprintf("Lesson: %s", date)
+		// Query the graph for the next lesson number to prevent duplicates when
+		// runs overlap or retry. Invariant 12: VERIFIED — no duplicate claims.
+		nextNum := r.cfg.APIClient.NextLessonNumber(r.cfg.SpaceSlug)
+		title := fmt.Sprintf("Lesson %d: %s", nextNum, date)
 		if _, err := r.cfg.APIClient.AssertClaim(r.cfg.SpaceSlug, title, formalize, iterationCauses); err != nil {
 			log.Printf("[reflector] assert lesson error: %v", err)
 		}
