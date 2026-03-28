@@ -356,3 +356,12 @@
 {"phase":"critic","outcome":"critique.pass","repo":"hive","board_open":9,"duration_secs":2.0072769,"timestamp":"2026-03-28T20:15:43Z"}
 {"phase":"reflector","outcome":"reflection.done","repo":"hive","board_open":9,"duration_secs":3.6101084,"timestamp":"2026-03-28T20:15:47Z"}
 {"phase":"observer","outcome":"audit.done","repo":"hive","board_open":9,"duration_secs":1.2635397,"timestamp":"2026-03-28T20:15:48Z"}
+{"phase":"pm","outcome":"milestone.created","repo":"hive","board_open":9,"duration_secs":0.3839454,"timestamp":"2026-03-28T20:18:41Z"}
+{"phase":"scout","outcome":"report.posted","repo":"hive","board_open":9,"duration_secs":0.4139666,"timestamp":"2026-03-28T20:18:41Z"}
+{"phase":"architect","outcome":"failure","error":"claude CLI operate error: exit status 1\nstderr: Error: Session ID 0155ecdf-bd7b-5e57-9389-6a8a25cd8bd1 is already in use.\n","timestamp":"2026-03-28T20:18:42Z"}
+{"phase":"architect","outcome":"tasks.created","repo":"hive","board_open":9,"duration_secs":0.41633,"timestamp":"2026-03-28T20:18:42Z"}
+{"phase":"builder","outcome":"task.done","repo":"hive","board_open":9,"duration_secs":0.3092339,"timestamp":"2026-03-28T20:18:43Z"}
+{"phase":"tester","outcome":"tests.pass","repo":"hive","board_open":9,"duration_secs":0.3646993,"timestamp":"2026-03-28T20:18:43Z"}
+{"phase":"critic","outcome":"critique.pass","repo":"hive","board_open":9,"duration_secs":1.4499971,"timestamp":"2026-03-28T20:18:46Z"}
+{"phase":"reflector","outcome":"reflection.done","repo":"hive","board_open":9,"duration_secs":3.682296,"timestamp":"2026-03-28T20:18:49Z"}
+{"phase":"observer","outcome":"audit.done","repo":"hive","board_open":9,"duration_secs":1.2795358000000001,"timestamp":"2026-03-28T20:18:51Z"}

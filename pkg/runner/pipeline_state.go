@@ -148,7 +148,7 @@ func (sm *PipelineStateMachine) Run(ctx context.Context) error {
 	hasOpen := false
 	hasFixes := false
 	for _, t := range tasks {
-		if t.Kind == "task" && t.State != "done" && t.State != "closed" {
+		if t.Kind == "task" && t.State != "done" && t.State != "closed" && t.ChildCount == 0 {
 			hasOpen = true
 			if len(t.Title) > 4 && t.Title[:4] == "Fix:" {
 				hasFixes = true
