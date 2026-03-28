@@ -382,3 +382,4 @@
 {"phase":"tester","outcome":"tests.pass","repo":"hive","board_open":5,"duration_secs":136.8619791,"cost_usd":1.7030092499999996,"timestamp":"2026-03-28T21:14:32Z"}
 {"phase":"critic","outcome":"critique.pass","repo":"hive","board_open":6,"duration_secs":212.0856079,"cost_usd":2.1321580499999997,"timestamp":"2026-03-28T21:18:05Z"}
 {"phase":"reflector","outcome":"reflection.done","repo":"hive","board_open":6,"duration_secs":224.1968664,"cost_usd":2.5534115999999996,"timestamp":"2026-03-28T21:21:50Z"}
+{"phase":"builder","outcome":"task.done","repo":"hive","board_open":5,"duration_secs":236.5836523,"cost_usd":0.5216430000000001,"timestamp":"2026-03-28T21:32:03Z"}

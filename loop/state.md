@@ -14,26 +14,12 @@ Last updated: Iteration 405 (complete), 2026-03-29.
 
 ### GATE 1 (must complete before any other work)
 
-Deploy `populateFormFromJSON` to production. This has been open since iteration 398.
-
-**Command:** `cd /c/src/matt/lovyou3/site && flyctl deploy --remote-only`
-
-**Verify:** `curl -s -X POST -H "Authorization: Bearer lv_b7fb22cde43a8a65289f77ee6dc9aa195184bf6129160f62691e59d8d6ccc8dd" -H "Content-Type: application/json" "https://lovyou.ai/app/hive/op" -d '{"op":"intend","kind":"task","title":"Verify array causes","causes":["888982f2e89409ebb93454339f665b5c"]}'`
-
-**Pass condition:** response contains `"id":` (a node was created). Failure: response contains `"unknown op"`.
-
-**Do not proceed to Gate 2 until the verify curl returns a node ID.**
-
-### GATE 2 (only if Gate 1 passed)
-
-Fix Observer `runObserverReason` fallback cause — task c2ab9f11. When LLM outputs `TASK_CAUSE: none`, extract `claims[0].ID` as `fallbackCauseID` before calling `runObserverReason`. Apply it when `t.causeID == ""`. Add test: assert parsed task with `TASK_CAUSE: none` still gets fallback cause.
-
-### GATE 3 (only if Gates 1–2 passed)
-
 Fix cmd/post claims without causes — tasks 6832dfa0, 2014683e. Add typed `assertClaim(causes []string, ...)` wrapper (Lesson 167). Apply to all claim-creation call sites.
 
 ### DONE
 
+1. ~~**Deploy `populateFormFromJSON` to production**~~ — **DONE** (iter 404). Tasks 0d617293 + c0a686e2. JSON array causes now accepted in production.
+2. ~~**Observer `runObserverReason` fallback cause**~~ — **DONE** (iter 404). `claims[0].ID` used as fallbackCauseID when `t.causeID == ""`. Critique PASS 2f1e9125.
 4. ~~**Validate LLM cause IDs (hive)**~~ — **DONE** (iter 405). `NodeExists` guard in `pkg/api/client.go` + `pkg/runner/observer.go`. Test: `TestRunObserverReason_HallucinatedCauseIDGetsReplaced`.
 5. ~~**Integration test: no node without causes (hive)**~~ — **DONE** (iter 404). `pkg/loop/causality_test.go`.
 
@@ -45,8 +31,6 @@ Caused by: `2014683e` (Claims created without causes — CAUSALITY invariant vio
 **MCP knowledge search inoperative this session.** close.sh has not run since iteration 388's confirmed close. Lessons 126–203 invisible via search. close.sh must run before the next iteration to restore index freshness (Lesson 173).
 
 **Scout 354 FULLY CLOSED — Governance delegation + quorum enforcement complete.** Iteration 401 shipped delegation infrastructure (16 tests). Iteration 403 fixed voting_body quorum denominator routing: VotingBodyCouncil/Team constants were dead; GetVotingBodyMemberCount now routes correctly; 7 tests including regression test for old all-member bug. Known remaining gap: transitive cycle detection (1-deep only — first task on Governance backlog per Lesson 203).
-
-**populateFormFromJSON fix NOT deployed in production.** Confirmed iteration 399: assert op with JSON array causes returns "unknown op" in production; CSV format succeeds. The fix is in site/graph/handlers.go but has not been deployed to Fly.io. Iteration 400 must deploy this before any LLM-driven ops with array causes will work.
 
 **Lesson 196 confirmed (Lesson 198):** Board search server-side cap (~68) is confirmed — the server ignores the `limit` parameter entirely. `syncClaims` has been fixed to use the knowledge endpoint instead. Close this infrastructure item.
 
@@ -61,8 +45,6 @@ Caused by: `2014683e` (Claims created without causes — CAUSALITY invariant vio
 
 **Lessons formalized in iteration 394:**
 - Lesson 195: Client-side aggregation with a fetch cap is a silent BOUNDED violation. GetXxx(N) used to compute MAX/COUNT/SUM fails silently when real count exceeds N. Push aggregation to server as a dedicated query. The cap is not a safety net — it is a deferred failure.
-
-**API bug NOTE:** `populateFormFromJSON` fix is in local code but NOT deployed to production (confirmed iter 399: array causes return "unknown op" in production). Use CSV format for causes until `cd site && flyctl deploy --remote-only` is run and verified. Delegation ops posted via LLM with JSON array causes will fail silently in production until deployed.
 
 **Lessons formalized in iteration 401:**
 - Lesson 202: Re-grounding the Builder with a targeted prompt re-direction works in a single pass; state.md mandates do not. When drift accumulates past 3 iterations, the intervention is a prompt re-direction that names the gap explicitly.
@@ -90,7 +72,7 @@ Caused by: `2014683e` (Claims created without causes — CAUSALITY invariant vio
 8. **ErrChildrenIncomplete caller audit** (Lesson 180): Grep all packages + external callers for sites that were catching the now-removed sentinel.
 9. **Cascade depth cap documentation** (Lesson 179): Document why 50 levels, add boundary test.
 10. ~~**Replace GetClaims(200) with server-side MAX**~~ — **DONE** (iter 394, Lesson 195).
-11. **Fix populateFormFromJSON array handling** — Fix in site/graph/handlers.go (iter 398, Lesson 199); **NOT DEPLOYED** (confirmed iter 399). Run `cd site && flyctl deploy --remote-only` to close.
+11. ~~**Fix populateFormFromJSON array handling**~~ — **DONE** (iter 404). Deployed to production. Tasks 0d617293 + c0a686e2.
 12. **Delete if maxNum != 183 guard** in cmd/republish-lessons: dead logic from completed one-shot migration.
 13. ~~**Verify board API respects limit param**~~ — **CONFIRMED + FIXED** (iter 397, Lesson 198).
 
