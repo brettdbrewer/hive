@@ -1,42 +1,48 @@
-# Test Report: Fix fetchBoardByQuery 65-node cap
+# Test Report: Meta-task structural guard (Lesson 137 level 2)
 
-**Date:** 2026-03-29
+- **Build:** 55d4214
+- **Tester:** Tester agent
+- **Date:** 2026-03-29
 
 ## What Was Tested
 
-Two tests added by the Builder in this iteration:
+The Builder shipped `isMetaTaskBody` and the `execTaskCreate` guard, with 15 tests pre-existing (13 loop + 2 new). The Tester added 2 more tests to close coverage gaps.
 
-### 1. `TestFetchBoardByQuerySendsLimit` (cmd/post/main_test.go:1535)
-- Verifies `fetchBoardByQuery` sends a `limit` query parameter
-- Asserts limit >= 200 (current lesson count ~200, constant is 500)
-- **Catches the regression**: without this test, silent truncation at 65 nodes could silently return
+## New Tests Added (`pkg/loop/tasks_test.go`)
 
-### 2. `TestHasClaimPrefix` — `"Lesson: 2026-03-27"` case (cmd/post/main_test.go:1667)
-- Added `{"Lesson: 2026-03-27", false}` case
-- Documents that malformed "Lesson: date" titles (colon at index 6, not space) are rejected
-- "Lesson " requires a space at position 7 — "Lesson:" has a colon, so prefix doesn't match
+### `TestExecTaskCreateRejectsMetaTask` (4 subtests)
+**Gap it fills:** `isMetaTaskBody` was tested in isolation, but the guard wired into `execTaskCreate` had no direct test. This test exercises the full rejection path inside `execTaskCreate` — not just the pure function.
+
+- All four patterns rejected from title field
+- Case-insensitive rejection (Close Task, not just close task)
+- Rejection when pattern is in description, not title
+- Error message contains `"meta-task rejected"` in all cases
+
+### `TestIsMetaTaskBodyTitleDescriptionJoin`
+**Gap it fills:** Documents and verifies a subtle boundary behaviour — the join is `title + " " + description`, so a pattern can span the boundary (title=`"close the"`, description=`"following tasks"` → joined matches `"close the following"`). Also confirms unrelated fragment pairs don't false-positive.
 
 ## Results
 
-| Test | Result |
+| Test | Status |
 |------|--------|
-| `TestFetchBoardByQuerySendsLimit` | PASS |
-| `TestHasClaimPrefix` (all 11 cases incl. new date case) | PASS |
+| TestIsMetaTaskBody (18 cases) | PASS |
+| TestParseTaskCommandsMetaTaskNotFiltered | PASS |
+| TestExecTaskCreateRejectsMetaTask/op=complete_in_title | PASS |
+| TestExecTaskCreateRejectsMetaTask/close_task_in_title | PASS |
+| TestExecTaskCreateRejectsMetaTask/mark_done_in_description | PASS |
+| TestExecTaskCreateRejectsMetaTask/close_the_following_in_description | PASS |
+| TestIsMetaTaskBodyTitleDescriptionJoin | PASS |
+| All 13 pre-existing loop tests | PASS |
 
-## Full Suite
-
-```
-go.exe test -count=1 ./...  — 13 packages, all pass (0.655s on cmd/post)
-```
+**Total: 17 tests, 0 failures**
 
 ## Coverage Notes
 
-- `fetchBoardByQuery` covered by 5 tests: Limit, ReturnsNodes, MalformedJSON, SendsAuthHeader, HTTPError — the new test completes the set
-- `hasClaimPrefix` now has 11 cases including the malformed "Lesson: date" edge case
-- `boardQueryLimit = 500` constant exercised via the limit check (>= 200 assertion)
+- `isMetaTaskBody` — all four patterns, both fields, case-insensitivity, boundary join: **covered**
+- `execTaskCreate` rejection path — all four patterns: **covered**
+- `execTaskCreate` happy path (reaching `tasks.Create`) — untestable without a real `TaskStore`; the `TestIsMetaTaskBody` negative cases provide the same guarantee at the unit level
+- `parseTaskCommands` pass-through: **covered**
 
-## Verdict
+## @Critic
 
-**PASS.** Both new tests exercise exactly what changed. No gaps. No production code issues.
-
-@Critic ready for review.
+Ready for review. The `TestExecTaskCreateRejectsMetaTask` test is the substantive addition — it proves the guard fires at the correct point in `execTaskCreate`, not just that `isMetaTaskBody` returns the right bool.

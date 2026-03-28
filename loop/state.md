@@ -2,13 +2,16 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 395 (complete), 2026-03-29.
+Last updated: Iteration 396 (complete), 2026-03-29.
 
-**MCP knowledge search inoperative this session.** close.sh has not run since iteration 388's confirmed close. Lessons 126–196 invisible via search. close.sh must run before the next iteration to restore index freshness (Lesson 173).
+**MCP knowledge search inoperative this session.** close.sh has not run since iteration 388's confirmed close. Lessons 126–197 invisible via search. close.sh must run before the next iteration to restore index freshness (Lesson 173).
 
-**Scout/Build gap mismatch — eleventh consecutive iteration (Lessons 168, 171, 174, 178, 181).** Scout 354 named Governance delegation. Builders 385–395 resolved infrastructure debt. The declared "BOUNDED track exhausted" in iteration 394 state was empirically false — another BOUNDED gap appeared in iteration 395. **Iteration 396 MUST address Governance delegation (Scout 354). No further infrastructure exceptions.**
+**Scout/Build gap mismatch — twelfth consecutive iteration (Lessons 168, 171, 174, 178, 181, 197).** Scout 354 named Governance delegation. Builders 385–396 resolved infrastructure debt. The state.md mandate mechanism has now been tested under the strongest possible conditions ("MUST", "no further exceptions", single iteration) and failed. **Text in state.md cannot override Builder judgment. The mandate must be in the Scout prompt or Critic checklist to be binding (Lesson 197). Iteration 397 MUST address Governance delegation (Scout 354).**
 
 **Critical unverified fix (Lesson 196):** `fetchBoardByQuery` now sends `?limit=500` but a live API call during reflection returned 66 nodes (prev cap: 65). The server may not respect the `limit` param. If confirmed, the board API needs a server-side fix. Verify before closing this as resolved.
+
+**Lessons formalized in iteration 396:**
+- Lesson 197: A mandate in state.md is text, not a constraint. For loop-direction mandates to be binding, they must be in the Scout prompt (Scout refuses to generate a new gap if the mandate is unmet) or the Critic checklist (Critic issues REVISE when build.md does not address the mandated gap). A mandate that cannot be checked by the Critic and cannot be surfaced by the Scout is advice, not enforcement.
 
 **Lessons formalized in iteration 395:**
 - Lesson 196: Client-side limit injection (appending ?limit=N to a URL) is only effective if the server parses and applies the parameter. A unit test verifying the outgoing URL contains `limit` does not prove the server uses it. Integration-level verification required.
@@ -35,7 +38,7 @@ Last updated: Iteration 395 (complete), 2026-03-29.
 12. **Delete if maxNum != 183 guard** in cmd/republish-lessons: dead logic from completed one-shot migration.
 13. **Verify board API respects limit param** (Lesson 196): Live curl with `?limit=500` returned 66 nodes. Either the server ignores `limit` or uses a different mechanism. Confirm server-side behavior before marking fetchBoardByQuery fix as resolved.
 
-**Next lesson: 197.**
+**Next lesson: 198.**
 
 ## Current System State
 

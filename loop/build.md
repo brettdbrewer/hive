@@ -1,22 +1,44 @@
-# Build: Fix fetchBoardByQuery 65-node cap — claims.md missing lessons 110-195
+# Build: Structural hardening: loop task parser should detect and reject meta-tasks programmatically (Lesson 137 level 2)
 
-## Gap
-`fetchBoardByQuery` in `cmd/post/main.go` called `/app/hive/board?q=Lesson` with no limit parameter. The board API defaults to 65 nodes. With 179+ knowledge claims on the graph, lessons 110-195 were silently truncated — absent from `loop/claims.md` and unsearchable via the MCP knowledge tool. Three malformed "Lesson: date" entries (lessons 106/107/108) also appeared in claims.md from a prior run with looser filtering.
+- **Commit:** 55d4214c7de113b18d70fda67357e56e95113afc
+- **Subject:** [hive:builder] Structural hardening: loop task parser should detect and reject meta-tasks programmatically (Lesson 137 level 2)
+- **Cost:** $0.3071
+- **Timestamp:** 2026-03-28T15:45:12Z
 
-## Changes
+## Task
 
-### `cmd/post/main.go`
-- Added `boardQueryLimit = 500` constant with Invariant 13 (BOUNDED) explanation
-- Changed `fetchBoardByQuery` URL from `?q={q}` to `?q={q}&limit=500` using `fmt.Sprintf`
+Lesson 137 names two hardening levels for the meta-task defect: (1) prompt prohibition (done in 24924471) and (2) structural post-processing. Level 2 is not yet implemented. The loop task-command parser in pkg/loop/loop.go already parses /task create commands from agent output. Add a guard: before e...
 
-### `cmd/post/main_test.go`
-- Added `strconv` import
-- Added `TestFetchBoardByQuerySendsLimit` — verifies the board query sends a `limit` param >= 200; catches the silent truncation regression
-- Added `"Lesson: 2026-03-27"` test case to `TestHasClaimPrefix` — documents that malformed "Lesson: date" titles are rejected by the filter (colon != space at index 6)
+## What Was Built
 
-## Verification
-- `go.exe build -buildvcs=false ./...` — clean
-- `go.exe test ./...` — all pass (13 packages)
+All 15 tests pass. Here's what was implemented:
 
-## Effect
-Next `syncClaims` run will fetch all ~200 lesson and critique nodes (not just 65), rebuild `loop/claims.md` with lessons 1-195 complete, and exclude the malformed "Lesson: date" entries. MCP knowledge index will be current.
+**`pkg/loop/tasks.go`** — two additions:
+
+1. `metaTaskPatterns` — a package-level slice of the four meta-task indicator phrases (`op=complete`, `close task`, `mark done`, `close the following`).
+
+2. `isMetaTaskBody(title, description string) bool` — case-insensitive check over the combined title+description against those patterns.
+
+3. Guard in `execTaskCreate` — called before `tasks.Create`. On match, logs a warning to stdout and returns a descriptive error, causing the command to be counted as failed in `executeTaskCommands`.
+
+**`pkg/loop/tasks_test.go`** (new file):
+
+- `TestIsMetaTaskBody` — 18 cases covering all four patterns, case-insensitivity, pattern in description vs title, and legitimate task descriptions.
+- `TestParseTaskCommandsMetaTaskNotFiltered` — confirms `parseTaskCommands` still surfaces the command so the guard can fire (the filter is structural, not at parse time).
+
+ACTION: DONE
+
+## Diff Stat
+
+```
+commit 55d4214c7de113b18d70fda67357e56e95113afc
+Author: hive <hive@lovyou.ai>
+Date:   Sun Mar 29 02:45:12 2026 +1100
+
+    [hive:builder] Structural hardening: loop task parser should detect and reject meta-tasks programmatically (Lesson 137 level 2)
+
+ loop/budget-20260329.txt |  1 +
+ pkg/loop/tasks.go        | 26 ++++++++++++++++++++++
+ pkg/loop/tasks_test.go   | 58 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 85 insertions(+)
+```

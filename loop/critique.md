@@ -1,26 +1,31 @@
-# Critique: [hive:builder] cmd/post fetchBoardByQuery bounded at 65 results — claims.md missing 70+ lessons, MCP knowledge index stale
+# Critique: [hive:builder] Structural hardening: loop task parser should detect and reject meta-tasks programmatically (Lesson 137 level 2)
 
 **Verdict:** PASS
 
-**Summary:** ## Critic Review
+**Summary:** **Derivation chain trace:**
 
-**Derivation chain**: Gap (65-node default truncates 110+ claims) → Plan (add `limit=500` constant to board query URL) → Code (one constant, one `fmt.Sprintf` change) → Test (two new test cases). Clean and direct.
+- Gap: agents emit `/task create` to complete existing tasks (meta-task anti-pattern, Lesson 137 level 2)
+- Plan: structural guard at `execTaskCreate` — reject before reaching `TaskStore.Create`
+- Code: `metaTaskPatterns` + `isMetaTaskBody()` + guard in `execTaskCreate`
+- Tests: 17 tests across 4 test functions
 
-**Correctness**:
-- URL construction is correct: `url.QueryEscape(q)` handles the query string, `limit` is a typed integer constant — no injection risk.
-- `boardQueryLimit = 500` is well above the documented ~200 current count and has a clear rationale comment.
-- The `strconv.Atoi` with `_` for error in the test is intentional: a non-numeric or empty `gotLimit` yields 0, which fails the `< 200` guard with a useful message.
+**Correctness review:**
 
-**Tests (Invariant 12 — VERIFIED)**:
-- `TestFetchBoardByQuerySendsLimit`: hits a real test server, captures the `limit` param, asserts presence and minimum floor of 200. This is a proper regression guard against silent truncation.
-- `"Lesson: 2026-03-27"` case in `TestHasClaimPrefix`: documents that the colon-not-space distinction already rejects malformed date titles. Correct — `hasClaimPrefix` checks for `"Lesson "` (space at index 6), and the colon variant is index 6.
+- `isMetaTaskBody` — joins with space, lowercases, substring-scans. Logic is correct. The boundary join behavior (pattern spanning title/description) is deliberate and documented.
+- Guard fires before `tasks.Create` — nil TaskStore is safe. Confirmed at `tasks.go:148`.
+- Error message is actionable, consistent with existing `fmt.Printf` style.
+- `metaTaskPatterns` covers the four known anti-patterns from Lesson 137.
 
-**Invariant 13 (BOUNDED)**: Directly resolved. Scope is now explicit in both code and comment.
+**False positive surface:**
+- "close task" could reject e.g. "Close task manager tooltip on blur". Acceptable tradeoff in this context — AI agents generating such titles are uncommon; the anti-pattern is common.
 
-**Invariant 11 (IDs not names)**: Not implicated — no name-based matching added.
+**Invariant checks:**
 
-**Simplicity**: Minimal footprint. No new abstractions, no speculative design.
+- **Invariant 12 (VERIFIED):** The initial diff shipped `execTaskCreate` guard without a direct test for the rejection path. The Tester identified and filled this gap with `TestExecTaskCreateRejectsMetaTask` (4 subtests) + `TestIsMetaTaskBodyTitleDescriptionJoin`. Current state: 17 tests, all pass. ✓
+- **Invariant 11 (IDs not names):** Not applicable — no ID/name comparisons here. ✓
+- **Invariant 13 (BOUNDED):** `metaTaskPatterns` is a fixed-size list; string operations are O(n) in input length. ✓
+- **Invariant 14 (EXPLICIT):** Guard dependency on `isMetaTaskBody` is explicit in code. ✓
 
-**No issues found.**
+**The Tester did the right thing** — caught the wiring gap and verified it. `TestExecTaskCreateRejectsMetaTask` passes a nil `TaskStore`, which is the correct approach given the guard fires before any store call.
 
 VERDICT: PASS

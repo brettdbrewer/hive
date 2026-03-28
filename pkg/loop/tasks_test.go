@@ -1,7 +1,10 @@
 package loop
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/lovyou-ai/eventgraph/go/pkg/types"
 )
 
 func TestIsMetaTaskBody(t *testing.T) {
@@ -54,5 +57,47 @@ func TestParseTaskCommandsMetaTaskNotFiltered(t *testing.T) {
 	}
 	if commands[0].Action != "create" {
 		t.Errorf("action = %q, want %q", commands[0].Action, "create")
+	}
+}
+
+func TestExecTaskCreateRejectsMetaTask(t *testing.T) {
+	// execTaskCreate must return an error for meta-task payloads before
+	// reaching TaskStore.Create. A nil TaskStore is safe because the guard
+	// fires before any store call.
+	cases := []struct {
+		name    string
+		payload string
+	}{
+		{"op=complete in title", `{"title": "op=complete task-123"}`},
+		{"close task in title", `{"title": "Close Task xyz"}`},
+		{"mark done in description", `{"title": "Wrap up", "description": "mark done all items"}`},
+		{"close the following in description", `{"title": "Batch", "description": "close the following: t1, t2"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := execTaskCreate([]byte(tc.payload), nil, types.ActorID{}, nil, types.ConversationID{})
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), "meta-task rejected") {
+				t.Errorf("error %q does not contain \"meta-task rejected\"", err.Error())
+			}
+		})
+	}
+}
+
+
+func TestIsMetaTaskBodyTitleDescriptionJoin(t *testing.T) {
+	// The join is title + " " + description — a pattern can span the boundary.
+	// This tests that documented behaviour rather than treating it as a surprise.
+	// "close the" in title + "following tasks" in description → matched.
+	got := isMetaTaskBody("close the", "following tasks")
+	if !got {
+		t.Error("expected match when pattern spans title/description join boundary, got false")
+	}
+	// Ensure it doesn't false-positive on unrelated fragments.
+	got = isMetaTaskBody("close the", "release branch")
+	if got {
+		t.Error("expected no match for unrelated fragments across boundary, got true")
 	}
 }
