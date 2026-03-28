@@ -403,6 +403,20 @@ func (c *Client) ListAgents(slug string) ([]Agent, error) {
 	return resp.Agents, nil
 }
 
+// UpdateAgentSession persists a new session ID for the named agent persona.
+// Called after each successful Claude CLI call so the next iteration can resume warm.
+func (c *Client) UpdateAgentSession(slug, name, sessionID string) error {
+	u := fmt.Sprintf("%s/app/%s/agents/%s/session", c.base, slug, name)
+	body := fmt.Sprintf(`{"session_id":%q}`, sessionID)
+	req, err := http.NewRequest("PATCH", u, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	c.setHeaders(req)
+	req.Header.Set("Content-Type", "application/json")
+	return c.do(req, nil)
+}
+
 // GetAgent fetches an agent by ID. Falls back to name match if ID not found.
 func (c *Client) GetAgent(slug, idOrName string) (*Agent, error) {
 	agents, err := c.ListAgents(slug)

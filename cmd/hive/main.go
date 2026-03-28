@@ -305,6 +305,25 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 	}
 	sm := runner.NewPipelineStateMachine(smRunner, makeRunner)
 
+	// After each phase, persist the session ID so the next iteration resumes warm.
+	type sessionGetter interface{ SessionID() string }
+	sm.SetPostPhase(func(role string, provider interface{}) {
+		sg, ok := provider.(sessionGetter)
+		if !ok {
+			return
+		}
+		sid := sg.SessionID()
+		if sid == "" || sid == agentSessions[role] {
+			return // unchanged
+		}
+		agentSessions[role] = sid
+		if err := client.UpdateAgentSession(space, role, sid); err != nil {
+			log.Printf("[pipeline] failed to persist session for %s: %v", role, err)
+		} else {
+			log.Printf("[pipeline] persisted session for %s: %s", role, sid[:8])
+		}
+	})
+
 	if err := sm.Run(ctx); err != nil {
 		log.Printf("[pipeline] state machine error: %v", err)
 	}

@@ -95,12 +95,18 @@ var stateAgents = map[PipelineState]string{
 // provider with its own session ID — no shared sessions across roles.
 type RunnerFactory func(role string) (*Runner, error)
 
+// PostPhaseFunc is called after each phase completes. role is the agent that
+// just ran. Implementations can use this to persist session state, emit
+// metrics, etc.
+type PostPhaseFunc func(role string, provider interface{})
+
 // and transitions invoke agents.
 type PipelineStateMachine struct {
 	state        PipelineState
 	runner       *Runner       // current runner (changes per role)
 	makeRunner   RunnerFactory // creates a fresh runner per role
 	reviseCount  int           // how many REVISE loops this cycle
+	postPhase    PostPhaseFunc // optional callback after each phase
 }
 
 // NewPipelineStateMachine creates a state machine with a runner factory.
@@ -111,6 +117,9 @@ func NewPipelineStateMachine(defaultRunner *Runner, factory RunnerFactory) *Pipe
 		makeRunner: factory,
 	}
 }
+
+// SetPostPhase registers a callback that runs after each phase completes.
+func (sm *PipelineStateMachine) SetPostPhase(fn PostPhaseFunc) { sm.postPhase = fn }
 
 // State returns the current state.
 func (sm *PipelineStateMachine) State() PipelineState { return sm.state }
@@ -199,6 +208,11 @@ func (sm *PipelineStateMachine) Run(ctx context.Context) error {
 		sm.runner.done = false
 		sm.runner.runTick(ctx)
 		phaseDuration := time.Since(phaseStart)
+
+		// Post-phase callback (e.g., persist session IDs).
+		if sm.postPhase != nil {
+			sm.postPhase(agent, sm.runner.cfg.Provider)
+		}
 
 		// Determine the next event based on what happened.
 		event := sm.inferEvent(agent)
