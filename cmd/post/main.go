@@ -157,13 +157,6 @@ func main() {
 		}
 	}
 
-	// Retroactive priority upgrade: task 468e0549 (title compounding cleanup)
-	// covers 95 nodes, not the 26 originally estimated — bump to high.
-	if err := upgradeTaskPriority(apiKey, baseURL, "468e0549", "high"); err != nil {
-		fmt.Fprintf(os.Stderr, "upgrade task 468e0549 priority: %v\n", err)
-		// Non-fatal — post succeeded.
-	}
-
 	fmt.Printf("posted iteration %s to %s/app/hive/feed\n", iteration, baseURL)
 }
 
