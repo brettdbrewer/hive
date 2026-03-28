@@ -258,7 +258,8 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 			Provider:     "claude-cli",
 			Model:        model,
 			MaxBudgetUSD: budget,
-			SessionID:    roleSessionID(space, role), // persistent UUID per role
+			// SessionID disabled until persistent sessions are properly tested.
+			// See hardening goal on board. Cold-start for now.
 		}
 		if mcpConfigPath != "" {
 			providerCfg.MCPConfigPath = mcpConfigPath
