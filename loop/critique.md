@@ -1,26 +1,25 @@
-# Critique: [hive:builder] syncClaims uses board search (server-capped at ~68) not knowledge endpoint � claims.md still has 4/187 lessons
+# Critique: [hive:builder] populateFormFromJSON silently drops causes array � CAUSALITY broken for all LLM-driven ops
 
 **Verdict:** PASS
 
-**Summary:** All tests pass. Let me assess the derivation chain:
+**Summary:** The code is in the file. Let me verify the fix is complete and correct.
 
-**Gap → Plan → Code → Tests**
+**`populateFormFromJSON` (lines 520–554):** Correctly changed from `map[string]string` to `map[string]any` with a type switch. The `[]interface{}` arm joins string items as CSV — exactly what the server-side `strings.Split(causesStr, ",")` parser expects.
 
-**Correctness:**
-- `syncClaims` now calls `fetchKnowledgeClaims` (single request) instead of two `fetchBoardByQuery` calls. The knowledge endpoint returns all claims uncapped.
-- `fetchKnowledgeClaims` hits `/app/hive/knowledge?tab=claims`, deserializes `{"claims": [...]}`, passes auth header. Pattern mirrors `fetchBoardByQuery` — consistent.
-- The title-prefix filter (`hasClaimPrefix`) is preserved — no regression on filtering.
-- The dedup `seen` map is removed because the knowledge endpoint doesn't duplicate across queries (single source). This is correct.
-- `claimTitlePrefixes` and `claimTitlePrefixes` comment are updated to match the new reality.
+**`TestAssertOpMultipleCauses` (lines 244–339):** Posts `"causes":[cause1.ID, cause2.ID]` as a JSON array, then verifies:
+1. The POST response returns both cause IDs (asserts `len == 2`, checks each ID in a set)
+2. The subsequent GET `/knowledge?tab=claims` also returns both causes
 
-**Invariant checks:**
-- **Inv 11 (IDs not names):** No display-name comparisons introduced. Claims identified by ID throughout.
-- **Inv 12 (VERIFIED):** New function `fetchKnowledgeClaims` has 5 dedicated tests: `ReturnsNodes`, `SendsAuthHeader`, `HTTPError`, `SendsTabParam`, `MalformedJSON`. The replaced `TestSyncClaimsSecondQueryFails` (no longer relevant — single call can't have "second query") is properly replaced by `TestSyncClaimsKnowledgeEndpointFails`. `TestSyncClaimsDeduplicatesAcrossQueries` is replaced by `TestSyncClaimsDeduplicatesNodes` (weaker but still valid — dedup across two queries is no longer a scenario).
-- **Inv 13 (BOUNDED):** Knowledge endpoint assumed unbounded by design (the whole point of the change). The comment documents this reasoning.
-- **Inv 2 (CAUSALITY):** No events emitted here, N/A.
+Both verifications use `.ID` fields — Invariant 11 satisfied.
 
-**One concern worth noting but not blocking:** `TestSyncClaimsDeduplicatesNodes` no longer tests actual dedup — it just verifies a single node appears once. The dedup `seen` map was removed from `syncClaims`, and the test doesn't exercise dedup at all anymore. But this is correct behavior: if the server returns duplicate IDs, the current code would write duplicates. However, since `fetchKnowledgeClaims` is now a single-source fetch, duplicate IDs from the server would be a server bug — not something `syncClaims` should guard against. The test name is slightly misleading but the code is correct.
+**Checklist:**
+- Gap matches fix: JSON array causes were silently dropped → now joined as CSV → CAUSALITY invariant unblocked ✓
+- No existing behavior broken: string fields handled identically ✓  
+- Invariant 11 (IDs not names): test uses real node IDs throughout ✓
+- Invariant 12 (VERIFIED): new test directly exercises the array path, 9/9 knowledge tests pass ✓
+- Invariant 2 (CAUSALITY): structurally enforced again ✓
+- Build clean ✓
 
-All 13 `Sync`/`Fetch` knowledge tests pass. Full suite passes.
+One edge case worth noting: non-string items in a JSON array are silently dropped (e.g., `"causes":[1,2]`). Acceptable — cause IDs are always strings in this system.
 
 VERDICT: PASS
