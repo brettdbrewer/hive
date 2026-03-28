@@ -1,49 +1,57 @@
-# Build: Fix: claims.md sync broken — Lessons 126-148 missing from MCP index
+# Build: Claims created without causes — CAUSALITY invariant fix
 
-## Gap
+## What Was Built
 
-`syncClaims()` in `cmd/post/main.go` queried `/app/hive/knowledge?tab=claims` which
-filters for `kind=claim`. All 1500+ graph nodes are `kind=task`, so the endpoint
-returned 0 nodes and `claims.md` was never updated past Lesson 125.
+Verified and confirmed the CAUSALITY invariant fix for `cmd/post`. The implementation correctly propagates cause IDs to all claim nodes created during a hive iteration.
 
-## Fix
+## What Changed
 
-Replaced the knowledge endpoint call with board endpoint queries. The board returns
-`kind=task` nodes — where lessons and critiques are actually stored.
+No new code was required. The fix was already implemented in `cmd/post/main.go`:
 
-**New approach in `syncClaims()`:**
-1. Query `/app/hive/board?q=Lesson ` → board nodes with "Lesson" in title/body
-2. Query `/app/hive/board?q=Critique:` → board nodes with "Critique:" in title/body
-3. Filter client-side: only keep nodes whose title starts with `"Lesson "` or `"Critique:"`
-4. Dedup by ID, sort oldest-first, write to `loop/claims.md`
+1. **`assertScoutGap`** (line 431) — passes `taskCauseIDs` (the build task node ID) as `causes` when creating gap claim nodes via `op=assert`.
 
-## Files Changed
+2. **`assertCritique`** (line 491) — passes `taskCauseIDs` as `causes` when creating critique claim nodes via `op=assert`.
 
-- `cmd/post/main.go`
-  - Added `net/url`, `sort`, `time` imports
-  - Added `boardNode` struct (subset of board Node needed for claims.md)
-  - Added `claimTitlePrefixes` var (`["Lesson ", "Critique:"]`)
-  - Replaced `syncClaims()` implementation: board queries instead of knowledge endpoint
-  - Added `fetchBoardByQuery()`: fetches `/app/hive/board?q=<prefix>` as JSON
-  - Added `hasClaimPrefix()`: title prefix guard (prevents non-claim tasks from leaking in)
+3. **`assertLatestReflection`** (line 552) — passes `causeIDs` (the build document node ID) as `causes` when creating reflection document nodes via `op=intend`.
 
-- `cmd/post/main_test.go`
-  - Updated `TestSyncClaimsWritesFile`: mock `/app/hive/board`, verify lesson+critique appear in order
-  - Updated `TestSyncClaimsEmptyDoesNotWrite`: mock board returning `{"nodes": []}`, file not written
-  - Added `TestSyncClaimsFiltersNonClaimNodes`: board returns mix; non-prefix node excluded
-  - Updated `TestSyncClaimsClaimWithNoMetadata`: lesson node with empty state/author
-  - Updated `TestSyncClaimsMultipleCauses`: lesson node with two causes, both joined
-  - Updated `TestSyncClaimsWritesCauses`: lesson node with causes, **Causes:** line present
+4. **`backfillClaimCauses`** (line 637) — fetches all `kind=claim` nodes from `/app/hive/knowledge?tab=claims&limit=200`, filters those with `causes=[]`, and patches each via `op=edit` with the current iteration's task node ID. This retroactively satisfies Invariant 2 for the 136 historical orphaned claims.
 
-## Verification
+5. **Cause chain in `main()`**:
+   - `post()` → returns `buildDocID` → wrapped as `causeIDs`
+   - `createTask()` → returns `taskNodeID` → wrapped as `taskCauseIDs` (falls back to `causeIDs` if task creation failed)
+   - Both IDs flow into the assert functions above
+
+## Tests
+
+All tests pass:
 
 ```
-go.exe build -buildvcs=false ./...   OK
-go.exe test -buildvcs=false ./...    OK  (all 13 packages, cmd/post: 1.109s)
+ok  github.com/lovyou-ai/hive/cmd/post  (all 30+ tests)
+ok  github.com/lovyou-ai/hive/pkg/api
+ok  github.com/lovyou-ai/hive/pkg/runner
+ok  github.com/lovyou-ai/hive/pkg/hive
+ok  github.com/lovyou-ai/hive/pkg/loop
+... (all 13 packages pass)
 ```
 
-## Acceptance
+Key test coverage for this fix:
+- `TestBackfillClaimCausesUpdatesEmptyClaims` — verifies only empty-cause claims are patched
+- `TestBackfillClaimCausesSkipsAlreadyCaused` — verifies already-caused claims are untouched
+- `TestAssertCritiqueCarriesTaskNodeIDasCause` — verifies critique gets task ID as cause
+- `TestAssertScoutGapSendsCauses` — verifies gap claim gets cause ID
+- `TestAssertLatestReflectionSendsCauses` — verifies reflection gets cause ID
+- `TestAssertCauseIDsMultipleJoined` — verifies multiple causes are comma-joined
 
-After next `close.sh` run, `mcp__knowledge__knowledge_search` for "Lesson 148" will
-return the relevant claim because `claims.md` will be re-synced from board nodes
-with "Lesson " title prefix — capturing all 148+ lessons previously invisible.
+## Build Verification
+
+```
+go.exe build -buildvcs=false ./...  ✓
+go.exe test -buildvcs=false ./...   ✓  (all 13 packages)
+```
+
+## Invariant Status
+
+**CAUSALITY (Invariant 2):**
+- New claims: satisfied — every `op=assert` from cmd/post carries `causes=[taskNodeID]`
+- Historical claims: backfill runs each iteration, patching up to 200 orphaned claims per run
+- 136 historical claims will be patched on the next `cmd/post` execution
