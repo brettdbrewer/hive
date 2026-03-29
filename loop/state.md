@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 409 (complete, reflected), 2026-03-29.
+Last updated: Iteration 412 (phantom, state.md updated), 2026-03-29.
 
 ## What the Scout Should Focus On Next
 
@@ -37,9 +37,18 @@ Once GATE 1 is verified passing: fix `git config` cmd.Dir (CreateTaskWorktree ru
 
 Caused by: `2014683e` (Claims created without causes — CAUSALITY invariant violated at scale)
 
+**Lessons formalized in iteration 412 (Reflector run — phantom):**
+- Lesson 220: State.md divergence from reflections.md amplifies phantom invocations. The Scout reads state.md as ground truth; reflections.md is invisible to it. When Reflector runs fail to update state.md, the Scout continues operating on stale iteration state. N phantom reflections without state.md updates creates N+1 phantom invocation opportunities. Every Reflector run must update state.md's iteration number, even for phantoms. Phantom reflections that don't update state.md are self-amplifying. Graph: `4e27fd947314a3cbfd218a4bc63c2b28`.
+
+**Lessons formalized in iteration 411 (Reflector run — phantom):**
+- Lesson 219: A lesson that names a failure mode and prescribes a behavioral response does not prevent recurrence. Lesson 218 named phantom Reflector invocations and prescribed ESCALATE. Iteration 411 ran unescalated. The structural fix is an executable precondition added to the Reflector prompt — not advice, not a lesson, but a mechanical check that runs before the phase begins. When a meta-failure recurs after being named, the fix is not stronger naming — it is a structural gate at the phase boundary.
+
+**Lessons formalized in iteration 410 (Reflector run — phantom):**
+- Lesson 218: The human-facilitated loop and the autonomous hive pipeline are now distinct processes with distinct audit trails. Loop artifacts (scout.md, build.md, critique.md) update only when a human facilitates an iteration. A phantom Reflector invocation occurs when the Reflector runs on artifacts that predate the last reflection entry. Precondition check needed: before any Reflector phase, verify that build.md describes work not yet reflected. If work is already present in reflections.md, ESCALATE rather than produce a duplicate reflection.
+
 **Lessons formalized in iteration 409 (Reflector run):**
 - Lesson 217: Structural build isolation enforces scope as an architectural constraint, not a behavioral one. When the Builder runs in a git worktree, loop artifacts and peer work are unreachable by construction — not by instruction. The same structural isolation pattern applies at three layers: database predicates (L214), typed I/O gates (L215), and filesystem boundaries (L217). When scope leakage recurs despite instruction, the fix is a smaller filesystem, not stronger prompting. Consequence: Critic confirms isolation held, not what the Builder touched. Graph: `b3826c0c0cf7209bbbb67a33cd907038`.
-- **Gaps flagged (open):** (a) worktree.go has no tests — VERIFIED violated; (b) `git config` in `CreateTaskWorktree` sets no `cmd.Dir`, modifying main repo identity silently; (c) `MergeToMain` not concurrency-safe in daemon mode.
+- **Gaps flagged (open):** (a) `pkg/runner/worktree.go` has no tests — VERIFIED violated (note: `pkg/workspace/workspace_test.go` was written but covers workspace utilities, not runner/worktree.go); (b) `git config` in `CreateTaskWorktree` sets no `cmd.Dir`, modifying main repo identity silently; (c) `MergeToMain` not concurrency-safe in daemon mode.
 
 **Next focus:** Scout should prioritize: (1) tests for `worktree.go` — closes VERIFIED violation; (2) fix `git config` cmd.Dir gap. Run close.sh to restore MCP index freshness (stale since iter 388, Lesson 173).
 

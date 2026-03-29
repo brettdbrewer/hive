@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -107,6 +108,79 @@ func TestReadSourceFilesSkipsHiveAndProducts(t *testing.T) {
 
 	if len(files) != 2 {
 		t.Errorf("ReadSourceFiles = %d files, want 2; got: %v", len(files), keys(files))
+	}
+}
+
+// initGitRepo initialises dir as a git repository with a single empty commit
+// so tests have a valid HEAD to build on.
+func initGitRepo(t *testing.T, dir string) {
+	t.Helper()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %s: %v", args, out, err)
+		}
+	}
+	run("init", "-b", "main")
+	run("config", "user.name", "test")
+	run("config", "user.email", "test@test.com")
+	run("commit", "--allow-empty", "-m", "initial")
+}
+
+func TestCreateWorktree_HappyPath(t *testing.T) {
+	dir := t.TempDir()
+	initGitRepo(t, dir)
+	p := &Product{Name: "test", Dir: dir}
+
+	wt, err := p.CreateWorktree("myworktree")
+	if err != nil {
+		t.Fatalf("CreateWorktree: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(wt.Dir) })
+
+	if _, err := os.Stat(wt.Dir); err != nil {
+		t.Fatalf("worktree dir does not exist: %v", err)
+	}
+
+	// git worktrees contain a .git file (not a directory).
+	gitEntry := filepath.Join(wt.Dir, ".git")
+	if _, err := os.Stat(gitEntry); err != nil {
+		t.Fatalf("worktree has no .git entry: %v", err)
+	}
+
+	p.PruneWorktrees() // step 5: clean up stale refs
+}
+
+func TestRemoveWorktree(t *testing.T) {
+	dir := t.TempDir()
+	initGitRepo(t, dir)
+	p := &Product{Name: "test", Dir: dir}
+
+	wt, err := p.CreateWorktree("removeme")
+	if err != nil {
+		t.Fatalf("CreateWorktree: %v", err)
+	}
+	wtDir := wt.Dir
+
+	if err := wt.RemoveWorktree(); err != nil {
+		t.Fatalf("RemoveWorktree: %v", err)
+	}
+
+	if _, statErr := os.Stat(wtDir); !os.IsNotExist(statErr) {
+		t.Errorf("worktree dir still exists after RemoveWorktree")
+	}
+}
+
+func TestCreateWorktree_NonGitDirErrors(t *testing.T) {
+	dir := t.TempDir() // plain directory — no .git
+	p := &Product{Name: "test", Dir: dir}
+
+	_, err := p.CreateWorktree("fail")
+	if err == nil {
+		t.Fatal("expected error for non-git dir, got nil")
 	}
 }
 

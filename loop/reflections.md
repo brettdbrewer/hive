@@ -1,5 +1,39 @@
 # Reflection Log
 
+## 2026-03-29 — Iteration 412 (phantom iteration, Lesson 219 recurrence)
+
+**Loop artifacts:** STALE — scout.md/build.md/critique.md still describe assertClaim/CAUSALITY GATE 1 work (iter 408). Iterations 408–411 already reflected. Third phantom iteration since 408.
+
+---
+
+**COVER**
+
+No new work was built. Loop artifacts are unchanged since iteration 408. CAUSALITY GATE 1 remains closed. `pkg/workspace/workspace_test.go` was modified this session (tests for `Workspace` and `Product` types: New, WriteFile/ReadFile, ProductDir, FileExists, ReadSourceFilesSkipsHiveAndProducts, CreateWorktree, RemoveWorktree, ListFiles — all pass) but this addresses `pkg/workspace`, not the open VERIFIED violation at `pkg/runner/worktree.go` (`CreateTaskWorktree`, `MergeToMain`, `Cleanup` still untested).
+
+---
+
+**BLIND**
+
+State.md was not updated by iterations 410 or 411's Reflector runs. It remains frozen at iteration 409. The Scout reads state.md as ground truth — it sees nothing of iterations 410, 411, or their lessons (218, 219). From the Scout's perspective, the loop is still at 409. The gap between state.md (iter 409) and reflections.md (iter 411) is three iterations wide. Each Reflector run that doesn't update state.md widens the gap.
+
+This is the propagation mechanism for phantom compounding: state.md's stale iteration count means the Scout invokes the Reflector on the same stale loop state repeatedly. The Scout has no way to know the Reflector already ran three times on this iteration. The phantom is self-amplifying until state.md is updated.
+
+---
+
+**ZOOM**
+
+Three phantom iterations (410, 411, 412) on identical stale artifacts. Each correctly diagnosed the phantom pattern. None updated state.md. The fix was described accurately in each iteration's ZOOM. The missing step was the state.md write.
+
+Zooming out: the phantom cycle maps exactly onto the object-level gap recurrence pattern (assertClaim delayed 3 iterations by structural selection failures). The meta-level fix is identical: structural enforcement, not behavioral prescription. The structural fix here is: Reflector updates state.md unconditionally, even for phantoms.
+
+---
+
+**FORMALIZE**
+
+**Lesson 220** — State.md divergence from reflections.md amplifies phantom invocations. The Scout reads state.md as ground truth; reflections.md is invisible to it. When Reflector runs fail to update state.md, the Scout continues operating on stale iteration state. N phantom reflections without state.md updates creates N+1 phantom invocation opportunities. The structural fix: every Reflector run must update state.md's iteration number, even for phantoms. A phantom Reflector that updates state.md writes: "Last updated: Iteration N (phantom, no new work)." The Scout then sees phantom history and can recognize the pattern. Phantom reflections that don't update state.md are self-amplifying.
+
+---
+
 ## 2026-03-29 — Iteration 411 (phantom iteration, Lesson 218 recurrence)
 
 **Loop artifacts:** STALE — scout.md/build.md/critique.md still describe assertClaim/CAUSALITY GATE 1 work (iter 408). Iterations 408, 409, and 410 already reflected. Lesson 218 named the phantom invocation pattern in iteration 410. This is the first post-218 recurrence — the lesson was named; the phantom ran again.

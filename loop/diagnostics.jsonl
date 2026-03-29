@@ -585,3 +585,9 @@
 {"phase":"critic","outcome":"critique.pass","repo":"hive","board_open":7,"duration_secs":15.4775251,"cost_usd":0.5515386000000001,"timestamp":"2026-03-29T12:26:24Z"}
 {"phase":"reflector","outcome":"reflection.done","repo":"hive","board_open":7,"duration_secs":364.1328022,"cost_usd":0.5802795,"timestamp":"2026-03-29T12:32:29Z"}
 {"phase":"observer","outcome":"audit.done","repo":"hive","board_open":7,"duration_secs":71.9313867,"cost_usd":0.4300478999999999,"timestamp":"2026-03-29T12:33:41Z"}
+{"phase":"builder","error":"exit status 1\ngo: go: GOMODCACHE entry is relative; must be absolute path: \"\\\\d\\\\gopath\\\\pkg\\\\mod\".\n","cost_usd":0.41025765000000003,"timestamp":"2026-03-29T12:43:42Z"}
+{"phase":"builder","outcome":"task.done","repo":"site","board_open":7,"duration_secs":227.2594177,"cost_usd":0.41025765000000003,"timestamp":"2026-03-29T12:43:42Z"}
+{"phase":"tester","outcome":"tests.pass","repo":"site","board_open":7,"duration_secs":11.4775633,"cost_usd":0.16934575,"timestamp":"2026-03-29T12:43:54Z"}
+{"phase":"critic","outcome":"critique.pass","repo":"site","board_open":7,"duration_secs":0.0230042,"timestamp":"2026-03-29T12:43:58Z"}
+{"phase":"reflector","outcome":"reflection.done","repo":"site","board_open":7,"duration_secs":437.6745329,"cost_usd":0.7500621000000001,"timestamp":"2026-03-29T12:51:16Z"}
+{"phase":"observer","outcome":"audit.done","repo":"site","duration_secs":6600.3238634,"timestamp":"2026-03-29T14:41:17Z"}
