@@ -403,6 +403,28 @@ func (c *Client) ListAgents(slug string) ([]Agent, error) {
 	return resp.Agents, nil
 }
 
+// EscalateTask sets a task to "escalated" state and creates a notification
+// for the space owner. Called when a Builder returns ACTION: ESCALATE.
+func (c *Client) EscalateTask(slug, taskID, reason, assigneeID string) error {
+	body := map[string]string{
+		"space_slug": slug,
+		"task_id":    taskID,
+		"reason":     reason,
+	}
+	if assigneeID != "" {
+		body["assignee_id"] = assigneeID
+	}
+	data, _ := json.Marshal(body)
+	u := fmt.Sprintf("%s/api/hive/escalation", c.base)
+	req, err := http.NewRequest("POST", u, strings.NewReader(string(data)))
+	if err != nil {
+		return err
+	}
+	c.setHeaders(req)
+	req.Header.Set("Content-Type", "application/json")
+	return c.do(req, nil)
+}
+
 // UpdateAgentSession persists a new session ID for the named agent persona.
 // Called after each successful Claude CLI call so the next iteration can resume warm.
 func (c *Client) UpdateAgentSession(slug, name, sessionID string) error {

@@ -23,6 +23,7 @@ const (
 	StateReviewing  PipelineState = "reviewing"   // Critic reviewing
 	StateReflecting PipelineState = "reflecting" // Reflector recording
 	StateAuditing   PipelineState = "auditing"   // Observer checking integrity
+	StateEscalated  PipelineState = "escalated"  // blocked, waiting for human resolution
 )
 
 // PipelineEvent triggers a state transition.
@@ -39,7 +40,9 @@ const (
 	EventCritiqueRevise  PipelineEvent = "critique.revise"
 	EventReflectionDone  PipelineEvent = "reflection.done"
 	EventAuditDone       PipelineEvent = "audit.done"
-	EventNoTasks         PipelineEvent = "no.tasks"
+	EventNoTasks             PipelineEvent = "no.tasks"
+	EventEscalation          PipelineEvent = "escalation"
+	EventEscalationResolved  PipelineEvent = "escalation.resolved"
 )
 
 // Transition maps (state, event) → next state.
@@ -59,7 +62,11 @@ var pipelineTransitions = map[PipelineState]map[PipelineEvent]PipelineState{
 		EventNoTasks:      StateIdle, // Architect couldn't decompose
 	},
 	StateBuilding: {
-		EventTaskDone: StateTesting,
+		EventTaskDone:   StateTesting,
+		EventEscalation: StateEscalated, // Builder couldn't proceed
+	},
+	StateEscalated: {
+		EventEscalationResolved: StateBuilding, // human unblocked the task
 	},
 	StateTesting: {
 		EventTestsPass: StateReviewing,
@@ -190,6 +197,43 @@ func (sm *PipelineStateMachine) Run(ctx context.Context) error {
 		default:
 		}
 
+		// Escalated state — no agent to invoke. Poll until resolved or timeout.
+		if sm.state == StateEscalated {
+			log.Printf("[pipeline] ⚠ ESCALATED — waiting for human resolution (timeout: 10m)")
+			resolved := false
+			deadline := time.After(10 * time.Minute)
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for !resolved {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-deadline:
+					log.Printf("[pipeline] escalation timeout — returning to idle")
+					sm.state = StateIdle
+					resolved = true
+				case <-ticker.C:
+					// Check if any escalated task was unblocked.
+					tasks, _ := sm.runner.cfg.APIClient.GetTasks(sm.runner.cfg.SpaceSlug, "")
+					stillEscalated := false
+					for _, t := range tasks {
+						if t.Kind == "task" && t.State == "escalated" {
+							stillEscalated = true
+							break
+						}
+					}
+					if !stillEscalated {
+						log.Printf("[pipeline] escalation resolved — resuming")
+						if _, _, err := sm.Transition(EventEscalationResolved); err != nil {
+							sm.state = StateIdle
+						}
+						resolved = true
+					}
+				}
+			}
+			continue
+		}
+
 		agent := stateAgents[sm.state]
 		if agent == "" {
 			return fmt.Errorf("no agent for state %q", sm.state)
@@ -270,6 +314,13 @@ func (sm *PipelineStateMachine) inferEvent(agent string) PipelineEvent {
 		return EventNoTasks
 
 	case "builder":
+		// Check if any task was escalated — the Builder called ESCALATE.
+		tasks, _ := sm.runner.cfg.APIClient.GetTasks(sm.runner.cfg.SpaceSlug, "")
+		for _, t := range tasks {
+			if t.Kind == "task" && t.State == "escalated" {
+				return EventEscalation
+			}
+		}
 		return EventTaskDone
 
 	case "tester":

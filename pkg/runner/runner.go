@@ -373,8 +373,19 @@ func (r *Runner) workTask(ctx context.Context, t api.Node) {
 
 	case "ESCALATE":
 		summary := extractSummary(result.Summary)
-		_ = r.cfg.APIClient.CommentTask(r.cfg.SpaceSlug, t.ID,
-			fmt.Sprintf("ESCALATE: %s", summary))
+		// Set task to "escalated" and notify the space owner.
+		if err := r.cfg.APIClient.EscalateTask(r.cfg.SpaceSlug, t.ID, summary, ""); err != nil {
+			log.Printf("[builder] escalation API error: %v", err)
+			// Fall back to comment if API fails.
+			_ = r.cfg.APIClient.CommentTask(r.cfg.SpaceSlug, t.ID,
+				fmt.Sprintf("ESCALATE: %s", summary))
+		}
+		r.appendDiagnostic(PhaseEvent{
+			Phase:   "builder",
+			Outcome: "escalated",
+			Error:   summary,
+			CostUSD: r.cost.TotalCostUSD,
+		})
 	}
 }
 
