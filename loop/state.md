@@ -6,15 +6,21 @@ Last updated: Iteration 405 (complete), 2026-03-29.
 
 ## What the Scout Should Focus On Next
 
-**PM milestone (b376684b):** Enforce CAUSALITY invariant end-to-end: Observer, cmd/post, deploy
+**PM milestone (042617000efca95a9b3c02955613571d):** Close CAUSALITY GATE 1 + fix 2 open production bugs
 
-**Target repo:** hive + site
+**Target repo:** hive
 
-**LESSON 211 APPLIES — GATED SEQUENCE, NOT LABELED LIST.** Present the Scout with one gate at a time. Do not list step 2 until step 1 is verified.
+**Three tasks — address in order:**
 
-### GATE 1 (must complete before any other work)
+### TASK 1 — cmd/post assertClaim wrapper (Lesson 167, GATE 1)
+Add typed `assertClaim(causeIDs []string, kind, title, body string) (string, error)` in `hive/cmd/post/main.go` that returns an error if `causeIDs` is empty or nil. Apply to every call site in cmd/post that creates a claim. Add a test that verifies empty causeIDs is rejected.
 
-Fix cmd/post claims without causes — tasks 6832dfa0, 2014683e. Add typed `assertClaim(causes []string, ...)` wrapper (Lesson 167). Apply to all claim-creation call sites.
+### TASK 2 — Fix duplicate loop header tasks
+The loop creates a fresh "Iteration N" and "Target repo: Y" task on every run without checking if one already exists. Extend the existing dedup guard (see commit 6127766) to cover loop header task creation — check board for existing open task with same title before creating.
+
+### TASK 3 — HIVE_REPO_PATH in fly.toml (site repo)
+**Target repo:** site
+Add `HIVE_REPO_PATH = "/app/hive"` to the `[env]` section of `site/fly.toml`. Deploy with `cd site && flyctl deploy --remote-only`. This fixes /hive dashboard showing "No diagnostics" in production.
 
 ### DONE
 

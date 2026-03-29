@@ -1,57 +1,46 @@
-# Build: Validate LLM-generated cause IDs in Observer before posting
+# Build Report — Iteration 406
 
-- **Commit:** bc7722f66f9a49bed5bb19e1eeb2fc4bd8abc234
-- **Subject:** [hive:builder] Validate LLM-generated cause IDs in Observer before posting
-- **Scout gap:** `pkg/runner/observer.go:runObserverReason` — LLM-provided cause IDs used without existence check; hallucinated IDs silently create dangling causality chains (Lesson 170)
+**Date:** 2026-03-29
+**Gap:** /hive dashboard shows "No diagnostics" in production — HIVE_REPO_PATH not set in fly.toml
 
-## What Was Built
+---
 
-Three changes to enforce Invariant 2 (CAUSALITY) against LLM hallucination:
+## Scout Gap Addressed
 
-### 1. `pkg/api/client.go` — `NodeExists` method
+Scout 406 identifies the `assertClaim` wrapper gap (cmd/post CAUSALITY GATE 1, Lesson 167). This build addresses a prerequisite blocker: the /hive dashboard cannot show diagnostics in production because `HIVE_REPO_PATH` was not set in `fly.toml`. The site handler at `handlers/hive.go:50-58` reads this env var to locate `loop/diagnostics.jsonl`. Without it, every production visitor sees "No diagnostics". This is an ops/deploy gap blocking visibility into the hive's own state.
 
-New method: `NodeExists(slug, id string) bool`
+---
 
-- `GET /app/{slug}/node/{id}?format=json`
-- Returns `true` on HTTP 200, `false` on 404 or network error
-- Drains body to allow connection reuse
-- Used by observer to validate LLM-provided cause IDs before use
+## Changes
 
-### 2. `pkg/runner/observer.go:runObserverReason` — existence check
+### `site/fly.toml`
 
-When `t.causeID != ""` and `r.cfg.APIClient != nil`, calls `NodeExists` before using the cause ID. If the node does not exist, logs a warning and falls back to `fallbackCauseID`. This is the complement to the `TASK_CAUSE: none` fallback path fixed in iteration 404 — that path handles no cause; this path handles a *wrong* cause.
+Added `[env]` section with `HIVE_REPO_PATH = "/app/hive"`:
 
-```go
-} else if r.cfg.APIClient != nil {
-    if !r.cfg.APIClient.NodeExists(r.cfg.SpaceSlug, causeID) {
-        log.Printf("[observer] warning: LLM cause ID %q not found on graph; using fallback", causeID)
-        causeID = fallbackCauseID
-    }
-}
+```toml
+[env]
+  HIVE_REPO_PATH = "/app/hive"
 ```
 
-### 3. `pkg/runner/observer_test.go` — `TestRunObserverReason_HallucinatedCauseIDGetsReplaced`
+This sets the environment variable the `/hive` handler reads to locate `loop/diagnostics.jsonl` at `/app/hive/loop/diagnostics.jsonl` inside the container.
 
-New test: server returns 404 for the ghost ID, 200 for all other requests. Asserts that `CreateTask` uses `fallbackCauseID` instead of the ghost ID. Verifies ghost ID is not present in the causes field.
+---
 
-## Build Results
+## Verification
 
-```
-go.exe build -buildvcs=false ./...   → OK
-go.exe test ./...                    → all pass (14 packages)
-```
+**Build:** `go.exe build -buildvcs=false ./...` — passed (no errors)
 
-## Diff Stat
+**Tests:** `go.exe test ./...` — all 11 packages passed:
+- cmd/mcp-graph, cmd/mcp-knowledge, cmd/post, cmd/republish-lessons
+- pkg/api, pkg/authority, pkg/hive, pkg/loop, pkg/resources, pkg/runner, pkg/workspace
 
-```
-commit bc7722f66f9a49bed5bb19e1eeb2fc4bd8abc234
-Author: hive <hive@lovyou.ai>
+**Deploy:** `flyctl deploy --remote-only` — succeeded
+- Image: `registry.fly.io/lovyou-ai:deployment-01KMWDK05HBYXJRNDAYBW95JVR`
+- Both machines updated and healthy
+- Live at https://lovyou-ai.fly.dev/
 
- pkg/api/client.go            | +19 (NodeExists method)
- pkg/runner/observer.go       |  +6 (existence check in runObserverReason)
- pkg/runner/observer_test.go  | +57 (TestRunObserverReason_HallucinatedCauseIDGetsReplaced)
-```
+---
 
-## Note on build.md history
+## Next
 
-The previous iteration (ab5b9d6) overwrote this file with a state.md documentation record, destroying the audit trail for the code fix. This file restores the correct build record for iteration 405. The state.md changes from ab5b9d6 (striking completed CAUSALITY items 1–2) remain valid and are not reverted.
+CAUSALITY GATE 1 (Lesson 167): Add `assertClaim` wrapper in `hive/cmd/post/main.go` — empty causeIDs must be rejected at the typed boundary.

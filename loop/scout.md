@@ -1,53 +1,102 @@
-# Scout Report — Iteration 405
+# Scout Report — Iteration 406
 
 **Date:** 2026-03-29
-**Gap:** LLM-generated cause IDs reach the graph unvalidated — hallucinated IDs silently create dangling causality chains (Lesson 170)
+**Gap:** Missing typed `assertClaim` guard in `hive/cmd/post` — empty causeIDs reach the graph unvalidated (Lesson 167, CAUSALITY GATE 1)
 
 ---
 
 ## Gap
 
-The Observer parses LLM output and uses whatever cause ID the LLM returned (`TASK_CAUSE: <id>`) directly in `CreateTask`. Nothing checks whether that ID actually exists on the graph before it is written as a cause. An LLM can hallucinate any string — a plausible-looking UUID, a title fragment, or a node ID from a prior session. When that ID is posted as a cause, the graph records a valid-looking causal link to a non-existent node. CAUSALITY is violated silently: no error, no warning, the task appears correctly created.
+The `cmd/post` tool creates claims (causal evidence nodes) without type-enforced validation that cause IDs are non-empty. While `pkg/runner/observer.go` was hardened in iteration 405 to validate LLM-provided cause IDs, the `cmd/post` path remains unguarded. Any call site in `cmd/post` can invoke `CreateClaim` with empty/nil `causeIDs` and succeed. An empty cause list violates Invariant 2 (CAUSALITY) — every event must have declared causes. When cmd/post operates during backfill or manual assertion, a single missed validation silently produces a causeless claim, breaking the causal chain.
 
-This is distinct from the empty-cause (`TASK_CAUSE: none`) path that was fixed in iteration 404. That path produces no cause. This path produces a *wrong* cause.
+**Root:** `hive/cmd/post/main.go` — Claims are created via raw `store.CreateClaim(...)` calls with no guard wrapper.
 
-**Root:** `pkg/runner/observer.go:runObserverReason` — `t.causeID` is used without existence check.
+**Lesson 167 (state.md):** Type-enforce CAUSALITY at the post tool's public boundary.
 
 ---
 
 ## Evidence
 
-**Lesson 170** (state.md): ghost IDs from LLM hallucination — Observer Operate path posts node IDs that may not exist on the graph, silently attaching dangling causes.
+**State.md Task 1 (PM milestone 042617000efca95a9b3c02955613571d):**
+> Add typed `assertClaim(causeIDs []string, kind, title, body string) (string, error)` in `hive/cmd/post/main.go` that returns an error if `causeIDs` is empty or nil. Apply to every call site in cmd/post that creates a claim. Add a test that verifies empty causeIDs is rejected.
 
-**Code (pre-fix):**
-```go
-causeID := t.causeID
-if causeID == "" {
-    causeID = fallbackCauseID
-}
-```
-No branch for "causeID is non-empty but doesn't exist." The LLM's ID goes straight to `CreateTask`.
+**Current state:** `cmd/post` creates claims via untyped function calls; no validation wrapper exists.
 
-**`pkg/api/client.go`** — no `NodeExists` method; no way to validate an ID against the graph before use.
+**Related:** Observer path (iteration 405, Lesson 170) was hardened with `NodeExists` checks. cmd/post represents the second unchecked entry point to the causal graph.
 
 ---
 
 ## Impact
 
-- Every Observer Operate call where the LLM guesses or misremembers a node ID produces a causally-linked task pointing to a ghost node
-- The graph cannot distinguish valid from dangling causes at query time — the violation is structural, not surfaced
-- Backfill (`backfillClaimCauses` in cmd/post) does not detect or repair dangling cause IDs — it only adds missing causes to causeless nodes
+- **Production blocking:** Open production bug — claims with empty causes silently created during backfill/manual ops
+- **CAUSALITY invariant:** Iteration 405 completed 3 of 4 CAUSALITY items; this is item 1 of GATE 1 (gate prevents deployment until complete)
+- **Audit trail:** Causeless claims make the causal ancestry unrecoverable — violations are permanent once written
+- **Iteration series:** Items 1–2 (Lessons 167, 170) are CAUSALITY GATE prerequisites; item 4 (Lesson 170) just shipped; item 1 (this gap) is now blocking
 
 ---
 
 ## Scope
 
-Strictly bounded:
-1. Add `NodeExists(slug, id string) bool` to `pkg/api/client.go` — `GET /app/{slug}/node/{id}?format=json`, returns `true` on HTTP 200 only
-2. In `pkg/runner/observer.go:runObserverReason`, when `t.causeID != ""`, call `NodeExists` before use; if false, log warning and replace with `fallbackCauseID`
-3. Add test `TestRunObserverReason_HallucinatedCauseIDGetsReplaced` — server returns 404 for ghost ID, assert `CreateTask` uses `fallbackCauseID`
+**Strictly bounded — three file changes:**
 
-**File list:**
-- `pkg/api/client.go` — new `NodeExists` method
-- `pkg/runner/observer.go:runObserverReason` — existence check before cause use
-- `pkg/runner/observer_test.go` — new test for hallucinated ID replacement
+### 1. `hive/cmd/post/main.go` — Add `assertClaim` wrapper
+
+New public function:
+
+```go
+func assertClaim(causeIDs []string, kind, title, body string) (string, error) {
+    if len(causeIDs) == 0 {
+        return "", fmt.Errorf("assertClaim: causeIDs must not be empty")
+    }
+    return store.CreateClaim(context.Background(), &work.Claim{
+        CauseIDs: causeIDs,
+        Kind:     kind,
+        Title:    title,
+        Body:     body,
+    })
+}
+```
+
+**Call sites to update:** Search for `store.CreateClaim` in `main.go` and replace with `assertClaim`. Typical locations:
+- `backfillClaimCauses()` when creating causal evidence
+- `main()` or initialization when seeding initial claims
+- Any explicit claim creation in `func init()` or command handlers
+
+### 2. `hive/cmd/post/main_test.go` — Add validation test
+
+New test function:
+
+```go
+func TestAssertClaim_RejectsEmptyCauseIDs(t *testing.T) {
+    _, err := assertClaim(nil, "test", "title", "body")
+    if err == nil || !strings.Contains(err.Error(), "causeIDs must not be empty") {
+        t.Errorf("expected error for nil causeIDs, got %v", err)
+    }
+
+    _, err = assertClaim([]string{}, "test", "title", "body")
+    if err == nil || !strings.Contains(err.Error(), "causeIDs must not be empty") {
+        t.Errorf("expected error for empty causeIDs, got %v", err)
+    }
+}
+```
+
+### 3. Verify all call sites
+
+Grep for `CreateClaim` in `hive/cmd/post/` — confirm no direct calls remain after wrapper is applied.
+
+---
+
+## Suggestion
+
+This is a **type-enforcement gate** (Lesson 167). The fix is trivial (1 function + 1 test) but architectural: once `assertClaim` exists, violations become compile-time/runtime errors instead of silent graph corruption. It closes the second unchecked entry point to the causal graph.
+
+**After this completes:** Mark CAUSALITY GATE 1 closed and proceed to Task 2 (duplicate loop header task dedup).
+
+**Note:** `close.sh` must run after this iteration to restore MCP knowledge freshness (Lesson 173) — the indexer has been stale since iteration 388.
+
+---
+
+## Files Affected
+
+- `hive/cmd/post/main.go` — new `assertClaim` wrapper function, call site updates
+- `hive/cmd/post/main_test.go` — new test for empty causeIDs rejection
