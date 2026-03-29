@@ -1,5 +1,45 @@
 # Reflection Log
 
+## 2026-03-29 — Iteration 410 (phantom iteration)
+
+**Loop artifacts:** STALE — scout.md/build.md/critique.md describe assertClaim/CAUSALITY GATE 1 work (iter 408, commit `0ee638e`). Iterations 408 and 409 already reflected. Three autonomous pipeline commits ran after iter 409: `8f10b4a`, `a47b60a`, `356a801`. This is a phantom Reflector invocation on already-completed, already-reflected work.
+
+---
+
+**COVER**
+
+The Scout identified CAUSALITY GATE 1 (assertClaim) as the gap. The Builder shipped `assertClaim` as a typed boundary enforcing `len(causeIDs) > 0` before any HTTP I/O. `assertScoutGap` and `assertCritique` were refactored through it. `TestAssertClaim_RejectsEmptyCauseIDs` covers nil and empty-slice cases. Critic PASS. All 15 packages pass.
+
+This is an accurate description of work already completed in a prior session (commit `0ee638e [hive:builder] Auth: helpful error messages and logging`). The code is in the repository. The Critic ran correctly on stale artifacts — its PASS is factually valid. The loop produced correct verdicts on incorrect inputs.
+
+---
+
+**BLIND**
+
+The loop artifacts are frozen at iteration 408's state while the pipeline advanced to at least iteration 410. Three autonomous pipeline commits (`8f10b4a`, `a47b60a`, `356a801`) and `54a772b` (escalation system), `c466d76` (repo registry), `765d033` (auto-clone/pull-all) ran after the last proper loop cycle. None of these are represented in scout.md, build.md, or critique.md.
+
+The human-facilitated loop (Scout→Builder→Critic→Reflector via Claude Code) and the autonomous hive pipeline (`cmd/hive` autonomous commits) have diverged. They share a codebase but not an audit trail. The loop artifacts only update when a human drives them. The autonomous pipeline leaves no loop artifacts — its work is invisible to the Scout.
+
+The MCP knowledge index stale issue (since iter 388, Lesson 173) appears in BLIND for the third consecutive Reflector entry. It has not been selected once. Selection failure for the same item across 3+ consecutive iterations is a pattern, not noise.
+
+---
+
+**ZOOM**
+
+Scale mismatch: the Reflector was invoked on a phantom iteration. The correct invocation would describe the autonomous pipeline work (escalation system, repo registry, auto-clone/pull-all). Instead it describes three-iteration-old work.
+
+Zooming out: two pipelines now coexist. The human-facilitated loop has a defined audit trail (loop artifacts, reflections.md, graph claims). The autonomous hive pipeline has git commits. These are not the same audit trail. As the autonomous pipeline matures, the loop artifacts become increasingly stale — not because of selection failures but because they're not the autonomous pipeline's responsibility.
+
+The structural question this surfaces: should the autonomous pipeline write loop artifacts? Or should loop artifacts be retired in favor of the graph audit trail (every autonomous commit posts a claim)? The current state — two pipelines, one stale artifact set — is unsustainable.
+
+---
+
+**FORMALIZE**
+
+**Lesson 218** — The human-facilitated loop and the autonomous hive pipeline are now distinct processes with distinct audit trails. Loop artifacts (scout.md, build.md, critique.md) are a human-loop artifact — they update only when a human facilitates an iteration. The autonomous pipeline's audit trail is git commits and graph claims. A phantom Reflector invocation occurs when the Reflector runs on artifacts that predate the last reflection entry. The precondition check: before any Reflector phase, verify that build.md's content describes work not yet reflected. If build.md describes work already present in reflections.md, the iteration is phantom — the Reflector should ESCALATE rather than produce a duplicate reflection. Structural resolution: either the autonomous pipeline writes loop artifacts, or loop artifacts are retired and all auditing moves to the graph.
+
+---
+
 ## 2026-03-29 — Iteration 409
 
 **What was built (autonomous pipeline, uncommitted):** Git worktree isolation for Builder tasks — `pkg/runner/worktree.go` (new), `pkg/runner/runner.go` + `pkg/runner/pipeline_state.go` + `cmd/hive/main.go` (modified). Each Builder task gets an isolated branch in a temp git worktree (`hive/{slug}-{unix}`). After Critic PASS, the branch merges to main with `--no-ff`. Merge conflict → escalation. Windows go.mod replace-directive fixup via NTFS junctions (`linkReplaceTargets`). `--worktrees` flag wired to `runPipeline` and `runDaemon`, defaulting to false.
