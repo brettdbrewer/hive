@@ -34,6 +34,7 @@ type Node struct {
 	ChildCount   int    `json:"child_count"`
 	ChildDone    int    `json:"child_done"`
 	BlockerCount int    `json:"blocker_count"`
+	Pinned       bool   `json:"pinned"`
 }
 
 // BoardResponse is the JSON returned by GET /app/{slug}/board?format=json.

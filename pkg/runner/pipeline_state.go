@@ -168,18 +168,25 @@ func (sm *PipelineStateMachine) Transition(event PipelineEvent) (PipelineState, 
 func (sm *PipelineStateMachine) Run(ctx context.Context) error {
 	// Check board to determine starting event.
 	tasks, _ := sm.runner.cfg.APIClient.GetTasks(sm.runner.cfg.SpaceSlug, "")
-	hasOpen := false
+	hasWork := false
 	hasFixes := false
 	for _, t := range tasks {
-		if t.Kind == "task" && t.State != "done" && t.State != "closed" && t.ChildCount == 0 {
-			hasOpen = true
-			if len(t.Title) > 4 && t.Title[:4] == "Fix:" {
-				hasFixes = true
-			}
+		if t.Kind != "task" || t.State == "done" || t.State == "closed" {
+			continue
+		}
+		if t.Pinned {
+			continue // pinned goals are direction, not work
+		}
+		if t.ChildCount > 0 && t.ChildDone < t.ChildCount {
+			continue // blocked by children
+		}
+		hasWork = true
+		if len(t.Title) > 4 && t.Title[:4] == "Fix:" {
+			hasFixes = true
 		}
 	}
 
-	if hasOpen || hasFixes {
+	if hasWork || hasFixes {
 		// Jump straight to building.
 		sm.state = StateBuilding
 		log.Printf("[pipeline] board has work — starting at %s", sm.state)

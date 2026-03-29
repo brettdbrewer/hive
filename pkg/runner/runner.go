@@ -228,6 +228,10 @@ func (r *Runner) runBuilder(ctx context.Context) {
 		if t.State == "done" || t.State == "closed" {
 			continue
 		}
+		// Skip pinned goals — these are strategic direction, not work items.
+		if t.Pinned {
+			continue
+		}
 		// Tasks with incomplete children are blocked — set state, skip.
 		if t.ChildCount > 0 && t.ChildDone < t.ChildCount {
 			if t.State != "blocked" {
