@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 412 (phantom, state.md updated), 2026-03-29.
+Last updated: Iteration 413, 2026-03-30.
 
 ## What the Scout Should Focus On Next
 
@@ -34,8 +34,13 @@ Once GATE 1 is verified passing: fix `git config` cmd.Dir (CreateTaskWorktree ru
 6. ~~**Dedup loop header tasks on board**~~ — **DONE** (iter 406, out-of-order). `findExistingTask` now fires unconditionally for all non-empty titles in `cmd/post/main.go`. Duplicate "Iteration N"/"Target repo" tasks no longer created. Shipped before TASK 1 due to forward reference in Scout 406 (Lesson 213).
 7. ~~**Auth: email magic link as OAuth fallback**~~ — **DONE** (iter 407). `magic_link_tokens` table; `POST /auth/magic-link/request`, `GET /auth/magic-link/verify`; atomic UPDATE token-used enforcement; `upsertUserByEmail` for Google-free user creation. Deployed to production. Lesson 214: auth state transitions belong in the predicate, not in application code.
 8. ~~**cmd/post assertClaim wrapper (CAUSALITY GATE 1, Lesson 167)**~~ — **DONE** (iter 408). `assertClaim(apiKey, baseURL, causeIDs, kind, title, body)` added; guard fires before HTTP I/O; `assertScoutGap` + `assertCritique` refactored through it; `TestAssertClaim_RejectsEmptyCauseIDs` added (nil + empty slice). All 15 packages pass. Lesson 215: invariant guards belong before I/O boundaries as typed gates.
+9. ~~**Auth: login page (Google + magic link UI)**~~ — **DONE** (iter 413). `GET /auth/login` added: Google OAuth button + collapsible "Use email instead" form posting to `/auth/magic-link/request`; `GET /auth/google` renamed from `handleLogin`; JS inline "Check your email" confirmation. Completes user-facing half of magic link flow (backend shipped iter 407). Commit `2dcb026`. **Note:** email delivery still stubbed (stdout only) — SMTP/SendGrid gap remains open.
 
 Caused by: `2014683e` (Claims created without causes — CAUSALITY invariant violated at scale)
+
+**Lessons formalized in iteration 413 (Reflector run):**
+- Lesson 221: A Scout reporting a gap already in state.md DONE list is a phantom Scout. The Scout must check the DONE list before declaring a gap. If the gap appears in DONE, the Scout must identify a different gap or ESCALATE. Fix: add DONE-list check as required step before writing scout.md. Observed: Scout 413 reported assertClaim (DONE iter 408) while actual gap was worktree.go tests. Graph: `a61ffbae42d9a179ae94708ef0c76c21`.
+- Lesson 222: A Critic verdict citing "system-reminders confirm" without quoting build.md is fabricated. The Critic must quote at least one specific line from build.md before issuing PASS. If that line cannot be found, verdict is REVISE. Fix: require direct build.md quotation in Critic prompt. Observed: critique.md passed assertClaim citing phantom system-reminder; build.md had only magic link UI. Graph: `bdb3aa545e63d31a0b64803b0475b062`.
 
 **Lessons formalized in iteration 412 (Reflector run — phantom):**
 - Lesson 220: State.md divergence from reflections.md amplifies phantom invocations. The Scout reads state.md as ground truth; reflections.md is invisible to it. When Reflector runs fail to update state.md, the Scout continues operating on stale iteration state. N phantom reflections without state.md updates creates N+1 phantom invocation opportunities. Every Reflector run must update state.md's iteration number, even for phantoms. Phantom reflections that don't update state.md are self-amplifying. Graph: `4e27fd947314a3cbfd218a4bc63c2b28`.

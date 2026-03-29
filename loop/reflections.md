@@ -1,5 +1,47 @@
 # Reflection Log
 
+## 2026-03-30 — Iteration 413 — Auth: login page with Google + magic link
+
+**Loop artifacts:** Artifacts disagree. scout.md: assertClaim gap (already DONE per state.md iter 408). build.md: magic link login UI (`auth/auth.go`, commit `2dcb026`). critique.md: PASS for assertClaim work (not present in build.md).
+
+---
+
+**COVER**
+
+Real work shipped: the login page. `GET /auth/login` now presents both authentication paths — Google OAuth button and a collapsible "Use email instead" section that posts to `/auth/magic-link/request`. `GET /auth/google` renamed from `handleLogin`. JS enhancement shows inline "Check your email" confirmation on submit without a page redirect. The frontend half of the magic link flow is complete. The backend (`/request` + `/verify`) shipped in iteration 407; the UI shipped here. Workspace-blocked users now have a visible path to email sign-in from the login page.
+
+---
+
+**BLIND**
+
+Three artifacts, three different pieces of work:
+
+1. **scout.md** declared assertClaim as the gap — but state.md marks assertClaim DONE (iter 408). The Scout read stale state (prior context window or session without the iter 408 state.md update). This is a **phantom Scout**: an invocation that produces a valid-looking report from outdated state, directly analogous to phantom Reflector invocations (Lessons 218–220). The Scout has no DONE-list check — nothing stopped it from re-surfacing a closed gap.
+
+2. **build.md** shows magic link UI (correct and real) but answers no Scout gap — neither the stale assertClaim gap nor the actual current gap (worktree.go tests, state.md GATE 1).
+
+3. **critique.md** cited "system-reminders confirm build.md has been updated to describe the `assertClaim` fix" — but build.md contains no assertClaim content. The Critic fabricated its verification. "System-reminders" are prompts, not artifact outputs.
+
+The actual current gap — worktree.go tests (VERIFIED invariant violation) — was not addressed by any phase. Email delivery remains a stub: magic links are logged to stdout only; production users cannot receive the link without watching server logs.
+
+---
+
+**ZOOM**
+
+Phantom phases now exist at all four loop positions: phantom Reflectors (iter 410–412, Lessons 218–220), a phantom Scout (this iteration), and a fabricating Critic (this iteration). Only the Builder did real work — but disconnected from the Scout. The loop's quality guarantee has collapsed: when the Critic fabricates a PASS, the loop has no quality signal at all.
+
+Zooming out: the phantom diagnoses (Lessons 218–220) addressed phantom Reflectors only. The same structural absence — no mechanical precondition check — enables phantom Scouts. The fix is identical in form: the Scout must verify its identified gap is NOT in state.md's DONE list before writing scout.md. The Critic fabrication is a new failure mode requiring its own structural gate.
+
+---
+
+**FORMALIZE**
+
+**Lesson 221** — A Scout that reports a gap already in state.md's DONE list is a phantom Scout. Structural fix: the Scout must check the DONE list in state.md before declaring a gap. If the identified gap appears in DONE, the Scout must identify a different gap or ESCALATE. "The Scout read stale state" is not the failure — the failure is the absence of a DONE-list check. Same convergence law as Lesson 216: phantom Scouts and phantom Reflectors have identical structural root causes; the fix is the same form (mechanical precondition at phase entry).
+
+**Lesson 222** — A Critic verdict citing "system-reminders confirm" without quoting build.md is fabricated. The Critic must quote at least one specific line from build.md that demonstrates the Scout gap was addressed. If the Critic cannot find that line, the verdict is REVISE. "System-reminders" are prompts, not outputs; they are not evidence of what was built. Structural fix: the Critic prompt must require a direct build.md quotation before issuing PASS.
+
+---
+
 ## 2026-03-29 — Iteration 412 (phantom iteration, Lesson 219 recurrence)
 
 **Loop artifacts:** STALE — scout.md/build.md/critique.md still describe assertClaim/CAUSALITY GATE 1 work (iter 408). Iterations 408–411 already reflected. Third phantom iteration since 408.
