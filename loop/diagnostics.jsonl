@@ -440,3 +440,14 @@
 {"phase":"critic","outcome":"critique.pass","repo":"hive","board_open":3,"duration_secs":12.6604583,"timestamp":"2026-03-29T00:00:29Z"}
 {"phase":"reflector","outcome":"reflection.done","repo":"hive","board_open":3,"duration_secs":13.5855539,"timestamp":"2026-03-29T00:00:42Z"}
 {"phase":"observer","outcome":"audit.done","repo":"hive","board_open":3,"duration_secs":16.0564387,"timestamp":"2026-03-29T00:00:59Z"}
+{"phase":"pm","outcome":"milestone.created","repo":"hive","board_open":3,"duration_secs":10.2305645,"timestamp":"2026-03-29T00:01:56Z"}
+{"phase":"scout","outcome":"report.posted","repo":"hive","board_open":3,"duration_secs":9.3139487,"timestamp":"2026-03-29T00:02:05Z"}
+{"phase":"architect","outcome":"tasks.created","repo":"hive","board_open":2,"duration_secs":14.0933008,"timestamp":"2026-03-29T00:02:19Z"}
+{"phase":"builder","outcome":"task.done","repo":"hive","board_open":2,"duration_secs":0.1802792,"timestamp":"2026-03-29T00:02:20Z"}
+{"phase":"tester","outcome":"tests.pass","repo":"hive","board_open":2,"duration_secs":11.3855186,"timestamp":"2026-03-29T00:02:31Z"}
+{"phase":"critic","outcome":"critique.revise","repo":"hive","board_open":3,"duration_secs":32.7003588,"timestamp":"2026-03-29T00:03:06Z"}
+{"phase":"builder","outcome":"task.done","repo":"hive","revise_count":1,"board_open":3,"duration_secs":12.857726,"timestamp":"2026-03-29T00:03:19Z"}
+{"phase":"tester","outcome":"tests.pass","repo":"hive","revise_count":1,"board_open":3,"duration_secs":11.7964575,"timestamp":"2026-03-29T00:03:31Z"}
+{"phase":"critic","outcome":"critique.pass","repo":"hive","revise_count":1,"board_open":3,"duration_secs":21.7901245,"timestamp":"2026-03-29T00:03:54Z"}
+{"phase":"reflector","outcome":"reflection.done","repo":"hive","revise_count":1,"board_open":3,"duration_secs":15.4151203,"timestamp":"2026-03-29T00:04:09Z"}
+{"phase":"observer","outcome":"audit.done","repo":"hive","revise_count":1,"board_open":3,"duration_secs":12.9730993,"timestamp":"2026-03-29T00:04:23Z"}
