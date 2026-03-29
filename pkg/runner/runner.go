@@ -749,6 +749,13 @@ func parseAction(summary string) string {
 	return "PROGRESS"
 }
 
+func truncateLog(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
 func extractSummary(s string) string {
 	// Return last 500 chars as summary.
 	if len(s) > 500 {
