@@ -58,8 +58,8 @@ func FromMap(repoMap map[string]string) *Registry {
 			LocalPath: path,
 			AbsPath:   abs,
 			Language:  "go",
-			BuildCmd:  "go.exe build -buildvcs=false ./...",
-			TestCmd:   "go.exe test -buildvcs=false ./...",
+			BuildCmd:  "go build -buildvcs=false ./...",
+			TestCmd:   "go test -buildvcs=false ./...",
 		})
 	}
 	return r

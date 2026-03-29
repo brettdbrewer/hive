@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -155,20 +156,19 @@ func linkReplaceTargets(worktreeDir, sourceDir string) error {
 		}
 
 		os.MkdirAll(filepath.Dir(expectedPath), 0755)
-		// Try junction (Windows, no admin), then symlink.
-		if err := createJunction(realPath, expectedPath); err != nil {
-			if err := os.Symlink(realPath, expectedPath); err != nil {
-				log.Printf("[worktree] warning: could not link %s → %s: %v", target, realPath, err)
+		// Symlink (works on Linux, macOS). On Windows, try junction first
+		// (works without admin), fall back to symlink.
+		if runtime.GOOS == "windows" {
+			cmd := exec.Command("cmd", "/c", "mklink", "/J", expectedPath, realPath)
+			if cmd.Run() == nil {
+				continue
 			}
+		}
+		if err := os.Symlink(realPath, expectedPath); err != nil {
+			log.Printf("[worktree] warning: could not link %s → %s: %v", target, realPath, err)
 		}
 	}
 	return nil
-}
-
-// createJunction creates an NTFS directory junction on Windows.
-func createJunction(target, link string) error {
-	cmd := exec.Command("cmd", "/c", "mklink", "/J", link, target)
-	return cmd.Run()
 }
 
 func gitIn(dir string, args ...string) error {

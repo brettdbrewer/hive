@@ -550,7 +550,7 @@ func writeMCPConfig(hiveDir string, repoMap map[string]string) string {
 
 	// Use go run to launch the knowledge server — no pre-build needed.
 	goPath := "go"
-	if p, err := exec.LookPath("go.exe"); err == nil {
+	if p, err := exec.LookPath("go"); err == nil {
 		goPath = p
 	}
 

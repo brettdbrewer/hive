@@ -437,8 +437,8 @@ func (r *Runner) buildPrompt(t api.Node) string {
 	}
 
 	// Repo context from registry — Builder knows which repo and how to build/test.
-	buildCmd := "go.exe build -buildvcs=false ./..."
-	testCmd := "go.exe test -buildvcs=false ./..."
+	buildCmd := "go build -buildvcs=false ./..."
+	testCmd := "go test -buildvcs=false ./..."
 	repoName := filepath.Base(r.cfg.RepoPath)
 	if reg := r.cfg.Registry; reg != nil {
 		if repo, found := reg.ForPath(r.cfg.RepoPath); found {
@@ -583,7 +583,7 @@ func (r *Runner) gitDiffStat() string {
 
 func (r *Runner) verifyBuild() error {
 	// Use build command from registry if available.
-	buildCmd := "go.exe build -buildvcs=false ./..."
+	buildCmd := "go build -buildvcs=false ./..."
 	if reg := r.cfg.Registry; reg != nil {
 		if repo, found := reg.ForPath(r.cfg.RepoPath); found && repo.BuildCmd != "" {
 			buildCmd = repo.BuildCmd
@@ -592,7 +592,9 @@ func (r *Runner) verifyBuild() error {
 	parts := strings.Fields(buildCmd)
 	cmd := exec.Command(parts[0], parts[1:]...)
 	cmd.Dir = r.cfg.RepoPath
-	cmd.Env = append(os.Environ(), "GOPATH=D:\\gopath", "GOCACHE=D:\\gocache")
+	// Inherit GOPATH/GOCACHE from environment. Don't override — let the
+	// system default work on Linux VMs where these aren't customized.
+	cmd.Env = os.Environ()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s\n%s", err, string(out))
