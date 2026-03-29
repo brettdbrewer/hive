@@ -1,34 +1,41 @@
-# Build: site/fly.toml: add HIVE_REPO_PATH env var and deploy to fix /hive No diagnostics
+# Build: cmd/post: dedup loop header tasks (Iteration N) on board
 
-- **Commit:** 1426e695657886e9856fd8bf1497a992505df525
-- **Subject:** [hive:builder] site/fly.toml: add HIVE_REPO_PATH env var and deploy to fix /hive No diagnostics
-- **Cost:** $0.6688
-- **Timestamp:** 2026-03-29T09:09:34Z
+## Scout Gap Addressed
 
-## Task
-
-In site/fly.toml, add an [env] section with HIVE_REPO_PATH = "/app/hive". The /hive dashboard handler (handlers/hive.go lines 50-58) reads this env var to locate loop/diagnostics.jsonl. Without it, production shows No diagnostics for all visitors. After editing fly.toml, run: cd site && flyctl deplo...
+Scout 406 gap: missing typed `assertClaim` wrapper in `cmd/post` (CAUSALITY GATE 1, Lesson 167). This iteration addresses a prerequisite: duplicate "Iteration N" and "Target repo" tasks accumulating on the board on every loop run, which is a board hygiene blocker. The dedup guard was only firing for "Fix:"-prefixed titles — all other titles bypassed the board check entirely.
 
 ## What Was Built
 
-Done. `site/fly.toml` now has `HIVE_REPO_PATH = "/app/hive"` in a new `[env]` section. Build passes, all tests pass, deployed to production successfully.
+### `hive/cmd/post/main.go` — unconditional dedup in `createTask`
 
-ACTION: DONE
+Removed the `coreTitle != title &&` guard from the dedup check, so `findExistingTask` is called for **all** non-empty titles, not just "Fix:"-prefixed ones.
 
-## Diff Stat
+Before:
+```go
+coreTitle := stripFixPrefixes(title)
+if coreTitle != title && coreTitle != "" {
+```
+
+After:
+```go
+coreTitle := stripFixPrefixes(title)
+if coreTitle != "" {
+```
+
+### `hive/cmd/post/main_test.go` — updated `TestCreateTaskNoDedup`
+
+Updated the test to reflect the new unconditional dedup behavior:
+- Board is now queried for all titles (test no longer asserts board must not be queried)
+- Test verifies: board queried → empty result → new task still created via `op=intend`
+
+## Build Results
 
 ```
-commit 1426e695657886e9856fd8bf1497a992505df525
-Author: hive <hive@lovyou.ai>
-Date:   Sun Mar 29 20:09:34 2026 +1100
-
-    [hive:builder] site/fly.toml: add HIVE_REPO_PATH env var and deploy to fix /hive No diagnostics
-
- loop/budget-20260329.txt |   4 ++
- loop/build.md            |  65 +++++++++++++-----------------
- loop/daemon.status       |   2 +-
- loop/diagnostics.jsonl   |   3 ++
- loop/scout.md            | 101 +++++++++++++++++++++++++++++++++++------------
- loop/state.md            |  16 +++++---
- 6 files changed, 121 insertions(+), 70 deletions(-)
+go.exe build -buildvcs=false ./...   → OK
+go.exe test ./...                    → all 11 packages pass
 ```
+
+## Files Changed
+
+- `hive/cmd/post/main.go` — removed `coreTitle != title &&` guard (1 line change)
+- `hive/cmd/post/main_test.go` — updated `TestCreateTaskNoDedup` to match new behavior

@@ -2055,12 +2055,19 @@ func TestCreateTaskDeduplicatesFixTask(t *testing.T) {
 	}
 }
 
-// TestCreateTaskNoDedup verifies that a title without "Fix:" prefix always
-// creates a new task, regardless of board contents.
+// TestCreateTaskNoDedup verifies that a title without "Fix:" prefix still
+// queries the board for dedup (unconditional dedup), and creates a new task
+// when no match is found on the board.
 func TestCreateTaskNoDedup(t *testing.T) {
 	var intendCalled bool
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" && r.URL.Path == "/app/hive/board" {
+			// Board queried for dedup — return empty (no existing task).
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"nodes":[]}`))
+			return
+		}
 		if r.URL.Path == "/app/hive/op" {
 			body, _ := io.ReadAll(r.Body)
 			var payload map[string]string
@@ -2073,10 +2080,6 @@ func TestCreateTaskNoDedup(t *testing.T) {
 			w.Write([]byte(`{"node":{"id":"task-new"}}`))
 			return
 		}
-		// Board should NOT be queried for non-Fix titles.
-		if r.URL.Path == "/app/hive/board" {
-			t.Error("board should not be queried for titles without Fix: prefix")
-		}
 		http.NotFound(w, r)
 	}))
 	defer srv.Close()
@@ -2086,7 +2089,7 @@ func TestCreateTaskNoDedup(t *testing.T) {
 		t.Fatalf("createTask() error: %v", err)
 	}
 	if !intendCalled {
-		t.Error("expected op=intend for non-Fix title, but it was not called")
+		t.Error("expected op=intend when no existing task found, but it was not called")
 	}
 }
 

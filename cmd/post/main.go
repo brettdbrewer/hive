@@ -283,16 +283,17 @@ func addTaskComment(apiKey, baseURL, nodeID, body string) error {
 // claims (Invariant 2: CAUSALITY — a critique of a task must cite that task).
 // causeIDs links this task to the nodes that triggered it (e.g. the build document).
 //
-// Dedup: if the title starts with "Fix:" and a task with the same core title
+// Dedup: if a task with the same core title (all "Fix: " prefixes stripped)
 // already exists on the board, a comment is added to the existing task instead
-// of creating a new one. This prevents "Fix: Fix: Fix: X" compounding when
-// repeated build failures each prepend another "Fix: " prefix.
+// of creating a new one. Fires for all titles, not just Fix:-prefixed ones,
+// so "Iteration N" and "Target repo" tasks don't accumulate duplicates.
 func createTask(apiKey, baseURL, title, description string, causeIDs []string) (string, error) {
 	// Dedup check: strip all "Fix: " prefixes to get the core title.
-	// If the title has at least one "Fix: " prefix AND an existing task with
-	// the core title exists, comment on it instead of creating a new task.
+	// If an existing task with the core title already exists on the board,
+	// comment on it instead of creating a new task. Fires unconditionally
+	// so "Iteration N" and "Target repo" tasks don't accumulate duplicates.
 	coreTitle := stripFixPrefixes(title)
-	if coreTitle != title && coreTitle != "" {
+	if coreTitle != "" {
 		existingID, err := findExistingTask(apiKey, baseURL, coreTitle)
 		if err == nil && existingID != "" {
 			comment := fmt.Sprintf("Fix attempt: %s\n\n%s", title, description)
