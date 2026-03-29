@@ -309,7 +309,7 @@ func TestAssertScoutGapCreatesClaimNode(t *testing.T) {
 	os.Chdir(tmp)
 	defer os.Chdir(origDir)
 
-	if err := assertScoutGap("lv_testkey", srv.URL, nil); err != nil {
+	if err := assertScoutGap("lv_testkey", srv.URL, []string{"doc-node-abc"}); err != nil {
 		t.Fatalf("assertScoutGap() error: %v", err)
 	}
 
@@ -327,6 +327,9 @@ func TestAssertScoutGapCreatesClaimNode(t *testing.T) {
 	}
 	if !strings.Contains(received["body"], "Governance lacks quorum logic.") {
 		t.Errorf("body %q does not contain gap title", received["body"])
+	}
+	if received["causes"] != "doc-node-abc" {
+		t.Errorf("causes = %q, want %q", received["causes"], "doc-node-abc")
 	}
 }
 
@@ -423,7 +426,7 @@ func TestAssertScoutGapSendsAuthHeader(t *testing.T) {
 	os.Chdir(tmp)
 	defer os.Chdir(origDir)
 
-	if err := assertScoutGap("lv_mykey", srv.URL, nil); err != nil {
+	if err := assertScoutGap("lv_mykey", srv.URL, []string{"cause-id"}); err != nil {
 		t.Fatalf("assertScoutGap() error: %v", err)
 	}
 
@@ -592,7 +595,7 @@ func TestAssertCritiqueCreatesClaimNode(t *testing.T) {
 	os.Chdir(tmp)
 	defer os.Chdir(origDir)
 
-	if err := assertCritique("lv_testkey", srv.URL, nil); err != nil {
+	if err := assertCritique("lv_testkey", srv.URL, []string{"task-node-xyz"}); err != nil {
 		t.Fatalf("assertCritique() error: %v", err)
 	}
 
@@ -2246,4 +2249,44 @@ func TestCreateTaskDeduplicatesSingleFixPrefix(t *testing.T) {
 	if len(opRequests) != 1 || opRequests[0]["op"] != "respond" {
 		t.Errorf("expected 1 op=respond comment, got %d requests: %v", len(opRequests), opRequests)
 	}
+}
+
+// TestAssertClaim_RejectsEmptyCauseIDs verifies that assertClaim returns an error
+// and makes no HTTP call when causeIDs is nil or empty.
+// This is CAUSALITY GATE 1 (Lesson 167, Invariant 2): the guard must fire before
+// any network I/O, so empty-cause claims can never reach the graph.
+func TestAssertClaim_RejectsEmptyCauseIDs(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"node":{"id":"x"}}`))
+	}))
+	defer srv.Close()
+
+	t.Run("nil", func(t *testing.T) {
+		called = false
+		_, err := assertClaim("key", srv.URL, nil, "claim", "Lesson X", "body")
+		if err == nil {
+			t.Fatal("expected error for nil causeIDs, got nil")
+		}
+		if !strings.Contains(err.Error(), "CAUSALITY") {
+			t.Errorf("error should mention CAUSALITY, got: %v", err)
+		}
+		if called {
+			t.Error("HTTP server must not be called when causeIDs is nil")
+		}
+	})
+
+	t.Run("empty_slice", func(t *testing.T) {
+		called = false
+		_, err := assertClaim("key", srv.URL, []string{}, "claim", "Lesson Y", "body")
+		if err == nil {
+			t.Fatal("expected error for empty causeIDs slice, got nil")
+		}
+		if called {
+			t.Error("HTTP server must not be called when causeIDs is empty")
+		}
+	})
 }

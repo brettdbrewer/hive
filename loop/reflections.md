@@ -1,5 +1,45 @@
 # Reflection Log
 
+## 2026-03-29 — Iteration 408
+
+**Scout gap:** `assertClaim` typed wrapper in `cmd/post/main.go` (CAUSALITY GATE 1, Lesson 167) — after two consecutive deferrals (iter 406, 407)
+**Builder task:** assertClaim implemented — `assertScoutGap` + `assertCritique` refactored through it. Guard fires before HTTP I/O. Tests: nil and empty slice rejection verified, 3 existing tests updated to pass valid causeIDs. All 15 packages pass.
+**Critic verdict:** PASS (fix task `ea6c502b` created: "assertClaim CAUSALITY GATE 1 still unshipped after auth iteration" — likely stale from prior Critic state, contradicts PASS verdict)
+
+---
+
+**COVER**
+
+CAUSALITY GATE 1 is closed. The `assertClaim` wrapper enforces non-empty causeIDs before any HTTP call — invariant check fires at the boundary, zero network cost for violations. Every call site in `cmd/post` that creates a claim now routes through one typed function. The typed error message ("Invariant 2: CAUSALITY") makes violations self-documenting at the call site.
+
+The Scout structural interventions finally worked: Lesson 212 (single task scope) + Lesson 213 (no forward references) → Builder delivered the gated task on the first attempt. Three iterations of deferral ended when the Scout's document scope was structurally constrained.
+
+---
+
+**BLIND**
+
+1. **Artifact title mismatch.** Build.md title reads "Auth: helpful error messages and logging" — the previous iteration's auth theme bled into this iteration's artifact title. The actual work was assertClaim/CAUSALITY. A reader tracing the build log by title would find no signal. Build artifact titles must track actual content, not inherited context.
+
+2. **False-positive fix task.** The Critic created fix task `ea6c502b` labeled "assertClaim CAUSALITY GATE 1 still unshipped after auth iteration" — but assertClaim WAS shipped this iteration. The fix task appears stale: created from prior-iteration state before the Critic acknowledged build.md, or generated in the same run that issued PASS. This leaves a contradictory task on the board. No mechanism exists to detect or clean up Critic-generated false-positive tasks.
+
+3. **Iteration numbering drift persists.** Scout labeled itself "Iteration 406"; state.md shows 407 complete. The off-by-one has now appeared in at least two consecutive iterations. Scout reads state.md and still miscounts. Either the read is stale or the increment logic is wrong.
+
+---
+
+**ZOOM**
+
+Scale was exactly right: one function, two refactors, two subtests. Three iterations of deferral to ship something with this scope is the anomaly, and the anomaly is now resolved by structural constraints rather than urgency.
+
+The pattern from iterations 405–408 maps cleanly: label urgency → ignored; add gate markers → ignored; prescribe execution order → ignored; scope-exclude competing tasks (Lesson 212) → partially effective; eliminate forward references (Lesson 213) → gate closes next iteration. The resolution came from constraining the document, not from increasing emphasis.
+
+Zooming out to the board: the Critic's fix task `ea6c502b` is a new board pollution mechanism. Previously, board noise came from duplicated loop-header tasks (fixed iter 406). Now it can come from Critic assertions that contradict build outcomes. Both paths produce stale tasks that require human triage.
+
+---
+
+**FORMALIZE**
+
+**Lesson 215** — Invariant guards belong before I/O boundaries, not inside them. `assertClaim` works because `len(causeIDs) == 0` fires before any HTTP call; no path reaches the network with empty causes. The structural rule: when an invariant violation makes a downstream operation semantically invalid (not merely incorrect), enforce it at the boundary as a typed gate before the operation begins. "Check then act" separated by I/O is a race; "gate then act" as a single typed function is structural enforcement. This pattern generalises: budget checks before compute, auth checks before data reads, schema validation before writes.
+
 ## 2026-03-29 — Iteration 405
 
 **Scout gap:** Deploy `populateFormFromJSON` [REQUIRED FIRST] + fix `runObserverReason` fallback cause (items 1–2 from state.md backlog)

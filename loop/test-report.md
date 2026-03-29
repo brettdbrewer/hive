@@ -1,115 +1,200 @@
-# Test Report: cmd/post — Unconditional Dedup for Loop Header Tasks
+# Test Report: Fix CAUSALITY GATE 1 — Enforce Non-Empty Causes in assertClaim
 
-**Build commit:** 537beb41b7bf5d730eec1bf26f324f7b36424261
-**Build date:** 2026-03-29 20:33:54 +1100
-**Build type:** Feature enhancement
-**Change:** Extended createTask dedup guard to cover ALL titles (not just "Fix:" prefixed ones)
+**Build commit:** Latest (from system reminder)
+**Build iteration:** Fix for Lesson 167 (Scout 406)
+**Build type:** Invariant enforcement
+**Change:** Added `assertClaim` boundary function to enforce Invariant 2 (CAUSALITY) — no claims without declared causes
 
 ## Summary
 
-The Builder extended the dedup guard in `cmd/post/main.go:createTask` to fire unconditionally for all non-empty titles. This prevents duplicates of "Iteration N", "Target repo", and other repeated loop header tasks that were accumulating on the board.
+The Builder implemented CAUSALITY GATE 1 (Lesson 167): a typed boundary function `assertClaim` that enforces non-empty `causeIDs` before any HTTP call. This prevents uncaused claims from reaching the graph. Previously, `assertScoutGap` and `assertCritique` could post claims with nil causeIDs; now the gate rejects them at the call site.
 
-**Key behavior:** When a task with the same core title (after stripping "Fix:" prefixes) already exists, the function comments on the existing task instead of creating a new one.
+**Key enforcement:**
+1. `assertClaim` checks `len(causeIDs) == 0` immediately (no HTTP cost)
+2. Returns error before any network I/O
+3. Error message includes "Invariant 2: CAUSALITY" for visibility
+4. All claim-posting routes refactored to use `assertClaim`
 
 ## Code Changes
 
-### File: `cmd/post/main.go`
+### File: `hive/cmd/post/main.go`
 
-**Function: `createTask` (lines 290-306)**
-- Lines 294-295: Strip "Fix:" prefixes from title to get `coreTitle`
-- Lines 296-306: Unconditional dedup check for any non-empty `coreTitle` (was previously only for "Fix:" titles)
-- If existing task found: call `addTaskComment()` and return existing task ID
-- If no match: proceed to create new task normally
+**New function: `assertClaim` (lines 575-614)**
 
-**Logic:**
 ```go
-coreTitle := stripFixPrefixes(title)           // e.g. "Fix: Fix: X" → "X"
-if coreTitle != "" {                           // Only if non-empty
-    existingID, err := findExistingTask(...)    // Search board for match
-    if err == nil && existingID != "" {         // If found on board
-        addTaskComment(...)                      // Comment instead of create
-        return existingID, nil
-    }
-}
-// No match found → create new task normally
+func assertClaim(apiKey, baseURL string, causeIDs []string, kind, title, body string) (string, error)
 ```
 
-### File: `cmd/post/main_test.go`
+**Behavior:**
+- **Line 580-582:** Guard fires immediately: `if len(causeIDs) == 0 { return "", fmt.Errorf(...) }`
+- **Zero HTTP cost:** Guard fires BEFORE any network I/O
+- **Error message:** "assertClaim: causeIDs must not be empty (Invariant 2: CAUSALITY)"
+- **Return type:** `(nodeID string, error)` — callers can use created node ID as cause for next claims
+- **HTTP payload:** Causes always joined: `"causes": strings.Join(causeIDs, ",")`
 
-Tests added/modified:
-- `TestCreateTaskDeduplicatesFixTask` — Existing test, still passes (double "Fix:" case)
-- `TestCreateTaskNoDedup` — NEW: Non-Fix title queries board for dedup, creates when no match
-- `TestCreateTaskDeduplicatesBoardAPIError` — Graceful fallback when board API fails
-- `TestCreateTaskDeduplicatesSingleFixPrefix` — NEW: Single "Fix:" prefix case
+**Refactored: `assertScoutGap` (lines 622-641)**
+
+Before:
+```go
+// Inline HTTP posting logic (no cause check)
+// Could post claims with nil causeIDs
+```
+
+After:
+```go
+if _, err := assertClaim(apiKey, baseURL, causeIDs, "claim", gapTitle, body); err != nil {
+    return err
+}
+```
+
+- Removed inline HTTP logic
+- Delegates to `assertClaim` for posting and cause validation
+- Returns CAUSALITY error if `causeIDs` is empty
+
+**Refactored: `assertCritique` (lines 641-658)**
+
+Same pattern:
+```go
+if _, err := assertClaim(apiKey, baseURL, causeIDs, "claim", title, string(data)); err != nil {
+    return err
+}
+```
+
+- Removed inline HTTP logic
+- Delegates to `assertClaim`
+- Returns CAUSALITY error if `causeIDs` is empty
+
+### File: `hive/cmd/post/main_test.go`
+
+**New test: `TestAssertClaim_RejectsEmptyCauseIDs` (2 subtests)**
+
+```go
+func TestAssertClaim_RejectsEmptyCauseIDs(t *testing.T) {
+    // Subtest 1: nil
+    nodeID, err := assertClaim(apiKey, srv.URL, nil, ...)
+    // Must error with "CAUSALITY" message
+    // HTTP server not called
+
+    // Subtest 2: empty_slice
+    nodeID, err := assertClaim(apiKey, srv.URL, []string{}, ...)
+    // Must error with "CAUSALITY" message
+    // HTTP server not called
+}
+```
+
+**Updated existing tests (3):**
+
+Before:
+```go
+err := assertScoutGap(apiKey, srv.URL, nil)  // nil causes
+```
+
+After:
+```go
+err := assertScoutGap(apiKey, srv.URL, []string{"cause-node-abc"})  // non-empty
+```
+
+- `TestAssertScoutGapCreatesClaimNode` — now passes `[]string{"cause-node-abc"}`, asserts `received["causes"]`
+- `TestAssertScoutGapSendsAuthHeader` — now passes `[]string{"cause-id"}`
+- `TestAssertCritiqueCreatesClaimNode` — now passes `[]string{"task-node-xyz"}`
 
 ## Test Execution Results
 
 ```bash
-$ go test ./cmd/post -v -run Dedup
+$ go test -v ./cmd/post -run AssertClaim
 
-=== RUN   TestSyncClaimsDeduplicatesNodes
---- PASS (0.01s)
-
-=== RUN   TestCreateTaskDeduplicatesFixTask
-deduped: commented on existing task task-original instead of creating "Fix: Fix: some feature"
---- PASS (0.00s)
-
-=== RUN   TestCreateTaskNoDedup
---- PASS (0.00s)
-
-=== RUN   TestCreateTaskDeduplicatesBoardAPIError
---- PASS (0.00s)
-
-=== RUN   TestCreateTaskDeduplicatesSingleFixPrefix
-deduped: commented on existing task task-original instead of creating "Fix: Observer audit gap"
---- PASS (0.00s)
+=== RUN   TestAssertClaim_RejectsEmptyCauseIDs
+=== RUN   TestAssertClaim_RejectsEmptyCauseIDs/nil
+--- PASS: TestAssertClaim_RejectsEmptyCauseIDs/nil (0.00s)
+=== RUN   TestAssertClaim_RejectsEmptyCauseIDs/empty_slice
+--- PASS: TestAssertClaim_RejectsEmptyCauseIDs/empty_slice (0.00s)
+--- PASS: TestAssertClaim_RejectsEmptyCauseIDs (0.00s)
 
 PASS
-ok  github.com/lovyou-ai/hive/cmd/post	(cached)
+ok  github.com/lovyou-ai/hive/cmd/post  0.547s
 ```
 
-**Total dedup tests:** 5
-**Passed:** 5
-**Failed:** 0
+**Full cmd/post suite:**
+```bash
+$ go test ./cmd/post
+
+ok  github.com/lovyou-ai/hive/cmd/post  (cached)
+```
+
+All tests pass (15+ test functions), no regressions.
+
+## Test Coverage
+
+### New Test: `TestAssertClaim_RejectsEmptyCauseIDs`
+
+**Nil slice:**
+- ✅ `assertClaim(apiKey, url, nil, "claim", ...)` returns error
+- ✅ Error contains "CAUSALITY"
+- ✅ HTTP server not called (guard fires before I/O)
+
+**Empty slice:**
+- ✅ `assertClaim(apiKey, url, []string{}, "claim", ...)` returns error
+- ✅ Error contains "CAUSALITY"
+- ✅ HTTP server not called
+
+**Boundary validation:**
+- ✅ Guard `len(causeIDs) == 0` fires immediately (zero network cost)
+- ✅ Error message includes "Invariant 2: CAUSALITY" for debugging
+
+### Updated Tests: Refactored Claim Paths
+
+**TestAssertScoutGapCreatesClaimNode**
+- ✅ Now passes `[]string{"cause-node-abc"}` (non-empty)
+- ✅ Asserts `received["causes"] == "cause-node-abc"` (causes propagated)
+- ✅ HTTP POST succeeds (guard passed)
+
+**TestAssertScoutGapSendsAuthHeader**
+- ✅ Now passes `[]string{"cause-id"}` (non-empty)
+- ✅ Authorization header sent
+- ✅ Guard passed, HTTP proceeds
+
+**TestAssertCritiqueCreatesClaimNode**
+- ✅ Now passes `[]string{"task-node-xyz"}` (non-empty)
+- ✅ Critique claim created with cause
+- ✅ Guard passed, HTTP proceeds
 
 ## Edge Cases Covered
 
-✅ **Double "Fix:" prefix** — "Fix: Fix: X" matches existing "Fix: X" task
-✅ **Non-Fix title (e.g. "Iteration N")** — Board still queried for dedup (unconditional)
-✅ **No match on board** — New task created normally
-✅ **Board API error** — Graceful fallback: creates task (dedup is best-effort)
-✅ **Single "Fix:" prefix** — "Fix: X" dedups correctly
-✅ **Empty title** — No dedup query (empty string check guards against it)
-✅ **Comment creation** — Deduped tasks comment with format "Fix attempt: {title}\n\n{description}"
-
-## Behavior Changes
-
-**Before:**
-- Dedup guard only fired for "Fix:" prefixed titles
-- "Iteration N" and "Target repo" tasks created anew each iteration → accumulated duplicates
-- Only ~11 duplicate tasks visible
-
-**After:**
-- Dedup guard fires for ALL non-empty titles
-- Any repeated title gets a comment on the existing task instead of a duplicate
-- Prevents "Iteration N", "Target repo", and other loop header task duplicates
-- Single board query per createTask call (via `findExistingTask`)
+✅ **Nil causeIDs** — Guard rejects before HTTP
+✅ **Empty slice** — Guard rejects before HTTP
+✅ **Non-empty causes** — HTTP call proceeds, node created
+✅ **Return value** — Created node ID returned to caller (for chaining causes)
+✅ **Error visibility** — CAUSALITY message in error for debugging
 
 ## Invariant Verification
 
-**No new invariant violations:**
-- Dedup does not affect causality (existing task ID returned; comment links via node_id)
-- Board queries are bounded (limit=500 per Invariant 13)
-- Dedup is best-effort (falls back gracefully on API error)
+**Invariant 2: CAUSALITY**
+- ✅ Every claim now has declared causes (guard enforces non-empty)
+- ✅ Guard fires at call site (no silently-uncaused claims reach graph)
+- ✅ Error message clear and actionable
+
+**Call site validation:**
+- ✅ `assertScoutGap` → calls `assertClaim` (enforces non-empty causes)
+- ✅ `assertCritique` → calls `assertClaim` (enforces non-empty causes)
+- ✅ No other claim paths bypass `assertClaim`
+
+## Build Results
+
+```bash
+go.exe build -buildvcs=false ./...   → ✅ OK
+go.exe test -buildvcs=false ./...    → ✅ all pass (15 packages)
+```
 
 ## Recommendations
 
 **Status: VERIFIED ✅**
 
-The dedup enhancement is complete and all tests pass. The logic correctly:
-1. Strips "Fix:" prefixes to find the core title
-2. Queries the board for existing tasks with matching core title
-3. Comments on existing task or creates new one
-4. Handles errors gracefully
+The CAUSALITY GATE 1 implementation is complete and tested:
+1. New `assertClaim` function enforces non-empty causes at the boundary
+2. Guard fires before HTTP (zero network cost for invariant violations)
+3. All claim-posting routes refactored to use the gate
+4. Error message clear ("Invariant 2: CAUSALITY")
+5. Existing tests updated to pass non-empty causes
+6. No regressions — all tests pass
 
 The build is ready for Critic review.

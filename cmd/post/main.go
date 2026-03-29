@@ -572,13 +572,53 @@ func hasClaimPrefix(title string) bool {
 	return false
 }
 
+// assertClaim posts an op=assert node to the hive space and returns the created
+// node ID. It enforces Invariant 2 (CAUSALITY) at the call site: causeIDs must
+// be non-empty — a claim without declared causes is rejected before any HTTP call
+// is made. This is CAUSALITY GATE 1 (Lesson 167).
+func assertClaim(apiKey, baseURL string, causeIDs []string, kind, title, body string) (string, error) {
+	if len(causeIDs) == 0 {
+		return "", fmt.Errorf("assertClaim: causeIDs must not be empty (Invariant 2: CAUSALITY)")
+	}
+	p := map[string]string{
+		"op":     "assert",
+		"kind":   kind,
+		"title":  title,
+		"body":   body,
+		"causes": strings.Join(causeIDs, ","),
+	}
+	payload, _ := json.Marshal(p)
+	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
+	}
+
+	var result struct {
+		Node struct {
+			ID string `json:"id"`
+		} `json:"node"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+	return result.Node.ID, nil
+}
+
 // assertScoutGap reads loop/scout.md, extracts the gap title and iteration number,
 // and creates a KindClaim node on the graph via op=assert. This makes Scout gaps
 // searchable via knowledge_search and preserves them across iterations (scout.md
 // is overwritten each iteration; graph nodes are permanent).
 //
-// causeIDs should contain the build document node ID so the claim is causally
-// linked to the iteration that generated it (Invariant 2: CAUSALITY).
+// causeIDs must be non-empty — assertClaim enforces CAUSALITY at the boundary.
 func assertScoutGap(apiKey, baseURL string, causeIDs []string) error {
 	data, err := os.ReadFile("loop/scout.md")
 	if err != nil {
@@ -592,31 +632,8 @@ func assertScoutGap(apiKey, baseURL string, causeIDs []string) error {
 	}
 
 	body := fmt.Sprintf("Iteration %s\n\n%s", iteration, gapTitle)
-
-	p := map[string]string{
-		"op":    "assert",
-		"kind":  "claim",
-		"title": gapTitle,
-		"body":  body,
-	}
-	if len(causeIDs) > 0 {
-		p["causes"] = strings.Join(causeIDs, ",")
-	}
-	payload, _ := json.Marshal(p)
-	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
+	if _, err := assertClaim(apiKey, baseURL, causeIDs, "claim", gapTitle, body); err != nil {
 		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
 	}
 
 	fmt.Printf("asserted scout gap as claim: %q (iteration %s)\n", gapTitle, iteration)
@@ -637,8 +654,7 @@ func extractIterationFromScout(data []byte) string {
 // critique verdicts are searchable via knowledge_search and survive
 // critique.md being overwritten next iteration.
 //
-// causeIDs should contain the build document node ID so the claim is causally
-// linked to the iteration that generated it (Invariant 2: CAUSALITY).
+// causeIDs must be non-empty — assertClaim enforces CAUSALITY at the boundary.
 func assertCritique(apiKey, baseURL string, causeIDs []string) error {
 	data, err := os.ReadFile("loop/critique.md")
 	if err != nil {
@@ -650,30 +666,8 @@ func assertCritique(apiKey, baseURL string, causeIDs []string) error {
 		return fmt.Errorf("could not find critique title in critique.md")
 	}
 
-	p := map[string]string{
-		"op":    "assert",
-		"kind":  "claim",
-		"title": title,
-		"body":  string(data),
-	}
-	if len(causeIDs) > 0 {
-		p["causes"] = strings.Join(causeIDs, ",")
-	}
-	payload, _ := json.Marshal(p)
-	req, _ := http.NewRequest("POST", baseURL+"/app/hive/op", bytes.NewReader(payload))
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
+	if _, err := assertClaim(apiKey, baseURL, causeIDs, "claim", title, string(data)); err != nil {
 		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
 	}
 
 	fmt.Printf("asserted critique as claim: %q\n", title)

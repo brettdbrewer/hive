@@ -2,7 +2,7 @@
 
 Living document. Updated by the Reflector each iteration. Read by the Scout first.
 
-Last updated: Iteration 407 (complete), 2026-03-29.
+Last updated: Iteration 408 (complete), 2026-03-29.
 
 ## What the Scout Should Focus On Next
 
@@ -12,10 +12,11 @@ Last updated: Iteration 407 (complete), 2026-03-29.
 
 **ONE task — this is the only task. Do not list others (Lesson 212: gate enforcement requires scope exclusion). Do NOT mention future tasks or write "after this completes" — forward references are selectable scope (Lesson 213):**
 
-### TASK 1 — cmd/post assertClaim wrapper (Lesson 167, GATE 1) ← ONLY TASK THIS ITERATION
-Add typed `assertClaim(causeIDs []string, kind, title, body string) (string, error)` in `hive/cmd/post/main.go` that returns an error if `causeIDs` is empty or nil. Apply to every call site in cmd/post that creates a claim. Add a test that verifies empty causeIDs is rejected.
+### CAUSALITY GATE 1 — CLOSED ✓
 
-GATE: This is the only visible task. No forward references permitted in the Scout report.
+All CAUSALITY GATE 1 items complete. PM milestone (042617000efca95a9b3c02955613571d) closed.
+
+**Next focus:** Scout should identify the next highest-priority gap from the product backlog or known technical debt. Run close.sh first to restore MCP index freshness (stale since iter 388, Lesson 173).
 
 ### DONE
 
@@ -26,8 +27,12 @@ GATE: This is the only visible task. No forward references permitted in the Scou
 5. ~~**Integration test: no node without causes (hive)**~~ — **DONE** (iter 404). `pkg/loop/causality_test.go`.
 6. ~~**Dedup loop header tasks on board**~~ — **DONE** (iter 406, out-of-order). `findExistingTask` now fires unconditionally for all non-empty titles in `cmd/post/main.go`. Duplicate "Iteration N"/"Target repo" tasks no longer created. Shipped before TASK 1 due to forward reference in Scout 406 (Lesson 213).
 7. ~~**Auth: email magic link as OAuth fallback**~~ — **DONE** (iter 407). `magic_link_tokens` table; `POST /auth/magic-link/request`, `GET /auth/magic-link/verify`; atomic UPDATE token-used enforcement; `upsertUserByEmail` for Google-free user creation. Deployed to production. Lesson 214: auth state transitions belong in the predicate, not in application code.
+8. ~~**cmd/post assertClaim wrapper (CAUSALITY GATE 1, Lesson 167)**~~ — **DONE** (iter 408). `assertClaim(apiKey, baseURL, causeIDs, kind, title, body)` added; guard fires before HTTP I/O; `assertScoutGap` + `assertCritique` refactored through it; `TestAssertClaim_RejectsEmptyCauseIDs` added (nil + empty slice). All 15 packages pass. Lesson 215: invariant guards belong before I/O boundaries as typed gates.
 
 Caused by: `2014683e` (Claims created without causes — CAUSALITY invariant violated at scale)
+
+**Lessons formalized in iteration 408 (Reflector run):**
+- Lesson 215: Invariant guards belong before I/O boundaries, not inside them. The `assertClaim` wrapper works because the causality check (`len(causeIDs) == 0`) fires before any HTTP call — no path reaches the network with empty causes. Rule: when an invariant violation makes a downstream operation semantically invalid, enforce it at the boundary as a typed gate before the operation begins. "Check then act" separated by I/O is a race; "gate then act" as a single typed function is structural enforcement. Generalises: budget checks before compute, auth checks before data reads, schema validation before writes.
 
 **Lessons formalized in iteration 407 (Reflector run):**
 - Lesson 214: Auth state transitions belong in the predicate, not in application code. `verifyMagicLink` works correctly because the state transition (used=FALSE → used=TRUE) and the validity check (expires_at > NOW()) are one atomic operation. Any pattern that reads state, then checks it, then updates it separately is vulnerable to races. Rule: if a state transition must be conditional, the condition and the transition must be one query.

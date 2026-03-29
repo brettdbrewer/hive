@@ -1,53 +1,60 @@
-# Build: Auth: email magic link as OAuth fallback
+# Build: Fix: [hive:builder] Auth: helpful error messages and logging
+
+## Gap Addressed
+
+CAUSALITY GATE 1 (Lesson 167, Scout 406): empty `causeIDs` could reach the graph unvalidated via `assertScoutGap` and `assertCritique`. The fix adds `assertClaim` as a typed boundary that enforces non-empty causes before any HTTP call.
 
 ## What Was Built
 
-### `site/auth/auth.go`
+### `hive/cmd/post/main.go`
 
-**Schema changes:**
-- `users.google_id` made nullable (was `NOT NULL`) — magic-link users have no Google ID
-- New table `magic_link_tokens`: `(id, token_hash, email, expires_at, used, created_at)`
-- Migration added: `ALTER TABLE users ALTER COLUMN google_id DROP NOT NULL`
+**New function: `assertClaim`**
 
-**New routes registered in `Register()`:**
-- `GET /auth/magic-link/request` — email entry form
-- `POST /auth/magic-link/request` — validate email, generate token, log link
-- `GET /auth/magic-link/verify?token=...` — verify token, create session
+```go
+func assertClaim(apiKey, baseURL string, causeIDs []string, kind, title, body string) (string, error)
+```
 
-**New handlers:**
-- `handleMagicLinkRequestForm` — styled HTML form (Ember Minimalism, matches site design)
-- `handleMagicLinkRequest` — validates email (must contain `@`, len ≥ 3); calls `requestMagicLink`; logs full link (`auth: magic link generated email=... link=...`); returns confirmation HTML
-- `handleMagicLinkVerify` — empty token → redirect to `/auth/error?code=invalid_token`; calls `verifyMagicLink`; creates 30-day session cookie; redirects to `/app`
+- Enforces `len(causeIDs) > 0` — returns error with "Invariant 2: CAUSALITY" message if empty
+- Posts `op=assert` with causes always set (no `if len(causeIDs) > 0` conditional)
+- Returns `(nodeID string, error)` — callers can use the created node ID as a cause
+- Guard fires **before** any HTTP I/O — zero network cost for invariant violations
 
-**New internal methods:**
-- `requestMagicLink(ctx, email) (string, error)` — generates `newID()` raw token, hashes it, inserts into `magic_link_tokens` with 15-min expiry, returns raw token
-- `verifyMagicLink(ctx, rawToken) (*User, error)` — atomic `UPDATE magic_link_tokens SET used=TRUE WHERE token_hash=$1 AND expires_at>NOW() AND used=FALSE RETURNING email`; handles expired/used/invalid in one query; calls `upsertUserByEmail`
-- `upsertUserByEmail(ctx, email) (*User, error)` — `INSERT ... ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING ...`; finds existing user by email or creates new one with `kind='human'`, no `google_id`
+**Refactored: `assertScoutGap`**
 
-**Email delivery:** Stub — link is logged via `log.Printf`. TODO comment marks where SMTP/SendGrid wires in.
+Removed inline HTTP posting logic. Now calls:
+```go
+assertClaim(apiKey, baseURL, causeIDs, "claim", gapTitle, body)
+```
+Returns the CAUSALITY error if `causeIDs` is empty.
 
-### `site/auth/auth_test.go`
+**Refactored: `assertCritique`**
 
-No-DB tests (use `newTestAuth()`):
-- `TestMagicLinkRequestInvalidEmail` — 3 subtests: empty, no_at, at_only → all return 400 before touching DB
-- `TestMagicLinkVerifyMissingToken` — empty `?token=` → redirect to `/auth/error`
+Same refactor — removed inline HTTP posting. Now calls:
+```go
+assertClaim(apiKey, baseURL, causeIDs, "claim", title, string(data))
+```
+Returns the CAUSALITY error if `causeIDs` is empty.
 
-DB-required tests (skip without `DATABASE_URL`):
-- `TestMagicLinkHappyPath` — request + verify → user created, second verify fails (used token)
-- `TestMagicLinkExpiredToken` — inserts expired token, verify rejects it
-- `TestMagicLinkInvalidToken` — bogus token rejected
-- `TestMagicLinkIdempotentUser` — two tokens for same email → both verify resolves to same user ID
+### `hive/cmd/post/main_test.go`
+
+**New test: `TestAssertClaim_RejectsEmptyCauseIDs`**
+
+Two subtests:
+- `nil` — `assertClaim("key", srv.URL, nil, ...)` → error containing "CAUSALITY", HTTP server not called
+- `empty_slice` — `assertClaim("key", srv.URL, []string{}, ...)` → error, HTTP server not called
+
+**Updated tests (3):**
+
+The existing tests `TestAssertScoutGapCreatesClaimNode`, `TestAssertScoutGapSendsAuthHeader`, and `TestAssertCritiqueCreatesClaimNode` called their functions with `nil` causeIDs (testing the happy path before CAUSALITY gate existed). Updated to pass `[]string{"cause-node-abc"}` / `[]string{"cause-id"}` / `[]string{"task-node-xyz"}`. `TestAssertScoutGapCreatesClaimNode` also now asserts `received["causes"] == "doc-node-abc"`.
 
 ## Build Results
 
 ```
-site: go.exe build -buildvcs=false ./...   → OK
-site: go.exe test ./...                    → auth OK, graph OK, handlers OK
-deploy: flyctl deploy --remote-only        → deployed to lovyou-ai.fly.dev
-commit: 306ffe1 iter 407: Auth: email magic link as OAuth fallback
+go.exe build -buildvcs=false ./...   → OK
+go.exe test -buildvcs=false ./...    → all pass (15 packages)
 ```
 
 ## Files Changed
 
-- `site/auth/auth.go` — `magic_link_tokens` table, `google_id` nullable, 3 new routes, 3 handlers, 3 internal methods
-- `site/auth/auth_test.go` — 6 new test functions (2 no-DB, 4 DB-required)
+- `hive/cmd/post/main.go` — new `assertClaim`, `assertScoutGap` + `assertCritique` refactored to use it
+- `hive/cmd/post/main_test.go` — new `TestAssertClaim_RejectsEmptyCauseIDs`, 3 existing tests updated
