@@ -210,6 +210,13 @@ func (l *Loop) Run(ctx context.Context) Result {
 		// 2.5. PROCESS task commands from the response.
 		l.processTaskCommands(response)
 
+		// 2.6. PROCESS /health command from the response.
+		if cmd := parseHealthCommand(response); cmd != nil {
+			if err := l.emitHealthReport(cmd); err != nil {
+				fmt.Printf("warning: /health command failed: %v\n", err)
+			}
+		}
+
 		// 3. CHECK stopping conditions in the response.
 		if stop := l.checkResponse(ctx, response, iteration); stop != nil {
 			return *stop
@@ -269,7 +276,8 @@ func (l *Loop) observe(ctx context.Context) (string, error) {
 		}
 	}
 
-	return sb.String(), nil
+	// Enrich observation with pre-computed health metrics for SysMon.
+	return l.enrichHealthObservation(sb.String()), nil
 }
 
 // buildPrompt constructs the reasoning prompt for this iteration.
