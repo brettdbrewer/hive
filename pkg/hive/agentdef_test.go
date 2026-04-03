@@ -64,8 +64,8 @@ func TestAgentDefDefaults(t *testing.T) {
 func TestStarterAgents(t *testing.T) {
 	agents := StarterAgents("TestHuman")
 
-	if len(agents) != 4 {
-		t.Fatalf("got %d agents, want 4", len(agents))
+	if len(agents) != 5 {
+		t.Fatalf("got %d agents, want 5", len(agents))
 	}
 
 	names := map[string]bool{}
@@ -87,7 +87,7 @@ func TestStarterAgents(t *testing.T) {
 	}
 
 	// Verify expected roles exist.
-	expectedRoles := []string{"strategist", "planner", "implementer", "guardian"}
+	expectedRoles := []string{"guardian", "sysmon", "strategist", "planner", "implementer"}
 	for _, role := range expectedRoles {
 		if !roles[role] {
 			t.Errorf("missing expected role: %s", role)
