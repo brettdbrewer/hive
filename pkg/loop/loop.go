@@ -140,6 +140,10 @@ type Loop struct {
 	// Only accessed from the Run() goroutine.
 	ctoCooldowns *CTOCooldowns
 	ctoConfig    CTOConfig
+
+	// spawnerState is populated in New() when role == "spawner".
+	// Only accessed from the Run() goroutine.
+	spawnerState *spawnerState
 }
 
 // New creates a new agentic loop.
@@ -170,6 +174,10 @@ func New(cfg Config) (*Loop, error) {
 	if string(cfg.Agent.Role()) == "cto" {
 		l.ctoCooldowns = NewCTOCooldowns()
 		l.ctoConfig = LoadCTOConfig()
+	}
+
+	if string(cfg.Agent.Role()) == "spawner" {
+		l.spawnerState = newSpawnerState()
 	}
 
 	return l, nil
@@ -283,6 +291,32 @@ func (l *Loop) Run(ctx context.Context) Result {
 			}
 		}
 
+		// 2.9. PROCESS /spawn command from the response (Spawner only).
+		if l.spawnerState != nil {
+			if cmd := parseSpawnCommand(response); cmd != nil {
+				spawnCtx := l.buildSpawnContext()
+				if err := validateSpawnCommand(cmd, spawnCtx); err != nil {
+					fmt.Printf("[%s] /spawn rejected: %v\n", l.agent.Name(), err)
+				} else if err := l.emitRoleProposed(cmd); err != nil {
+					fmt.Printf("[%s] /spawn emit failed: %v\n", l.agent.Name(), err)
+				}
+			}
+		}
+
+		// 2.10. PROCESS /approve and /reject commands from the response (Guardian only).
+		if string(l.agent.Role()) == "guardian" {
+			if cmd := parseApproveCommand(response); cmd != nil {
+				if err := l.emitRoleApproved(cmd); err != nil {
+					fmt.Printf("[%s] /approve emit failed: %v\n", l.agent.Name(), err)
+				}
+			}
+			if cmd := parseRejectCommand(response); cmd != nil {
+				if err := l.emitRoleRejected(cmd); err != nil {
+					fmt.Printf("[%s] /reject emit failed: %v\n", l.agent.Name(), err)
+				}
+			}
+		}
+
 		// 3. CHECK stopping conditions in the response.
 		if stop := l.checkResponse(ctx, response, iteration); stop != nil {
 			return *stop
@@ -327,6 +361,11 @@ func (l *Loop) observe(ctx context.Context) (string, error) {
 	l.pendingEvents = nil
 	l.mu.Unlock()
 
+	// Update spawner cross-iteration state from this iteration's events.
+	if l.spawnerState != nil {
+		l.spawnerState.update(pending)
+	}
+
 	var sb strings.Builder
 	sb.WriteString("## Recent Events\n")
 	for _, ev := range events {
@@ -348,6 +387,8 @@ func (l *Loop) observe(ctx context.Context) (string, error) {
 	enriched = l.enrichBudgetObservation(enriched, l.iteration)
 	// Enrich observation with leadership briefing for CTO.
 	enriched = l.enrichCTOObservation(enriched)
+	// Enrich observation with spawn context for Spawner.
+	enriched = l.enrichSpawnObservation(enriched)
 	return enriched, nil
 }
 
