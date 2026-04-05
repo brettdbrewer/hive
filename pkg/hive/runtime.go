@@ -26,6 +26,7 @@ import (
 	"github.com/lovyou-ai/hive/pkg/loop"
 	"github.com/lovyou-ai/hive/pkg/membrane"
 	"github.com/lovyou-ai/hive/pkg/resources"
+	"github.com/lovyou-ai/hive/pkg/telemetry"
 	"github.com/lovyou-ai/work"
 )
 
@@ -50,6 +51,9 @@ type Runtime struct {
 	// Budget registry for cross-agent budget visibility and mutation.
 	budgetRegistry *resources.BudgetRegistry
 
+	// Telemetry writer (optional, nil when no postgres available).
+	telemetryWriter *telemetry.Writer
+
 	// Options.
 	autoApprove bool
 	repoPath    string
@@ -64,6 +68,9 @@ type Config struct {
 	AutoApprove bool   // --yes flag
 	RepoPath    string // --repo flag (for Implementer's Operate)
 	Keepalive   bool   // --keepalive flag: agents block on bus instead of quiescing
+
+	// TelemetryWriter snapshots agent and hive state to postgres. Optional.
+	TelemetryWriter *telemetry.Writer
 }
 
 // New creates a new hive Runtime.
@@ -97,17 +104,18 @@ func New(ctx context.Context, cfg Config) (*Runtime, error) {
 	tasks := work.NewTaskStore(cfg.Store, factory, signer)
 
 	return &Runtime{
-		store:       cfg.Store,
-		actors:      cfg.Actors,
-		graph:       g,
-		humanID:     cfg.HumanID,
-		signer:      signer,
-		factory:     factory,
-		convID:      convID,
-		tasks:       tasks,
-		autoApprove: cfg.AutoApprove,
-		repoPath:    cfg.RepoPath,
-		keepalive:   cfg.Keepalive,
+		store:           cfg.Store,
+		actors:          cfg.Actors,
+		graph:           g,
+		humanID:         cfg.HumanID,
+		signer:          signer,
+		factory:         factory,
+		convID:          convID,
+		tasks:           tasks,
+		autoApprove:     cfg.AutoApprove,
+		repoPath:        cfg.RepoPath,
+		keepalive:       cfg.Keepalive,
+		telemetryWriter: cfg.TelemetryWriter,
 	}, nil
 }
 
@@ -166,6 +174,11 @@ func (r *Runtime) Run(ctx context.Context, seedIdea string) error {
 	// Create the budget registry for cross-agent visibility.
 	r.budgetRegistry = resources.NewBudgetRegistry()
 
+	// Wire budget registry into telemetry writer now that it exists.
+	if r.telemetryWriter != nil {
+		r.telemetryWriter.SetBudgetRegistry(r.budgetRegistry)
+	}
+
 	// Build loop configs for all agents.
 	configs := make([]loop.Config, 0, len(r.defs))
 	for _, def := range r.defs {
@@ -181,6 +194,17 @@ func (r *Runtime) Run(ctx context.Context, seedIdea string) error {
 		}
 		agentBudget := resources.NewBudget(budgetCfg)
 		r.budgetRegistry.Register(def.Name, agentBudget, def.EffectiveMaxIterations())
+
+		// Register agent with telemetry writer.
+		if r.telemetryWriter != nil {
+			r.telemetryWriter.RegisterAgent(telemetry.AgentRegistration{
+				Name:          def.Name,
+				Role:          def.Role,
+				Model:         def.Model,
+				Agent:         agent,
+				MaxIterations: def.EffectiveMaxIterations(),
+			})
+		}
 
 		cfg := loop.Config{
 			Agent:          agent,
@@ -201,12 +225,22 @@ func (r *Runtime) Run(ctx context.Context, seedIdea string) error {
 			OnIteration: func(iteration int, response string) {
 				fmt.Fprintf(os.Stderr, "[%s] iteration %d (%d chars)\n",
 					def.Name, iteration, len(response))
+				if r.telemetryWriter != nil {
+					r.telemetryWriter.RecordResponse(def.Name, response)
+				}
 			},
 		}
 		configs = append(configs, cfg)
 	}
 
 	fmt.Fprintf(os.Stderr, "\nStarting %d agents...\n", len(configs))
+
+	// Start telemetry writer and event stream capture before agents run.
+	if r.telemetryWriter != nil {
+		go r.telemetryWriter.Start(ctx)
+		r.telemetryWriter.SubscribeToBus(r.graph.Bus())
+		fmt.Fprintf(os.Stderr, "Telemetry: writer started (%d agents registered)\n", r.telemetryWriter.Agents())
+	}
 
 	// Run all agents concurrently.
 	results := loop.RunConcurrent(ctx, configs)

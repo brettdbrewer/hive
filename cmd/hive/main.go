@@ -43,6 +43,7 @@ import (
 	"github.com/lovyou-ai/hive/pkg/hive"
 	"github.com/lovyou-ai/hive/pkg/registry"
 	"github.com/lovyou-ai/hive/pkg/runner"
+	"github.com/lovyou-ai/hive/pkg/telemetry"
 )
 
 func main() {
@@ -746,6 +747,14 @@ func runLegacy(humanName, idea, dsn string, autoApprove bool, repoPath string, k
 	}
 
 	if pool != nil {
+		if err := telemetry.EnsureTables(ctx, pool); err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: telemetry tables: %v (continuing without telemetry)\n", err)
+		} else {
+			fmt.Fprintln(os.Stderr, "Telemetry: tables ready")
+		}
+	}
+
+	if pool != nil {
 		fmt.Fprintln(os.Stderr, "WARNING: CLI key derivation is insecure for persistent Postgres stores.")
 	}
 	humanID, err := registerHuman(actors, humanName)
@@ -761,13 +770,34 @@ func runLegacy(humanName, idea, dsn string, autoApprove bool, repoPath string, k
 		repoPath = "."
 	}
 
+	// Create telemetry writer if postgres is available.
+	// The writer gets its own small pool (max 3 conns) so it never competes
+	// with agent goroutines for connections on the shared store pool.
+	var tw *telemetry.Writer
+	if pool != nil {
+		cfg, cfgErr := pgxpool.ParseConfig(dsn)
+		if cfgErr != nil {
+			return fmt.Errorf("telemetry pool config: %w", cfgErr)
+		}
+		cfg.MaxConns = 3
+		telPool, telErr := pgxpool.NewWithConfig(ctx, cfg)
+		if telErr != nil {
+			return fmt.Errorf("telemetry pool: %w", telErr)
+		}
+		defer telPool.Close()
+		tw = telemetry.NewWriter(telPool, s, nil) // budgetRegistry wired in Runtime.Run()
+		pruner := telemetry.NewPruner(telPool)
+		go pruner.Start(ctx)
+	}
+
 	rt, err := hive.New(ctx, hive.Config{
-		Store:       s,
-		Actors:      actors,
-		HumanID:     humanID,
-		AutoApprove: autoApprove,
-		RepoPath:    repoPath,
-		Keepalive:   keepalive,
+		Store:           s,
+		Actors:          actors,
+		HumanID:         humanID,
+		AutoApprove:     autoApprove,
+		RepoPath:        repoPath,
+		Keepalive:       keepalive,
+		TelemetryWriter: tw,
 	})
 	if err != nil {
 		return fmt.Errorf("runtime: %w", err)
