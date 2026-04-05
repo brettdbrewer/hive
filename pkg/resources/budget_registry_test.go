@@ -193,6 +193,45 @@ func TestConcurrentAccess(t *testing.T) {
 	}
 }
 
+func TestSetAgentState_NonexistentAgent(t *testing.T) {
+	reg := NewBudgetRegistry()
+	// Should be a no-op, not panic.
+	reg.SetAgentState("nonexistent", "Stopped")
+
+	snap := reg.Snapshot()
+	if len(snap) != 0 {
+		t.Fatalf("snapshot len = %d, want 0", len(snap))
+	}
+}
+
+func TestRegisterOverwrite(t *testing.T) {
+	reg := NewBudgetRegistry()
+	reg.Register("agent", NewBudget(BudgetConfig{MaxIterations: 100}), 100)
+	reg.Register("agent", NewBudget(BudgetConfig{MaxIterations: 200}), 200)
+
+	snap := reg.Snapshot()
+	if len(snap) != 1 {
+		t.Fatalf("snapshot len = %d, want 1", len(snap))
+	}
+	if snap[0].MaxIterations != 200 {
+		t.Errorf("MaxIterations = %d, want 200 (overwritten)", snap[0].MaxIterations)
+	}
+}
+
+func TestTotalPool_Empty(t *testing.T) {
+	reg := NewBudgetRegistry()
+	if got := reg.TotalPool(); got != 0 {
+		t.Errorf("TotalPool = %d, want 0 for empty registry", got)
+	}
+}
+
+func TestTotalUsed_Empty(t *testing.T) {
+	reg := NewBudgetRegistry()
+	if got := reg.TotalUsed(); got != 0 {
+		t.Errorf("TotalUsed = %d, want 0 for empty registry", got)
+	}
+}
+
 func TestBudget_SetMaxIterations(t *testing.T) {
 	b := NewBudget(BudgetConfig{MaxIterations: 100})
 	if got := b.MaxIterations(); got != 100 {
