@@ -153,6 +153,10 @@ type Loop struct {
 	// spawnerState is populated in New() when role == "spawner".
 	// Only accessed from the Run() goroutine.
 	spawnerState *spawnerState
+
+	// reviewerState is populated in New() when role == "reviewer".
+	// Only accessed from the Run() goroutine.
+	reviewerState *reviewerState
 }
 
 // New creates a new agentic loop.
@@ -187,6 +191,10 @@ func New(cfg Config) (*Loop, error) {
 
 	if string(cfg.Agent.Role()) == "spawner" {
 		l.spawnerState = newSpawnerState()
+	}
+
+	if string(cfg.Agent.Role()) == "reviewer" {
+		l.reviewerState = newReviewerState()
 	}
 
 	return l, nil
@@ -312,7 +320,29 @@ func (l *Loop) Run(ctx context.Context) Result {
 			}
 		}
 
-		// 2.10. PROCESS /approve and /reject commands from the response (Guardian only).
+		// 2.10. PROCESS /review command from the response (Reviewer only).
+		if l.reviewerState != nil {
+			if cmd := parseReviewCommand(response); cmd != nil {
+				if err := validateReviewCommand(cmd, l.iteration); err != nil {
+					fmt.Printf("[%s] /review rejected: %v\n", l.agent.Name(), err)
+				} else if l.reviewerState.shouldEscalate(cmd.TaskID) {
+					fmt.Printf("[%s] review cycle limit reached for %s, escalating\n",
+						l.agent.Name(), cmd.TaskID)
+				} else {
+					if err := l.emitCodeReview(cmd); err != nil {
+						fmt.Printf("[%s] /review emit failed: %v\n", l.agent.Name(), err)
+					} else {
+						// Record directly — own events are filtered by onEvent()
+						// (ev.Source() == l.agent.ID() → skip), so the bus-driven
+						// update() path never sees our own reviews.
+						l.reviewerState.recordReview(
+							cmd.TaskID, cmd.Verdict, cmd.Issues, l.iteration)
+					}
+				}
+			}
+		}
+
+		// 2.11. PROCESS /approve and /reject commands from the response (Guardian only).
 		if string(l.agent.Role()) == "guardian" {
 			if cmd := parseApproveCommand(response); cmd != nil {
 				if err := l.emitRoleApproved(cmd); err != nil {
@@ -374,6 +404,10 @@ func (l *Loop) observe(ctx context.Context) (string, error) {
 	if l.spawnerState != nil {
 		l.spawnerState.update(pending)
 	}
+	// Update reviewer cross-iteration state from this iteration's events.
+	if l.reviewerState != nil {
+		l.reviewerState.update(pending)
+	}
 
 	var sb strings.Builder
 	sb.WriteString("## Recent Events\n")
@@ -398,6 +432,8 @@ func (l *Loop) observe(ctx context.Context) (string, error) {
 	enriched = l.enrichCTOObservation(enriched)
 	// Enrich observation with spawn context for Spawner.
 	enriched = l.enrichSpawnObservation(enriched)
+	// Enrich observation with code review context for Reviewer.
+	enriched = l.enrichReviewObservation(enriched)
 	// Enrich observation with institutional knowledge for ALL agents.
 	enriched = l.enrichKnowledgeObservation(enriched)
 	return enriched, nil
