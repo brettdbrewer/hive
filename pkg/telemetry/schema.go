@@ -297,6 +297,22 @@ func EnsureTables(ctx context.Context, pool *pgxpool.Pool) error {
 	const migrations = `
 ALTER TABLE telemetry_agent_snapshots ADD COLUMN IF NOT EXISTS last_event_at TIMESTAMPTZ;
 ALTER TABLE telemetry_phases ADD COLUMN IF NOT EXISTS exit_criteria TEXT;
+
+-- Backfill exit_criteria for phases seeded before this column existed.
+-- Only updates rows where exit_criteria is NULL (won't clobber manual edits).
+UPDATE telemetry_phases SET exit_criteria = v.criteria
+FROM (VALUES
+    (0, 'All foundation agents coordinating via events and tasks.'),
+    (1, 'SysMon emitting health reports. Allocator adjusting budgets.'),
+    (2, 'CTO making architecture decisions. Reviewer gating code.'),
+    (3, 'Growth loop completes: gap → propose → approve → budget → spawn.'),
+    (4, 'At least 3 Tier B roles spawned organically via growth loop.'),
+    (5, 'Integrator deploys with trust > 0.7, Reviewer approved, Tester passed.'),
+    (6, 'Business operations running autonomously.'),
+    (7, 'Governance proposals made and enacted by agent + human constituencies.'),
+    (8, 'All emergent roles formalized with ROLES.md + prompt + persona.')
+) AS v(phase, criteria)
+WHERE telemetry_phases.phase = v.phase AND telemetry_phases.exit_criteria IS NULL;
 `
 	if _, err := pool.Exec(ctx, migrations); err != nil {
 		return fmt.Errorf("telemetry migrations: %w", err)
