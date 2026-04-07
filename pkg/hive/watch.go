@@ -159,6 +159,8 @@ func (r *Runtime) spawnDynamicAgent(ctx context.Context, proposal event.RoleProp
 			Model:         def.Model,
 			Agent:         agent,
 			MaxIterations: def.EffectiveMaxIterations(),
+			WatchPatterns: def.WatchPatterns,
+			CanOperate:    def.CanOperate,
 		})
 	}
 
