@@ -83,45 +83,70 @@ func (r *Runtime) EmitSiteOp(ctx context.Context, op runner.OpEvent) error {
 	}
 }
 
+// intendPayload holds the parsed fields from an intend op's JSON payload.
+type intendPayload struct {
+	Desc     string
+	Priority work.TaskPriority
+}
+
+// parseIntendPayload extracts description, body, and priority from a raw
+// JSON payload. When both Description and Body are present, they are
+// combined so the full content is preserved (TaskStore.Create accepts a
+// single description string). Priority is validated against the known
+// constants; invalid values are replaced with DefaultPriority.
+func parseIntendPayload(raw json.RawMessage) intendPayload {
+	var result intendPayload
+	if len(raw) > 0 {
+		var p struct {
+			Description string `json:"description"`
+			Body        string `json:"body"`
+			Priority    string `json:"priority"`
+		}
+		if json.Unmarshal(raw, &p) == nil {
+			switch {
+			case p.Description != "" && p.Body != "":
+				result.Desc = p.Description + "\n\n" + p.Body
+			case p.Description != "":
+				result.Desc = p.Description
+			default:
+				result.Desc = p.Body
+			}
+			if p.Priority != "" {
+				result.Priority = work.TaskPriority(p.Priority)
+			}
+		}
+	}
+
+	// Validate and default priority.
+	if result.Priority != "" {
+		switch result.Priority {
+		case work.PriorityLow, work.PriorityMedium, work.PriorityHigh, work.PriorityCritical:
+			// valid
+		default:
+			log.Printf("[dispatch] ignoring invalid priority %q, using default", result.Priority)
+			result.Priority = ""
+		}
+	}
+	if result.Priority == "" {
+		result.Priority = work.DefaultPriority
+	}
+	return result
+}
+
 // dispatchIntend creates a task on the eventgraph from a site "intend" op.
 func (r *Runtime) dispatchIntend(op runner.OpEvent) error {
 	title := op.NodeTitle
 	if title == "" {
 		title = "Site task (no title)"
 	}
-	// Extract description and priority from payload if available.
-	var desc string
-	var priority string
-	if len(op.Payload) > 0 {
-		var p struct {
-			Description string `json:"description"`
-			Body        string `json:"body"`
-			Priority    string `json:"priority"`
-		}
-		if json.Unmarshal(op.Payload, &p) == nil {
-			desc = p.Description
-			if desc == "" {
-				desc = p.Body
-			}
-			priority = p.Priority
-		}
-	}
+
+	parsed := parseIntendPayload(op.Payload)
 
 	causes, err := r.headCauses()
 	if err != nil {
 		return err
 	}
-	var priorityArgs []work.TaskPriority
-	if priority != "" {
-		p := work.TaskPriority(priority)
-		switch p {
-		case work.PriorityLow, work.PriorityMedium, work.PriorityHigh, work.PriorityCritical:
-			priorityArgs = append(priorityArgs, p)
-		default:
-			log.Printf("[dispatch] ignoring invalid priority %q", priority)
-		}
-	}
-	task, err := r.tasks.Create(r.humanID, title, desc, causes, r.convID, priorityArgs...)
+	task, err := r.tasks.Create(r.humanID, title, parsed.Desc, causes, r.convID, parsed.Priority)
 	if err != nil {
 		return fmt.Errorf("dispatch intend: %w", err)
 	}

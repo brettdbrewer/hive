@@ -95,6 +95,14 @@ type Event struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
+// Webhook protocol constants. These match the site's OpEvent wire format
+// (lowercase), which is distinct from eventgraph's ActorType (capitalized).
+const (
+	opIntend      = "intend"
+	actorKindHuman = "human"
+	eventIDPrefix  = "idea-file-"
+)
+
 // validPriorities is the set of accepted priority values.
 var validPriorities = map[work.TaskPriority]bool{
 	work.PriorityLow:      true,
@@ -105,7 +113,9 @@ var validPriorities = map[work.TaskPriority]bool{
 
 // BuildEvent constructs an Event from Options.
 // Title defaults to TitleFromFilename(opts.SourceFile) when empty.
-// Actor is passed through as-is; callers are responsible for supplying a value.
+// Actor is a display name used for logging only — dispatchIntend uses the
+// configured human operator's ActorID for task attribution, not this field.
+// ActorKind is always "human" (the webhook protocol's lowercase convention).
 // Returns an error if Priority is non-empty and not one of: low, medium, high, critical.
 func BuildEvent(opts Options) (Event, error) {
 	if opts.Priority != "" && !validPriorities[work.TaskPriority(opts.Priority)] {
@@ -122,11 +132,11 @@ func BuildEvent(opts Options) (Event, error) {
 		return Event{}, fmt.Errorf("marshal payload: %w", err)
 	}
 	return Event{
-		ID:        "idea-file-" + uuid.New().String(),
+		ID:        eventIDPrefix + uuid.New().String(),
 		NodeTitle: title,
-		Op:        "intend",
+		Op:        opIntend,
 		Actor:     opts.Actor,
-		ActorKind: "human",
+		ActorKind: actorKindHuman,
 		Payload:   payloadJSON,
 	}, nil
 }
