@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -189,6 +190,28 @@ func TestWarmStartIntegration_TaskRecovery(t *testing.T) {
 
 		tasks := work.NewTaskStore(s, factory, signer)
 
+		// Register cleanup so test tasks are marked done even if assertions fatal.
+		t.Cleanup(func() {
+			head, err := s.Head()
+			if err != nil || !head.IsSome() {
+				t.Logf("cleanup: no head event, skipping task cleanup")
+				return
+			}
+			causes := []types.EventID{head.Unwrap().ID()}
+			if err := tasks.WaiveArtifact(humanID, taskID, "test cleanup — no deliverable", causes, convID); err != nil {
+				if !strings.Contains(err.Error(), "already") {
+					t.Errorf("cleanup: waive artifact: %v", err)
+				}
+			}
+			if err := tasks.Complete(humanID, taskID, "test cleanup", causes, convID); err != nil {
+				if !strings.Contains(err.Error(), "already") {
+					t.Errorf("cleanup: complete task: %v", err)
+				}
+			} else {
+				t.Logf("cleanup: marked task %s as completed", taskID)
+			}
+		})
+
 		// ── Check 1: pending tasks still present ──────────────────────────
 
 		allTasks, err := tasks.List(100)
@@ -285,6 +308,7 @@ func TestWarmStartIntegration_TaskRecovery(t *testing.T) {
 		} else {
 			t.Logf("PASS: ReplayBudgetFromStore succeeded (agents: %d)", len(budgets))
 		}
+
 	})
 }
 
