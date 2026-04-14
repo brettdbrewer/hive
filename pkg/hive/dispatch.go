@@ -113,7 +113,13 @@ func (r *Runtime) dispatchIntend(op runner.OpEvent) error {
 	}
 	var priorityArgs []work.TaskPriority
 	if priority != "" {
-		priorityArgs = append(priorityArgs, work.TaskPriority(priority))
+		p := work.TaskPriority(priority)
+		switch p {
+		case work.PriorityLow, work.PriorityMedium, work.PriorityHigh, work.PriorityCritical:
+			priorityArgs = append(priorityArgs, p)
+		default:
+			log.Printf("[dispatch] ignoring invalid priority %q", priority)
+		}
 	}
 	task, err := r.tasks.Create(r.humanID, title, desc, causes, r.convID, priorityArgs...)
 	if err != nil {

@@ -134,7 +134,8 @@ func Post(ev Event, addr string) error {
 		return fmt.Errorf("marshal event: %w", err)
 	}
 	url := fmt.Sprintf("http://%s/event", addr)
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body)) //nolint:noctx
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("post to %s: %w", url, err)
 	}
