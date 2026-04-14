@@ -1,8 +1,9 @@
 // Command hive runs hive agents.
 //
-// Pipeline mode: runs Scout → Builder → Critic in one full cycle.
+// Pipeline mode: runs Scout → Builder → Critic in a loop (default 30m interval).
 //
 //	go run ./cmd/hive --pipeline --repo ../site --space hive
+//	go run ./cmd/hive --pipeline --one-shot --repo ../site   # single cycle
 //
 // Single role: one process per agent role, polls lovyou.ai.
 //
@@ -64,16 +65,15 @@ func main() {
 func run() error {
 	// Runner mode flags.
 	role := flag.String("role", "", "Agent role (builder, scout, critic, monitor). Enables runner mode.")
-	pipeline := flag.Bool("pipeline", false, "Run Scout → Builder → Critic in sequence (one full cycle)")
-	daemon := flag.Bool("daemon", false, "Run pipeline in a loop at --interval until interrupted")
-	interval := flag.Duration("interval", 30*time.Minute, "Daemon cycle interval (used with --daemon)")
+	pipeline := flag.Bool("pipeline", false, "Run Scout → Builder → Critic pipeline (loops at --interval)")
+	interval := flag.Duration("interval", 30*time.Minute, "Pipeline cycle interval (default: 30m, use with --pipeline)")
 	council := flag.Bool("council", false, "Convene all agents for deliberation")
 	councilTopic := flag.String("topic", "", "Focus the council on a specific question")
 	space := flag.String("space", "hive", "lovyou.ai space slug")
 	apiBase := flag.String("api", "https://lovyou.ai", "lovyou.ai API base URL")
 	budget := flag.Float64("budget", 10.0, "Daily budget in USD")
 	agentID := flag.String("agent-id", "", "Agent's lovyou.ai user ID (filters task assignment)")
-	oneShot := flag.Bool("one-shot", false, "Work one task then exit (for testing)")
+	oneShot := flag.Bool("one-shot", false, "Run once then exit (single pipeline cycle or single task)")
 	prMode := flag.Bool("pr", false, "Create a feature branch and open a PR instead of pushing directly to main")
 	useWorktrees := flag.Bool("worktrees", false, "Each Builder task gets its own git worktree for isolation")
 	autoClone := flag.Bool("auto-clone", false, "Clone missing repos from registry URLs before each cycle")
@@ -101,13 +101,12 @@ func run() error {
 	if *council {
 		return runCouncilCmd(*space, *apiBase, *repo, *budget, *councilTopic)
 	}
-	if *daemon {
-		repoMap := parseRepos(*repos, *repo)
-		return runDaemon(*space, *apiBase, *repo, *budget, *agentID, repoMap, *interval, *prMode, *useWorktrees, *autoClone)
-	}
 	if *pipeline || *role == "pipeline" {
 		repoMap := parseRepos(*repos, *repo)
-		return runPipeline(*space, *apiBase, *repo, *budget, *agentID, repoMap, *prMode, *useWorktrees, *autoClone)
+		if *oneShot {
+			return runPipeline(*space, *apiBase, *repo, *budget, *agentID, repoMap, *prMode, *useWorktrees, *autoClone)
+		}
+		return runDaemon(*space, *apiBase, *repo, *budget, *agentID, repoMap, *interval, *prMode, *useWorktrees, *autoClone)
 	}
 	if *role != "" {
 		return runRunner(*role, *space, *apiBase, *repo, *budget, *agentID, *oneShot, *prMode)
@@ -125,8 +124,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Modes:")
 	fmt.Fprintln(os.Stderr, "  --human NAME           Start hive with human operator (default mode)")
-	fmt.Fprintln(os.Stderr, "  --pipeline             Run Scout → Builder → Critic in sequence")
-	fmt.Fprintln(os.Stderr, "  --daemon               Run pipeline in a loop at --interval")
+	fmt.Fprintln(os.Stderr, "  --pipeline             Run Scout → Builder → Critic pipeline (loops at --interval)")
 	fmt.Fprintln(os.Stderr, "  --role ROLE             Run a single agent role (builder, scout, critic, monitor)")
 	fmt.Fprintln(os.Stderr, "  --council              Convene all agents for deliberation")
 	fmt.Fprintln(os.Stderr, "  --ingest PATH          Ingest a spec markdown file as a task")
@@ -148,8 +146,8 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "  --pr                    Create feature branch + PR instead of pushing to main")
 	fmt.Fprintln(os.Stderr, "  --worktrees             Each task gets its own git worktree")
 	fmt.Fprintln(os.Stderr, "  --auto-clone            Clone missing repos from registry URLs")
-	fmt.Fprintln(os.Stderr, "  --interval DURATION     Daemon cycle interval (default: 30m)")
-	fmt.Fprintln(os.Stderr, "  --one-shot              Work one task then exit")
+	fmt.Fprintln(os.Stderr, "  --interval DURATION     Pipeline cycle interval (default: 30m)")
+	fmt.Fprintln(os.Stderr, "  --one-shot              Run once then exit (single cycle or single task)")
 	fmt.Fprintln(os.Stderr, "  --topic TEXT            Focus council on a specific question")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Environment:")
@@ -159,7 +157,8 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "Examples:")
 	fmt.Fprintln(os.Stderr, "  hive --human Michael --idea 'Build a REST API' --store postgres://hive:hive@localhost:5432/hive")
 	fmt.Fprintln(os.Stderr, "  hive --human Michael --approve-requests --approve-roles --loop --store postgres://...")
-	fmt.Fprintln(os.Stderr, "  hive --pipeline --repo ../site --space hive --budget 10")
+	fmt.Fprintln(os.Stderr, "  hive --pipeline --repo ../site --space hive --budget 10 --interval 15m")
+	fmt.Fprintln(os.Stderr, "  hive --pipeline --one-shot --repo ../site --space hive  # single cycle")
 	fmt.Fprintln(os.Stderr, "  hive --role builder --repo ../site --one-shot")
 	fmt.Fprintln(os.Stderr, "  hive --ingest spec.md --space hive --api http://localhost:8082")
 }
