@@ -8,8 +8,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
+
+// mergeToMainMu serializes all MergeToMain calls. git checkout+merge is not
+// atomic; concurrent calls would interleave and corrupt the repo state.
+var mergeToMainMu sync.Mutex
 
 // WorktreeContext wraps a git worktree for a single Builder task.
 // Created before Operate, merged or cleaned up after.
@@ -46,9 +51,13 @@ func CreateTaskWorktree(repoDir, taskTitle, taskID string) (*WorktreeContext, er
 		return nil, fmt.Errorf("create branch: %w\n%s", err, out)
 	}
 
-	// Configure git identity.
-	exec.Command("git", "config", "user.name", "hive").Run()
-	exec.Command("git", "config", "user.email", "hive@lovyou.ai").Run()
+	// Configure git identity in the worktree (cmd.Dir = dir, not main repo).
+	if err := gitIn(dir, "config", "user.name", "hive"); err != nil {
+		log.Printf("[worktree] warning: git config user.name: %v", err)
+	}
+	if err := gitIn(dir, "config", "user.email", "hive@lovyou.ai"); err != nil {
+		log.Printf("[worktree] warning: git config user.email: %v", err)
+	}
 
 	// Fix go.mod replace directives — worktree is in temp dir, not next to siblings.
 	if err := linkReplaceTargets(dir, repoDir); err != nil {
@@ -66,7 +75,12 @@ func CreateTaskWorktree(repoDir, taskTitle, taskID string) (*WorktreeContext, er
 
 // MergeToMain merges the worktree branch into main in the source repo.
 // Uses --no-ff to preserve branch history in the audit trail.
+// Serialized by mergeToMainMu: git checkout+merge is not atomic and concurrent
+// calls would interleave and corrupt the repository state in daemon mode.
 func (wc *WorktreeContext) MergeToMain() error {
+	mergeToMainMu.Lock()
+	defer mergeToMainMu.Unlock()
+
 	// Switch source repo to main.
 	if err := gitIn(wc.SourceDir, "checkout", "main"); err != nil {
 		return fmt.Errorf("checkout main: %w", err)
