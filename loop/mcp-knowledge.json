@@ -4,13 +4,13 @@
       "args": [
         "run",
         "-buildvcs=false",
-        "D:\\src\\matt\\lovyou3\\hive\\cmd\\mcp-knowledge"
+        "/home/transpara/transpara-ai/repos/lovyou-ai-hive/cmd/mcp-knowledge"
       ],
-      "command": "C:\\Users\\matt_\\go-sdk\\go\\bin\\go.exe",
+      "command": "/snap/go/11127/bin/go",
       "env": {
-        "HIVE_DIR": "D:\\src\\matt\\lovyou3\\hive",
-        "SITE_DIR": "D:\\src\\matt\\lovyou3\\site",
-        "WORKSPACE": "D:\\src\\matt\\lovyou3"
+        "HIVE_DIR": "/home/transpara/transpara-ai/repos/lovyou-ai-hive",
+        "SITE_DIR": "/home/transpara/transpara-ai/repos/site",
+        "WORKSPACE": "/home/transpara/transpara-ai/repos"
       }
     }
   }
