@@ -40,6 +40,7 @@ const (
 	EventCritiqueRevise  PipelineEvent = "critique.revise"
 	EventReflectionDone  PipelineEvent = "reflection.done"
 	EventAuditDone       PipelineEvent = "audit.done"
+	EventWorkExists          PipelineEvent = "work.exists"
 	EventNoTasks             PipelineEvent = "no.tasks"
 	EventEscalation          PipelineEvent = "escalation"
 	EventEscalationResolved  PipelineEvent = "escalation.resolved"
@@ -52,7 +53,8 @@ var pipelineTransitions = map[PipelineState]map[PipelineEvent]PipelineState{
 	},
 	StateDirecting: {
 		EventMilestoneCreated: StateScouting,
-		EventNoTasks:          StateIdle, // PM found nothing to do
+		EventWorkExists:       StateBuilding, // existing work, skip scout/architect
+		EventNoTasks:          StateIdle,      // PM found nothing to do
 	},
 	StateScouting: {
 		EventReportPosted: StatePlanning,
@@ -177,8 +179,8 @@ func (sm *PipelineStateMachine) Run(ctx context.Context) error {
 		if t.Pinned {
 			continue // pinned goals are direction, not work
 		}
-		if t.ChildCount > 0 && t.ChildDone < t.ChildCount {
-			continue // blocked by children
+		if t.State != "active" && t.ChildCount > 0 && t.ChildDone < t.ChildCount {
+			continue // blocked by children (unless explicitly active)
 		}
 		hasWork = true
 		if len(t.Title) > 4 && t.Title[:4] == "Fix:" {
@@ -324,12 +326,24 @@ func (sm *PipelineStateMachine) Run(ctx context.Context) error {
 func (sm *PipelineStateMachine) inferEvent(agent string) PipelineEvent {
 	switch agent {
 	case "pm":
-		// Check if milestone was created.
+		// Check if milestone was created or actionable work exists.
 		tasks, _ := sm.runner.cfg.APIClient.GetTasks(sm.runner.cfg.SpaceSlug, "")
+		hasActionableWork := false
 		for _, t := range tasks {
-			if t.Kind == "task" && t.State != "done" && t.State != "closed" && t.Priority == "high" && len(t.Body) > 200 {
+			if t.Kind != "task" || t.State == "done" || t.State == "closed" || t.Pinned {
+				continue
+			}
+			// Milestone: high-priority task with detailed body (PM just created it).
+			if t.Priority == "high" && len(t.Body) > 200 {
 				return EventMilestoneCreated
 			}
+			// Any actionable task counts as existing work.
+			if t.State == "active" || (t.State == "open" && (t.ChildCount == 0 || t.ChildDone >= t.ChildCount)) {
+				hasActionableWork = true
+			}
+		}
+		if hasActionableWork {
+			return EventWorkExists
 		}
 		return EventNoTasks
 

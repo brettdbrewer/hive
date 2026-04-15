@@ -21,6 +21,7 @@ func TestPipelineTransitionValid(t *testing.T) {
 	}{
 		{StateIdle, EventBoardClear, StateDirecting, "pm"},
 		{StateDirecting, EventMilestoneCreated, StateScouting, "scout"},
+		{StateDirecting, EventWorkExists, StateBuilding, "builder"},
 		{StateDirecting, EventNoTasks, StateIdle, ""},
 		{StateScouting, EventReportPosted, StatePlanning, "architect"},
 		{StatePlanning, EventTasksCreated, StateBuilding, "builder"},
@@ -130,6 +131,94 @@ func TestRunExistingTasksStartsAtBuilding(t *testing.T) {
 
 	if sm.State() != StateBuilding {
 		t.Errorf("existing-tasks path: state = %s, want %s", sm.State(), StateBuilding)
+	}
+}
+
+// TestRunActiveTaskWithChildrenStartsAtBuilding verifies that an active task
+// with incomplete children is still treated as actionable work (not skipped).
+func TestRunActiveTaskWithChildrenStartsAtBuilding(t *testing.T) {
+	activeTask := api.Node{
+		ID:         "task-1",
+		Kind:       "task",
+		State:      "active",
+		Title:      "Active task with children",
+		ChildCount: 1,
+		ChildDone:  0,
+	}
+	srv := newTasksServer(t, []api.Node{activeTask})
+	defer srv.Close()
+
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+	r := New(Config{
+		HiveDir:   hiveDir,
+		RepoPath:  t.TempDir(),
+		SpaceSlug: "test",
+		APIClient: api.New(srv.URL, "test-key"),
+	})
+	sm := NewPipelineStateMachine(r, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	sm.Run(ctx) //nolint:errcheck — we expect ctx.Err()
+
+	if sm.State() != StateBuilding {
+		t.Errorf("active-with-children path: state = %s, want %s", sm.State(), StateBuilding)
+	}
+}
+
+// TestInferEventPMWorkExists verifies that inferEvent("pm") returns
+// EventWorkExists when actionable tasks exist but no milestone was created.
+func TestInferEventPMWorkExists(t *testing.T) {
+	activeTask := api.Node{
+		ID:    "task-1",
+		Kind:  "task",
+		State: "active",
+		Title: "Some active task",
+		Body:  "Short body",
+	}
+	srv := newTasksServer(t, []api.Node{activeTask})
+	defer srv.Close()
+
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+	r := New(Config{
+		HiveDir:   hiveDir,
+		SpaceSlug: "test",
+		APIClient: api.New(srv.URL, "test-key"),
+	})
+	sm := NewPipelineStateMachine(r, nil)
+
+	got := sm.inferEvent("pm")
+	if got != EventWorkExists {
+		t.Errorf("inferEvent(pm) with active task: got %s, want %s", got, EventWorkExists)
+	}
+}
+
+// TestInferEventPMMilestoneCreated verifies that inferEvent("pm") returns
+// EventMilestoneCreated for a high-priority task with a detailed body.
+func TestInferEventPMMilestoneCreated(t *testing.T) {
+	milestone := api.Node{
+		ID:       "task-1",
+		Kind:     "task",
+		State:    "open",
+		Title:    "Build auth system",
+		Priority: "high",
+		Body:     string(make([]byte, 250)), // > 200 chars
+	}
+	srv := newTasksServer(t, []api.Node{milestone})
+	defer srv.Close()
+
+	hiveDir := makeHiveDir(t, "# State\n", nil)
+	r := New(Config{
+		HiveDir:   hiveDir,
+		SpaceSlug: "test",
+		APIClient: api.New(srv.URL, "test-key"),
+	})
+	sm := NewPipelineStateMachine(r, nil)
+
+	got := sm.inferEvent("pm")
+	if got != EventMilestoneCreated {
+		t.Errorf("inferEvent(pm) with milestone: got %s, want %s", got, EventMilestoneCreated)
 	}
 }
 
