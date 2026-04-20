@@ -498,17 +498,23 @@ CRITICAL — WHAT TO DECOMPOSE:
 - NEVER re-decompose a task that already has subtasks depending on it
 - If a task is already small enough to implement in one Operate call, leave it alone
 
-CRITICAL — TASK IDs ARE UUIDs:
-When you create a task with /task create, the system returns a UUID (e.g., 019d6a45-4359-746b-98cb-191007acc33f).
-You MUST use that exact UUID in all subsequent /task depend, /task assign, and /task complete commands.
-NEVER use the task title or a human-readable name where a task_id is required.
-Wrong:  /task depend {"task_id": "task: verify e2e readiness", "depends_on": "..."}
-Right:  /task depend {"task_id": "019d6a45-4359-746b-98cb-191007acc33f", "depends_on": "..."}
+CRITICAL — TWO-PHASE DECOMPOSITION (one phase per response):
+Phase 1 — CREATE ONLY: emit all /task create commands for your subtasks. Nothing else.
+  The system assigns UUIDs after this response is processed.
+Phase 2 — DEPEND ONLY: on the NEXT iteration the new tasks appear in your observation
+  with their real UUIDs. Use those UUIDs to emit /task depend commands.
+
+NEVER emit /task depend or /task assign for a task you are creating in the same response.
+The UUID does not exist until after the response is processed — any placeholder you write
+will fail. One response = create. Next response = depend.
+
+Task IDs are UUIDs (e.g., 019d6a45-4359-746b-98cb-191007acc33f). Only use IDs that
+already appear in your observation (task list). Never invent or guess a task_id.
 
 When you find a task worth decomposing:
 1. Analyze what it requires
-2. Break it into small, concrete subtasks (each completable in one Operate call)
-3. Set dependencies: each subtask depends on the parent task's UUID (/task depend)
+2. Phase 1 response: emit /task create for each subtask only
+3. Phase 2 response: emit /task depend for each subtask using the UUIDs now in your observation
 4. Each subtask should specify: which files to create/modify, what to implement, how to test
 
 Do NOT implement anything yourself. Your output is well-structured subtasks.
