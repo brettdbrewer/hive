@@ -100,7 +100,7 @@ func (s *Store) CreateNode(spaceID string, n Node) (*Node, error) {
 		n.Kind = "task"
 	}
 	if n.State == "" {
-		n.State = "open"
+		n.State = NodeStateOpen
 	}
 	if n.Priority == "" {
 		n.Priority = "medium"
@@ -192,34 +192,114 @@ func (s *Store) ListNodes(spaceID, kind, state string) ([]Node, error) {
 	return nodes, rows.Err()
 }
 
-// UpdateNodeState sets the state of a node and bumps updated_at.
+// UpdateNodeState sets the state of a node and bumps updated_at. The
+// update is unscoped (no space filter); it is intended for cross-space
+// callers like the /api/hive/escalation handler that does not carry a
+// slug. Returns ErrNotFound if no row matches id.
 func (s *Store) UpdateNodeState(id, state string) error {
-	_, err := s.db.Exec(`UPDATE `+s.tableName+` SET state = $1, updated_at = now() WHERE id = $2`, state, id)
-	return err
+	res, err := s.db.Exec(`UPDATE `+s.tableName+` SET state = $1, updated_at = now() WHERE id = $2`, state, id)
+	if err != nil {
+		return fmt.Errorf("UpdateNodeState: %w", err)
+	}
+	return checkRowsAffected(res, "UpdateNodeState")
 }
 
-// ClaimNode assigns a node to the given assignee.
-func (s *Store) ClaimNode(id, assignee string) error {
-	_, err := s.db.Exec(`UPDATE `+s.tableName+` SET assignee = $1, updated_at = now() WHERE id = $2`, assignee, id)
-	return err
+// UpdateNodeStateInSpace updates a node's state, requiring the node to
+// belong to spaceID. Returns ErrNotFound if no row matches.
+func (s *Store) UpdateNodeStateInSpace(spaceID, id, state string) error {
+	res, err := s.db.Exec(
+		`UPDATE `+s.tableName+` SET state = $1, updated_at = now() WHERE id = $2 AND space_id = $3`,
+		state, id, spaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("UpdateNodeStateInSpace: %w", err)
+	}
+	return checkRowsAffected(res, "UpdateNodeStateInSpace")
 }
 
-// CompleteNode sets a node's state to "done".
-func (s *Store) CompleteNode(id string) error {
-	return s.UpdateNodeState(id, "done")
+// ClaimNode assigns a node to the given assignee. Requires the node to
+// belong to spaceID. Returns ErrNotFound if no row matches.
+func (s *Store) ClaimNode(spaceID, id, assignee string) error {
+	res, err := s.db.Exec(
+		`UPDATE `+s.tableName+` SET assignee = $1, updated_at = now() WHERE id = $2 AND space_id = $3`,
+		assignee, id, spaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("ClaimNode: %w", err)
+	}
+	return checkRowsAffected(res, "ClaimNode")
 }
 
-// OpenNode sets a node's state to "open", reopening a completed task.
-func (s *Store) OpenNode(id string) error {
-	return s.UpdateNodeState(id, "open")
+// CompleteNode sets a node's state to "done". Requires the node to belong
+// to spaceID. Returns ErrNotFound if no row matches.
+func (s *Store) CompleteNode(spaceID, id string) error {
+	return s.UpdateNodeStateInSpace(spaceID, id, NodeStateDone)
 }
 
-// ChildCounts returns (total, done) child counts for a parent node.
-func (s *Store) ChildCounts(parentID string) (int, int) {
+// OpenNode sets a node's state to "open", reopening a previously closed,
+// completed, or escalated task. Requires the node to belong to spaceID
+// and to be in any state other than "open"; reopening an already-open
+// node returns ErrInvalidState rather than silently succeeding.
+//
+// The UPDATE and the disambiguating SELECT run in a single statement via
+// a CTE so they share the same MVCC snapshot; a concurrent writer cannot
+// change the node's state between the two reads and cause this function
+// to misclassify ErrNotFound vs ErrInvalidState.
+func (s *Store) OpenNode(spaceID, id string) error {
+	var (
+		didUpdate bool
+		current   sql.NullString
+	)
+	err := s.db.QueryRow(`
+		WITH updated AS (
+			UPDATE `+s.tableName+`
+			SET state = $1, updated_at = now()
+			WHERE id = $2 AND space_id = $3 AND state <> $1
+			RETURNING 1
+		)
+		SELECT
+			EXISTS(SELECT 1 FROM updated),
+			(SELECT state FROM `+s.tableName+` WHERE id = $2 AND space_id = $3)
+	`, NodeStateOpen, id, spaceID).Scan(&didUpdate, &current)
+	if err != nil {
+		return fmt.Errorf("OpenNode: %w", err)
+	}
+	if didUpdate {
+		return nil
+	}
+	if !current.Valid {
+		return ErrNotFound
+	}
+	return fmt.Errorf("%w: node already in state %q", ErrInvalidState, current.String)
+}
+
+// checkRowsAffected returns ErrNotFound if a successful UPDATE changed no
+// rows, fmt-wrapping a RowsAffected lookup error otherwise.
+func checkRowsAffected(res sql.Result, op string) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s rows affected: %w", op, err)
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ChildCounts returns (total, done) child counts for a parent node in a
+// single round-trip. Returns an error if the query fails; callers should
+// decide whether the failure is fatal (board enrichment treats it as
+// best-effort and skips the node).
+func (s *Store) ChildCounts(parentID string) (int, int, error) {
 	var total, done int
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM `+s.tableName+` WHERE parent_id = $1`, parentID).Scan(&total)
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM `+s.tableName+` WHERE parent_id = $1 AND state = 'done'`, parentID).Scan(&done)
-	return total, done
+	err := s.db.QueryRow(
+		`SELECT COUNT(*), COUNT(*) FILTER (WHERE state = $2) FROM `+s.tableName+` WHERE parent_id = $1`,
+		parentID, NodeStateDone,
+	).Scan(&total, &done)
+	if err != nil {
+		return 0, 0, fmt.Errorf("ChildCounts: %w", err)
+	}
+	return total, done, nil
 }
 
 // MaxLessonNumber scans node titles in a space for patterns like "Lesson N:"
@@ -284,10 +364,15 @@ func (s *Store) SearchNodesByTitle(spaceID, prefix string, limit int) ([]Node, e
 	return nodes, rows.Err()
 }
 
-// enrichChildCounts fills ChildCount and ChildDone on each node.
+// enrichChildCounts fills ChildCount and ChildDone on each node. Per-node
+// count failures are non-fatal — the affected node is left with zero
+// counts and enrichment continues with the next node.
 func (s *Store) enrichChildCounts(nodes []Node) {
 	for i := range nodes {
-		nodes[i].ChildCount, nodes[i].ChildDone = s.ChildCounts(nodes[i].ID)
+		if total, done, err := s.ChildCounts(nodes[i].ID); err == nil {
+			nodes[i].ChildCount = total
+			nodes[i].ChildDone = done
+		}
 	}
 }
 
@@ -295,7 +380,7 @@ func (s *Store) enrichChildCounts(nodes []Node) {
 func filterExcludeDone(nodes []Node) []Node {
 	out := make([]Node, 0, len(nodes))
 	for _, n := range nodes {
-		if n.State != "done" && n.State != "closed" {
+		if n.State != NodeStateDone && n.State != NodeStateClosed {
 			out = append(out, n)
 		}
 	}
