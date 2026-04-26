@@ -1,0 +1,39 @@
+# Mixed provider catalog: Claude + Codex + Ollama (gemma4)
+# Usage: go run ./cmd/hive civilization run --human Matt --catalog catalog-mixed.yaml --idea "..."
+
+models:
+  - id: ollama-gemma4
+    aliases: [gemma4]
+    provider: ollama
+    base_url: http://localhost:11434
+    auth_mode: local
+    tier: volume
+    capabilities: [coding, fast-latency]
+    context_window: 8192
+    max_output_tokens: 4096
+    pricing:
+      input_per_million: 0
+      output_per_million: 0
+
+  - id: codex-o3
+    aliases: [o3]
+    provider: codex-cli
+    auth_mode: subscription
+    tier: judgment
+    capabilities: [tools, reasoning, coding, operate]
+    context_window: 200000
+    max_output_tokens: 16384
+    pricing:
+      input_per_million: 2.00
+      output_per_million: 8.00
+
+role_defaults:
+  guardian: gemma4
+  sysmon: gemma4
+  allocator: gemma4
+  spawner: gemma4
+  cto: o3
+  reviewer: o3
+  strategist: sonnet      # Claude (built-in)
+  planner: sonnet         # Claude (built-in)
+  implementer: opus       # Claude (forced claude-cli by CanOperate)
