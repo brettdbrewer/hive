@@ -4,8 +4,8 @@
 
 models:
   # ── Ollama (local) ──
-  - id: ollama-gemma4
-    aliases: [gemma4]
+  - id: gemma4
+    aliases: [ollama-gemma4]
     provider: ollama
     base_url: http://localhost:11434/v1
     auth_mode: local
@@ -18,8 +18,8 @@ models:
       output_per_million: 0
 
   # ── Codex (subscription) ──
-  - id: codex-o3
-    aliases: [o3]
+  - id: codex-gpt5.5
+    aliases: [gpt5.5]
     provider: codex-cli
     auth_mode: subscription
     tier: judgment
@@ -60,7 +60,7 @@ role_defaults:
   sysmon: gemma4
   allocator: gemma4
   spawner: gemma4
-  cto: kimi-k2.6               # OpenRouter
+  cto: gpt5.5                   # Codex CLI
   reviewer: deepseek-v4-pro    # OpenRouter
   strategist: deepseek-v4-pro  # OpenRouter
   planner: sonnet              # Claude (built-in)
