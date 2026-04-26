@@ -18,7 +18,7 @@ models:
       output_per_million: 0
 
   # ── Codex (subscription) ──
-  - id: codex-gpt5.5
+  - id: gpt-5.5
     aliases: [gpt5.5]
     provider: codex-cli
     auth_mode: subscription
