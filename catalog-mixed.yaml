@@ -7,7 +7,7 @@ models:
   - id: ollama-gemma4
     aliases: [gemma4]
     provider: ollama
-    base_url: http://localhost:11434
+    base_url: http://localhost:11434/v1
     auth_mode: local
     tier: volume
     capabilities: [coding, fast-latency]
@@ -60,8 +60,8 @@ role_defaults:
   sysmon: gemma4
   allocator: gemma4
   spawner: gemma4
-  cto: o3
-  reviewer: kimi-k2.6          # OpenRouter
+  cto: kimi-k2.6               # OpenRouter
+  reviewer: deepseek-v4-pro    # OpenRouter
   strategist: deepseek-v4-pro  # OpenRouter
   planner: sonnet              # Claude (built-in)
   implementer: opus            # Claude (forced claude-cli by CanOperate)
