@@ -128,8 +128,10 @@ func (r *Resolver) Resolve(input ResolutionInput) (ResolvedConfig, error) {
 		rc.BaseURL = entry.BaseURL
 	}
 	if rc.Provider == r.defaults.Provider && entry.Provider != "" {
-		// Only override provider from entry if we're still on system default
-		// (explicit policy/override already set it otherwise)
+		// Override provider from catalog entry when still on system default.
+		// Explicit policy/override already set it otherwise.
+		rc.Provider = entry.Provider
+		rc.Trace = append(rc.Trace, fmt.Sprintf("provider: catalog entry → %s", entry.Provider))
 	}
 
 	// Layer 7: CanOperate constraint
