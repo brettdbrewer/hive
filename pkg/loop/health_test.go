@@ -5,6 +5,7 @@ import (
 
 	"github.com/transpara-ai/eventgraph/go/pkg/types"
 
+	"github.com/transpara-ai/hive/pkg/health"
 	"github.com/transpara-ai/hive/pkg/resources"
 )
 
@@ -121,6 +122,86 @@ func TestSeverityToScore_Empty(t *testing.T) {
 	want := types.MustScore(1.0)
 	if got != want {
 		t.Errorf("severityToScore(%q) = %v, want %v (safe default)", "", got, want)
+	}
+}
+
+func TestParseHealthCommand_WithAgentVitals(t *testing.T) {
+	response := `Vitals look mixed.
+/health {"severity":"warning","chain_ok":true,"active_agents":3,"event_rate":12.0,"agent_vitals":[{"agent_id":"actor_aaa","iterations_pct":0.4,"trust_score":0.9,"budget_burn_rate_per_hour":18.5,"last_heartbeat_ticks":3,"severity":"ok"},{"agent_id":"actor_bbb","iterations_pct":0.85,"trust_score":0.7,"budget_burn_rate_per_hour":42.0,"last_heartbeat_ticks":17,"severity":"warning"}]}
+/signal {"signal": "IDLE"}`
+
+	cmd := parseHealthCommand(response)
+	if cmd == nil {
+		t.Fatal("expected non-nil HealthCommand")
+	}
+	if cmd.Severity != "warning" {
+		t.Errorf("Severity = %q, want %q", cmd.Severity, "warning")
+	}
+	if len(cmd.AgentVitals) != 2 {
+		t.Fatalf("AgentVitals length = %d, want 2", len(cmd.AgentVitals))
+	}
+	a := cmd.AgentVitals[0]
+	if a.AgentID != "actor_aaa" || a.IterationsPct != 0.4 || a.TrustScore != 0.9 ||
+		a.BudgetBurnRatePerHour != 18.5 || a.LastHeartbeatTicks != 3 || a.Severity != health.SeverityOK {
+		t.Errorf("AgentVitals[0] = %+v, mismatch on at least one field", a)
+	}
+	b := cmd.AgentVitals[1]
+	if b.AgentID != "actor_bbb" || b.Severity != health.SeverityWarning || b.IterationsPct != 0.85 {
+		t.Errorf("AgentVitals[1] = %+v, mismatch on at least one field", b)
+	}
+	if cmd.agentVitalsOmitted {
+		t.Error("agentVitalsOmitted = true, want false (key was present)")
+	}
+}
+
+func TestParseHealthCommand_AgentVitalsPresentEmpty(t *testing.T) {
+	// "agent_vitals":[] is a valid SysMon emission (no observable agents
+	// this cycle). Parser must recognize the key as present, so the
+	// omitted-warning path stays quiet.
+	response := `/health {"severity":"ok","chain_ok":true,"active_agents":0,"event_rate":0.0,"agent_vitals":[]}`
+	cmd := parseHealthCommand(response)
+	if cmd == nil {
+		t.Fatal("expected non-nil HealthCommand")
+	}
+	if len(cmd.AgentVitals) != 0 {
+		t.Errorf("AgentVitals length = %d, want 0", len(cmd.AgentVitals))
+	}
+	if cmd.agentVitalsOmitted {
+		t.Error("agentVitalsOmitted = true, want false (empty array is present, not omitted)")
+	}
+}
+
+func TestParseHealthCommand_WithoutAgentVitals_BackwardCompatible(t *testing.T) {
+	// Pre-Stage-3 /health command shape — no agent_vitals field. Parser must
+	// succeed and AgentVitals must be nil/empty, never error. The parser
+	// records the omission on agentVitalsOmitted so emitHealthReport can
+	// surface a loud warning, but the command still goes through.
+	response := `/health {"severity":"ok","chain_ok":true,"active_agents":4,"event_rate":20.0}`
+	cmd := parseHealthCommand(response)
+	if cmd == nil {
+		t.Fatal("expected non-nil HealthCommand")
+	}
+	if len(cmd.AgentVitals) != 0 {
+		t.Errorf("AgentVitals = %+v, want empty when field omitted", cmd.AgentVitals)
+	}
+	if !cmd.agentVitalsOmitted {
+		t.Error("agentVitalsOmitted = false, want true (key was absent from JSON)")
+	}
+}
+
+func TestNormalizeAgentVitalSeverity_KnownValues(t *testing.T) {
+	for _, s := range []health.Severity{health.SeverityOK, health.SeverityWarning, health.SeverityCritical} {
+		if got := normalizeAgentVitalSeverity(s); got != s {
+			t.Errorf("normalizeAgentVitalSeverity(%q) = %q, want %q", s, got, s)
+		}
+	}
+}
+
+func TestNormalizeAgentVitalSeverity_Unknown(t *testing.T) {
+	for _, s := range []health.Severity{"OK", "Warning", "fatal", "", "info"} {
+		if got := normalizeAgentVitalSeverity(s); got != health.SeverityWarning {
+			t.Errorf("normalizeAgentVitalSeverity(%q) = %q, want %q", s, got, health.SeverityWarning)
+		}
 	}
 }
 
