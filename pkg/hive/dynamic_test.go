@@ -108,7 +108,7 @@ func TestMapModelName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got := mapModelName(tt.input)
+			got := mapModelName(tt.input, nil)
 			if got != tt.want {
 				t.Errorf("mapModelName(%q) = %q, want %q", tt.input, got, tt.want)
 			}
@@ -120,7 +120,7 @@ func TestMapModelName_Default(t *testing.T) {
 	unknowns := []string{"gpt-4", "unknown", "", "SONNET", "Haiku"}
 	for _, name := range unknowns {
 		t.Run(name, func(t *testing.T) {
-			got := mapModelName(name)
+			got := mapModelName(name, nil)
 			if got != ModelSonnet {
 				t.Errorf("mapModelName(%q) = %q, want ModelSonnet (%q)", name, got, ModelSonnet)
 			}

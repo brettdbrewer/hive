@@ -237,7 +237,7 @@ func (r *Runtime) spawnDynamicAgent(ctx context.Context, proposal event.RoleProp
 	def := AgentDef{
 		Name:          proposal.Name,
 		Role:          proposal.Name, // name == role for dynamically spawned agents
-		Model:         mapModelName(proposal.Model),
+		Model:         mapModelName(proposal.Model, r.resolver.Catalog()),
 		SystemPrompt:  prompt,
 		WatchPatterns: proposal.WatchPatterns,
 		CanOperate:    false, // trust must be earned; always false for spawned agents
@@ -294,6 +294,7 @@ func (r *Runtime) spawnDynamicAgent(ctx context.Context, proposal event.RoleProp
 		RepoPath:       r.repoPath,
 		Keepalive:      r.loop,
 		KnowledgeStore: r.knowledgeStore,
+		Catalog:        r.resolver.Catalog(),
 		ActorResolver: func(id types.ActorID) string {
 			a, err := r.actors.Get(id)
 			if err != nil {

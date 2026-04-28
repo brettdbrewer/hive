@@ -62,6 +62,11 @@ func (r *Resolver) Defaults() ResolverDefaults {
 	return r.defaults
 }
 
+// Catalog returns the resolver's model catalog.
+func (r *Resolver) Catalog() *ModelCatalog {
+	return r.catalog
+}
+
 // Resolve applies the precedence chain and returns a ResolvedConfig.
 //
 // Precedence (later layers win):

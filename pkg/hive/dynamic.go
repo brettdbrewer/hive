@@ -51,8 +51,10 @@ func (d *dynamicAgentTracker) Wait() {
 // Accepts both the short tier name and the full identifier (since
 // RoleProposedContent.Model stores the resolved full string).
 // Defaults to ModelSonnet for unrecognised inputs.
-func mapModelName(name string) string {
-	cat := modelconfig.DefaultCatalog()
+func mapModelName(name string, cat *modelconfig.ModelCatalog) string {
+	if cat == nil {
+		cat = modelconfig.DefaultCatalog()
+	}
 	entry, ok := cat.Lookup(name)
 	if ok {
 		return entry.ID

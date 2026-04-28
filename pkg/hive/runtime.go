@@ -399,6 +399,7 @@ func (r *Runtime) Run(ctx context.Context, seedIdea string) error {
 			Keepalive:      r.loop,
 			KnowledgeStore: r.knowledgeStore,
 			CostSummary:    r.costSummary,
+			Catalog:        r.resolver.Catalog(),
 			ActorResolver: func(id types.ActorID) string {
 				a, err := r.actors.Get(id)
 				if err != nil {

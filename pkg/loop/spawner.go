@@ -107,6 +107,7 @@ type SpawnContext struct {
 	HasPendingProposal bool
 	AgentRoster        []string       // agent names from BudgetRegistry.Snapshot()
 	RecentRejections   map[string]int // role name → iteration when rejected
+	Catalog            *modelconfig.ModelCatalog // model catalog for validation
 }
 
 // RosterContains returns true if name is already in the agent roster.
@@ -225,7 +226,11 @@ func validateSpawnCommand(cmd *SpawnCommand, ctx *SpawnContext) error {
 	}
 
 	// 4. Model validation.
-	if _, ok := modelconfig.DefaultCatalog().Lookup(cmd.Model); !ok {
+	cat := ctx.Catalog
+	if cat == nil {
+		cat = modelconfig.DefaultCatalog()
+	}
+	if _, ok := cat.Lookup(cmd.Model); !ok {
 		return fmt.Errorf("invalid model %q: not found in model catalog", cmd.Model)
 	}
 
@@ -391,6 +396,7 @@ func (l *Loop) buildSpawnContext() *SpawnContext {
 		Iteration:          l.spawnerState.iteration,
 		HasPendingProposal: l.spawnerState.pendingProposal != "",
 		RecentRejections:   l.spawnerState.recentRejections,
+		Catalog:            l.config.Catalog,
 	}
 
 	if reg := l.config.BudgetRegistry; reg != nil {
