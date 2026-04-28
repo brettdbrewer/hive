@@ -65,7 +65,8 @@ type Runtime struct {
 	// Knowledge store for distilled insights (survives reboot via chain replay).
 	knowledgeStore knowledge.KnowledgeStore
 
-	// Model resolver for agent provider/model selection.
+	// Model resolver for agent provider/model selection. Set once during Run()
+	// and never swapped — closures that capture it are safe without synchronization.
 	resolver *modelconfig.Resolver
 
 	// Dynamic agent lifecycle tracker (agents spawned after boot).

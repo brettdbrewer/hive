@@ -97,13 +97,13 @@ func TestMapModelName(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"haiku", ModelHaiku},
-		{"sonnet", ModelSonnet},
-		{"opus", ModelOpus},
+		{"haiku", "claude-haiku-4-5-20251001"},
+		{"sonnet", "claude-sonnet-4-6"},
+		{"opus", "claude-opus-4-6"},
 		// Full model identifiers should also pass through correctly.
-		{ModelHaiku, ModelHaiku},
+		{"claude-haiku-4-5-20251001", "claude-haiku-4-5-20251001"},
 		{ModelSonnet, ModelSonnet},
-		{ModelOpus, ModelOpus},
+		{"claude-opus-4-6", "claude-opus-4-6"},
 	}
 
 	for _, tt := range tests {

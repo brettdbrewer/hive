@@ -1,6 +1,7 @@
 # Mixed provider catalog: Claude + Codex + Ollama + OpenRouter
+# This is a LOCAL DEV example — adjust base_url values for your environment.
 # Usage: go run ./cmd/hive civilization run --human Matt --catalog catalog-mixed.yaml --idea "..."
-# Env vars: OPENROUTER_API_KEY for OpenRouter models
+# Env vars: OPENROUTER_API_KEY for OpenRouter models, OLLAMA_HOST to override localhost
 
 models:
   # ── Ollama (local) ──

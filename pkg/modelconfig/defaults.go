@@ -134,8 +134,14 @@ func ResolverFromCatalogFile(catalogPath string) (*Resolver, error) {
 	maps.Copy(profiles, defaultProfiles)
 	maps.Copy(profiles, userProfiles)
 
-	// Merge defaults: start from embedded, layer user on top.
-	defaults := defaultDefaults
+	// Merge defaults: deep-copy maps from embedded defaults to avoid mutating
+	// the package-level defaultDefaults (shared with DefaultResolver).
+	defaults := ResolverDefaults{
+		Provider:   defaultDefaults.Provider,
+		Model:      defaultDefaults.Model,
+		TierModels: maps.Clone(defaultDefaults.TierModels),
+		RoleModels: maps.Clone(defaultDefaults.RoleModels),
+	}
 	if userDefaults.Provider != defaultDefaults.Provider {
 		defaults.Provider = userDefaults.Provider
 	}
@@ -143,15 +149,9 @@ func ResolverFromCatalogFile(catalogPath string) (*Resolver, error) {
 		defaults.Model = userDefaults.Model
 	}
 	for tier, model := range userDefaults.TierModels {
-		if defaults.TierModels == nil {
-			defaults.TierModels = make(map[ModelTier]string)
-		}
 		defaults.TierModels[tier] = model
 	}
 	for role, model := range userDefaults.RoleModels {
-		if defaults.RoleModels == nil {
-			defaults.RoleModels = make(map[string]string)
-		}
 		defaults.RoleModels[role] = model
 	}
 

@@ -7,12 +7,8 @@ import (
 	"github.com/transpara-ai/hive/pkg/modelconfig"
 )
 
-// Model constants for LLM provider selection.
-const (
-	ModelOpus   = "claude-opus-4-6"
-	ModelSonnet = "claude-sonnet-4-6"
-	ModelHaiku  = "claude-haiku-4-5-20251001"
-)
+// ModelSonnet is the fallback model for unrecognised inputs in dynamic agent spawning.
+const ModelSonnet = "claude-sonnet-4-6"
 
 // Tier constants for role classification.
 const (
