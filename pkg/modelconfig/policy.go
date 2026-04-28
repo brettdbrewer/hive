@@ -19,7 +19,10 @@ type RoleModelPolicy struct {
 	// RequiredCapabilities lists capabilities the resolved model must have.
 	RequiredCapabilities []Capability `json:"required_capabilities,omitempty" yaml:"required_capabilities,omitempty"`
 
-	// MaxCostPerCallUSD caps per-call spending.
+	// MaxCostPerCallUSD caps per-call spending. Enforcement uses a reference
+	// call size of 10k input + 2k output tokens to estimate cost from the
+	// model's published pricing. The cap is checked at resolution time, not
+	// at runtime — actual calls may vary in token count.
 	MaxCostPerCallUSD *float64 `json:"max_cost_per_call_usd,omitempty" yaml:"max_cost_per_call_usd,omitempty"`
 
 	// AllowDowngrade permits the resolver to pick a cheaper model

@@ -200,7 +200,7 @@ func parseSpawnCommand(response string) *SpawnCommand {
 //  1. Stabilization window: first 20 iterations are observe-only
 //  2. Pending proposal: only one proposal in-flight at a time
 //  3. Name: valid kebab-case, no collision with existing roster
-//  4. Model: must be "haiku", "sonnet", or "opus"
+//  4. Model: must exist in the model catalog (alias or full ID)
 //  5. MaxIterations: 10–200
 //  6. Prompt: >= 100 characters
 //  7. WatchPatterns: non-empty, no bare wildcard ("*")
@@ -273,12 +273,15 @@ func validateSpawnCommand(cmd *SpawnCommand, ctx *SpawnContext) error {
 
 // emitRoleProposed constructs a RoleProposedContent from the validated
 // SpawnCommand and records it on the event chain via agent.EmitRoleProposed.
-// The model tier name ("haiku", "sonnet", "opus") is resolved to the actual
-// model identifier string before emission.
+// Model aliases are resolved to canonical catalog IDs before emission.
 func (l *Loop) emitRoleProposed(cmd *SpawnCommand) error {
 	// Resolve model name via catalog — maps aliases like "sonnet" to full IDs.
+	cat := l.config.Catalog
+	if cat == nil {
+		cat = modelconfig.DefaultCatalog()
+	}
 	resolvedModel := cmd.Model
-	if entry, ok := modelconfig.DefaultCatalog().Lookup(cmd.Model); ok {
+	if entry, ok := cat.Lookup(cmd.Model); ok {
 		resolvedModel = entry.ID
 	}
 	content := event.RoleProposedContent{

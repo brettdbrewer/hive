@@ -141,7 +141,7 @@ func TestResolve(t *testing.T) {
 			wantProv:  "claude-cli",
 		},
 		{
-			name: "CanOperate forces claude-cli provider",
+			name: "CanOperate with claude-cli model succeeds",
 			input: ResolutionInput{
 				Role:       "worker",
 				CanOperate: true,
@@ -218,6 +218,34 @@ func TestResolve_CanOperate_ValidatesCapability(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "does not support operate")
+}
+
+func TestResolve_CanOperate_RejectsNonOperatorProvider(t *testing.T) {
+	// Build a catalog with a model on a non-operator provider that claims operate capability.
+	entries := []ModelCatalogEntry{
+		{
+			ID:           "fake-ollama-op",
+			Aliases:      []string{"fake-op"},
+			Provider:     "ollama",
+			Tier:         TierExecution,
+			Capabilities: []Capability{CapTools, CapCoding, CapOperate},
+			Pricing:      ModelPricing{InputPerMillion: 0, OutputPerMillion: 0},
+		},
+	}
+	cat, err := NewCatalog(entries)
+	require.NoError(t, err)
+
+	resolver := NewResolver(cat, nil, ResolverDefaults{
+		Provider: "ollama",
+		Model:    "fake-ollama-op",
+	})
+
+	_, err = resolver.Resolve(ResolutionInput{
+		Role:       "worker",
+		CanOperate: true,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be used with CanOperate")
 }
 
 func TestResolve_ProfileTemperature(t *testing.T) {

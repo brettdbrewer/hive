@@ -143,16 +143,17 @@ func (r *Resolver) Resolve(input ResolutionInput) (ResolvedConfig, error) {
 	}
 
 	// Layer 7: CanOperate constraint — provider must support agentic tool use.
-	// Currently claude-cli and codex-cli implement IOperator. If the resolved
-	// provider is neither, fall back to claude-cli.
+	// Currently claude-cli and codex-cli implement IOperator. Reject if the
+	// resolved provider can't operate — silently forcing a different provider
+	// would create broken pairs like claude-cli/deepseek-v4-pro.
 	if input.CanOperate {
 		switch rc.Provider {
 		case "claude-cli", "codex-cli":
 			// Already an Operate-capable provider — keep it.
 		default:
-			rc.Trace = append(rc.Trace, fmt.Sprintf("provider: CanOperate forced claude-cli (was %s)", rc.Provider))
-			rc.Provider = "claude-cli"
-			rc.AuthMode = AuthSubscription
+			return ResolvedConfig{}, fmt.Errorf(
+				"model %s (provider %s) cannot be used with CanOperate — only claude-cli and codex-cli support Operate",
+				rc.Model, rc.Provider)
 		}
 	}
 
@@ -173,7 +174,8 @@ func (r *Resolver) Resolve(input ResolutionInput) (ResolvedConfig, error) {
 		}
 	}
 
-	// Cost cap enforcement.
+	// Cost cap enforcement. Uses a reference call size of 10k input + 2k output
+	// tokens as the estimation basis (documented in RoleModelPolicy).
 	if input.Policy != nil && input.Policy.MaxCostPerCallUSD != nil {
 		estimatedCost := entry.Pricing.EstimateCost(10_000, 2_000)
 		if estimatedCost > *input.Policy.MaxCostPerCallUSD {
