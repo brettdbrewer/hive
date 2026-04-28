@@ -7,6 +7,7 @@ import (
 	"github.com/transpara-ai/eventgraph/go/pkg/event"
 	"github.com/transpara-ai/eventgraph/go/pkg/types"
 
+	"github.com/transpara-ai/hive/pkg/health"
 	"github.com/transpara-ai/hive/pkg/resources"
 )
 
@@ -224,6 +225,179 @@ func TestHealthCommandCausalChain(t *testing.T) {
 	}
 	if c1.Overall == c2.Overall {
 		t.Errorf("expected different severities, both are %v", c1.Overall)
+	}
+}
+
+func TestEmitHealthReport_WithAgentVitals(t *testing.T) {
+	// One HealthCommand carrying 3 AgentVitals must produce 1 health.report
+	// + 3 agent.vital.reported events on the chain, all sharing the same
+	// HealthReportCycleID. See design v0.1.8 §5.2.
+	provider := newMockProvider("/signal {\"signal\": \"IDLE\"}")
+	agent := testHiveAgent(t, provider, "sysmon", "test-sysmon")
+
+	l, err := New(Config{
+		Agent:   agent,
+		HumanID: humanID(),
+		Budget:  resources.BudgetConfig{MaxIterations: 10},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &HealthCommand{
+		Severity:     "ok",
+		ChainOK:      true,
+		ActiveAgents: 3,
+		EventRate:    12.0,
+		AgentVitals: []AgentVital{
+			{AgentID: "actor_aaa", IterationsPct: 0.4, TrustScore: 0.9, BudgetBurnRatePerHour: 18.5, LastHeartbeatTicks: 3, Severity: health.SeverityOK},
+			{AgentID: "actor_bbb", IterationsPct: 0.85, TrustScore: 0.7, BudgetBurnRatePerHour: 42.0, LastHeartbeatTicks: 17, Severity: health.SeverityWarning},
+			{AgentID: "actor_ccc", IterationsPct: 0.2, TrustScore: 0.95, BudgetBurnRatePerHour: 9.0, LastHeartbeatTicks: 1, Severity: health.SeverityOK},
+		},
+	}
+	if err := l.emitHealthReport(cmd); err != nil {
+		t.Fatalf("emitHealthReport: %v", err)
+	}
+
+	g := agent.Graph()
+
+	// 1 health.report
+	hpage, err := g.Store().ByType(event.EventTypeHealthReport, 10, types.None[types.Cursor]())
+	if err != nil {
+		t.Fatalf("ByType health.report: %v", err)
+	}
+	if len(hpage.Items()) != 1 {
+		t.Fatalf("health.report count = %d, want 1", len(hpage.Items()))
+	}
+
+	// 3 agent.vital.reported
+	vpage, err := g.Store().ByType(event.EventTypeAgentVitalReported, 10, types.None[types.Cursor]())
+	if err != nil {
+		t.Fatalf("ByType agent.vital.reported: %v", err)
+	}
+	if len(vpage.Items()) != 3 {
+		t.Fatalf("agent.vital.reported count = %d, want 3", len(vpage.Items()))
+	}
+
+	// All three vitals share the same cycle id
+	cycleIDs := map[string]bool{}
+	for _, ev := range vpage.Items() {
+		c, ok := ev.Content().(event.AgentVitalReportedContent)
+		if !ok {
+			t.Fatalf("event content is %T, want AgentVitalReportedContent", ev.Content())
+		}
+		if c.HealthReportCycleID == "" {
+			t.Error("HealthReportCycleID is empty on agent.vital.reported event")
+		}
+		cycleIDs[c.HealthReportCycleID] = true
+	}
+	if len(cycleIDs) != 1 {
+		t.Errorf("distinct cycle ids across 3 vitals = %d, want 1 (same cycle)", len(cycleIDs))
+	}
+}
+
+func TestEmitHealthReport_NoAgentVitals(t *testing.T) {
+	// HealthCommand with no AgentVitals must produce 1 health.report
+	// + 0 agent.vital.reported events. Backward compatibility for any
+	// /health command shape that omits agent_vitals.
+	provider := newMockProvider("/signal {\"signal\": \"IDLE\"}")
+	agent := testHiveAgent(t, provider, "sysmon", "test-sysmon")
+
+	l, err := New(Config{
+		Agent:   agent,
+		HumanID: humanID(),
+		Budget:  resources.BudgetConfig{MaxIterations: 10},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := &HealthCommand{Severity: "ok", ChainOK: true, ActiveAgents: 0, EventRate: 0.0}
+	if err := l.emitHealthReport(cmd); err != nil {
+		t.Fatalf("emitHealthReport: %v", err)
+	}
+
+	g := agent.Graph()
+	hpage, _ := g.Store().ByType(event.EventTypeHealthReport, 10, types.None[types.Cursor]())
+	if len(hpage.Items()) != 1 {
+		t.Errorf("health.report count = %d, want 1", len(hpage.Items()))
+	}
+	vpage, _ := g.Store().ByType(event.EventTypeAgentVitalReported, 10, types.None[types.Cursor]())
+	if len(vpage.Items()) != 0 {
+		t.Errorf("agent.vital.reported count = %d, want 0", len(vpage.Items()))
+	}
+}
+
+func TestEmitHealthReport_RuntimeCanary(t *testing.T) {
+	// Runtime canary per design v0.1.8 §5.5 + A13.
+	//
+	// SCOPE — what this test actually verifies: across N synthesized health
+	// cycles, at least M produced at least one agent.vital.reported event
+	// with a distinct cycle_id. The assertion runs against the count of
+	// distinct HealthReportCycleID values on emitted agent.vital.reported
+	// events.
+	//
+	// SCOPE LIMIT — what this test does NOT verify: cross-event correlation
+	// between health.report and agent.vital.reported (i.e. that for each
+	// health.report there is a matching vital with the same cycle_id).
+	// HealthReportContent has no CycleID field today (eventgraph follow-up),
+	// so the umbrella event carries no cycle_id to match against. Until that
+	// lands the canary's signal is one-sided: if the SysMon role prompt
+	// regresses and the LLM stops emitting agent_vitals, the distinct-cycle
+	// count drops below M and this test fires.
+	//
+	// In a deterministic test we control the input: 8 of 10 cycles carry
+	// vitals; 2 do not (simulating cycles where the LLM legitimately reports
+	// no observable agents). The canary must pass with M=8.
+	const N = 10
+	const M = 8
+
+	provider := newMockProvider("/signal {\"signal\": \"IDLE\"}")
+	agent := testHiveAgent(t, provider, "sysmon", "test-sysmon")
+
+	l, err := New(Config{
+		Agent:   agent,
+		HumanID: humanID(),
+		Budget:  resources.BudgetConfig{MaxIterations: 100},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < N; i++ {
+		cmd := &HealthCommand{Severity: "ok", ChainOK: true, ActiveAgents: 3, EventRate: 12.0}
+		if i < M {
+			cmd.AgentVitals = []AgentVital{
+				{AgentID: "actor_aaa", IterationsPct: 0.4, TrustScore: 0.9, Severity: health.SeverityOK},
+				{AgentID: "actor_bbb", IterationsPct: 0.5, TrustScore: 0.85, Severity: health.SeverityOK},
+			}
+		}
+		if err := l.emitHealthReport(cmd); err != nil {
+			t.Fatalf("emitHealthReport[%d]: %v", i, err)
+		}
+	}
+
+	g := agent.Graph()
+	hpage, _ := g.Store().ByType(event.EventTypeHealthReport, 100, types.None[types.Cursor]())
+	if len(hpage.Items()) != N {
+		t.Fatalf("health.report count = %d, want %d", len(hpage.Items()), N)
+	}
+	vpage, _ := g.Store().ByType(event.EventTypeAgentVitalReported, 1000, types.None[types.Cursor]())
+
+	// Bucket vitals by cycle_id; assert ≥ M distinct cycle_ids exist.
+	cycles := map[string]int{}
+	for _, ev := range vpage.Items() {
+		c, ok := ev.Content().(event.AgentVitalReportedContent)
+		if !ok {
+			continue
+		}
+		cycles[c.HealthReportCycleID]++
+	}
+	if len(cycles) < M {
+		t.Errorf("canary FAIL: distinct cycle_ids on agent.vital.reported = %d, want >= %d "+
+			"(of %d health.report events). SysMon role prompt may have regressed and "+
+			"stopped emitting agent_vitals — see design v0.1.8 §5.5 / A13.",
+			len(cycles), M, N)
 	}
 }
 
