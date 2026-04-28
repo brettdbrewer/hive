@@ -9,8 +9,10 @@ import (
 )
 
 // NewServer creates an http.Handler that mirrors the lovyou.ai REST API
-// surface, backed by a local Store. The apiKey is checked on every request
-// via Bearer token in the Authorization header.
+// surface, backed by a local Store. If apiKey is non-empty, every request
+// is checked for a Bearer token in the Authorization header that matches
+// apiKey. Passing an empty apiKey disables authentication entirely; this
+// is intended only for development against a private loopback bind.
 func NewServer(store *Store, apiKey string) http.Handler {
 	s := &server{store: store, apiKey: apiKey}
 
@@ -105,8 +107,19 @@ func (s *server) handleOp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// requireNodeID extracts node_id and returns "" after writing a 400 if
+	// it is missing. Callers must early-return when the second value is false.
+	requireNodeID := func() (string, bool) {
+		nodeID := stringField(m, "node_id", "")
+		if nodeID == "" {
+			http.Error(w, `missing "node_id" field`, http.StatusBadRequest)
+			return "", false
+		}
+		return nodeID, true
+	}
+
 	switch op {
-	case "intend":
+	case OpIntend:
 		kind := stringField(m, "kind", "task")
 		n := Node{
 			Kind:     kind,
@@ -119,43 +132,74 @@ func (s *server) handleOp(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "intend", "node": created})
+		writeJSON(w, map[string]any{"op": OpIntend, "node": created})
 
-	case "complete":
-		nodeID := stringField(m, "node_id", "")
-		if err := s.store.CompleteNode(nodeID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+	case OpComplete:
+		nodeID, ok := requireNodeID()
+		if !ok {
 			return
 		}
-		writeJSON(w, map[string]any{"op": "complete", "status": "ok"})
+		if err := s.store.CompleteNode(spaceID, nodeID); err != nil {
+			s.writeStoreErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"op": OpComplete, "status": "ok"})
 
-	case "edit":
-		nodeID := stringField(m, "node_id", "")
+	case OpOpen:
+		nodeID, ok := requireNodeID()
+		if !ok {
+			return
+		}
+		if err := s.store.OpenNode(spaceID, nodeID); err != nil {
+			s.writeStoreErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"op": OpOpen, "status": "ok"})
+
+	case OpEdit:
+		nodeID, ok := requireNodeID()
+		if !ok {
+			return
+		}
 		state := stringField(m, "state", "")
-		if err := s.store.UpdateNodeState(nodeID, state); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if state == "" {
+			http.Error(w, `missing "state" field`, http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "edit", "status": "ok"})
-
-	case "claim":
-		nodeID := stringField(m, "node_id", "")
-		if err := s.store.ClaimNode(nodeID, "agent"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if err := s.store.UpdateNodeStateInSpace(spaceID, nodeID, state); err != nil {
+			s.writeStoreErr(w, err)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "claim", "status": "ok"})
+		writeJSON(w, map[string]any{"op": OpEdit, "status": "ok"})
 
-	case "assign":
-		nodeID := stringField(m, "node_id", "")
+	case OpClaim:
+		nodeID, ok := requireNodeID()
+		if !ok {
+			return
+		}
+		if err := s.store.ClaimNode(spaceID, nodeID, "agent"); err != nil {
+			s.writeStoreErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"op": OpClaim, "status": "ok"})
+
+	case OpAssign:
+		nodeID, ok := requireNodeID()
+		if !ok {
+			return
+		}
 		assignee := stringField(m, "assignee", "")
-		if err := s.store.ClaimNode(nodeID, assignee); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if assignee == "" {
+			http.Error(w, `missing "assignee" field`, http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "assign", "status": "ok"})
+		if err := s.store.ClaimNode(spaceID, nodeID, assignee); err != nil {
+			s.writeStoreErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"op": OpAssign, "status": "ok"})
 
-	case "respond":
+	case OpRespond:
 		n := Node{
 			Kind:     "comment",
 			ParentID: stringField(m, "parent_id", ""),
@@ -166,9 +210,9 @@ func (s *server) handleOp(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "respond", "node": created})
+		writeJSON(w, map[string]any{"op": OpRespond, "node": created})
 
-	case "express":
+	case OpExpress:
 		n := Node{
 			Kind:  "post",
 			Title: stringField(m, "title", ""),
@@ -179,9 +223,9 @@ func (s *server) handleOp(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "express", "node": created})
+		writeJSON(w, map[string]any{"op": OpExpress, "node": created})
 
-	case "assert":
+	case OpAssert:
 		n := Node{
 			Kind:  "claim",
 			Title: stringField(m, "title", ""),
@@ -192,9 +236,9 @@ func (s *server) handleOp(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "assert", "node": created})
+		writeJSON(w, map[string]any{"op": OpAssert, "node": created})
 
-	case "discuss":
+	case OpDiscuss:
 		n := Node{
 			Kind:  "thread",
 			Title: stringField(m, "title", ""),
@@ -205,10 +249,25 @@ func (s *server) handleOp(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]any{"op": "discuss", "node": created})
+		writeJSON(w, map[string]any{"op": OpDiscuss, "node": created})
 
 	default:
 		http.Error(w, "unknown op: "+op, http.StatusBadRequest)
+	}
+}
+
+// writeStoreErr maps store errors to HTTP responses:
+//   - ErrNotFound    → 404 (node does not exist or belongs to a different space)
+//   - ErrInvalidState → 409 (state-specific precondition failed)
+//   - anything else  → 500
+func (s *server) writeStoreErr(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	case errors.Is(err, ErrInvalidState):
+		http.Error(w, err.Error(), http.StatusConflict)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -315,8 +374,8 @@ func (s *server) handleEscalation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.store.UpdateNodeState(body.TaskID, "escalated"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if err := s.store.UpdateNodeState(body.TaskID, NodeStateEscalated); err != nil {
+		s.writeStoreErr(w, err)
 		return
 	}
 	writeJSON(w, map[string]any{"status": "ok"})

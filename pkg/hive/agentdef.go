@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lovyou-ai/hive/pkg/modelconfig"
+	"github.com/transpara-ai/hive/pkg/modelconfig"
 )
 
 // Model constants for LLM provider selection.

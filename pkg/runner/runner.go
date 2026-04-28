@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lovyou-ai/eventgraph/go/pkg/decision"
-	"github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
-	"github.com/lovyou-ai/hive/pkg/api"
-	"github.com/lovyou-ai/hive/pkg/modelconfig"
-	"github.com/lovyou-ai/hive/pkg/registry"
+	"github.com/transpara-ai/eventgraph/go/pkg/decision"
+	"github.com/transpara-ai/eventgraph/go/pkg/intelligence"
+	"github.com/transpara-ai/hive/pkg/api"
+	"github.com/transpara-ai/hive/pkg/modelconfig"
+	"github.com/transpara-ai/hive/pkg/registry"
 )
 
 

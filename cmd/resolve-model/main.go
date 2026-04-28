@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/lovyou-ai/hive/pkg/modelconfig"
+	"github.com/transpara-ai/hive/pkg/modelconfig"
 )
 
 func main() {

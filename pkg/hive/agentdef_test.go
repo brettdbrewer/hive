@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lovyou-ai/hive/pkg/modelconfig"
+	"github.com/transpara-ai/hive/pkg/modelconfig"
 )
 
 func TestAgentDefValidate(t *testing.T) {

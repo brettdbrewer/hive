@@ -1,6 +1,6 @@
 package modelconfig
 
-import "github.com/lovyou-ai/eventgraph/go/pkg/intelligence"
+import "github.com/transpara-ai/eventgraph/go/pkg/intelligence"
 
 // Provider option keys for ResolvedConfig.ProviderOptions.
 const (

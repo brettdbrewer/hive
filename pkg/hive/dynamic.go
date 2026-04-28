@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/lovyou-ai/hive/pkg/modelconfig"
+	"github.com/transpara-ai/hive/pkg/modelconfig"
 )
 
 // dynamicAgentTracker manages the lifecycle of agents spawned after boot.
