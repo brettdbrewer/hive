@@ -24,9 +24,11 @@ type RoleModelPolicy struct {
 
 	// AllowDowngrade permits the resolver to pick a cheaper model
 	// if the preferred one exceeds budget constraints.
+	// NOTE: Advisory only — not yet enforced by the resolver.
 	AllowDowngrade bool `json:"allow_downgrade,omitempty" yaml:"allow_downgrade,omitempty"`
 
 	// SelectionStrategy guides how the resolver picks among candidates.
 	// Values: "exact", "lowest_cost", "balanced", "highest_capability", "latency_first"
+	// NOTE: Advisory only — not yet enforced by the resolver.
 	SelectionStrategy string `json:"selection_strategy,omitempty" yaml:"selection_strategy,omitempty"`
 }

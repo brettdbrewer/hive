@@ -173,6 +173,24 @@ func (r *Resolver) Resolve(input ResolutionInput) (ResolvedConfig, error) {
 		}
 	}
 
+	// Cost cap enforcement.
+	if input.Policy != nil && input.Policy.MaxCostPerCallUSD != nil {
+		estimatedCost := entry.Pricing.EstimateCost(10_000, 2_000)
+		if estimatedCost > *input.Policy.MaxCostPerCallUSD {
+			return ResolvedConfig{}, fmt.Errorf(
+				"model %s estimated cost $%.4f/call exceeds cost cap $%.4f",
+				entry.ID, estimatedCost, *input.Policy.MaxCostPerCallUSD)
+		}
+	}
+	if input.TaskOverride != nil && input.TaskOverride.MaxCostPerCallUSD != nil {
+		estimatedCost := entry.Pricing.EstimateCost(10_000, 2_000)
+		if estimatedCost > *input.TaskOverride.MaxCostPerCallUSD {
+			return ResolvedConfig{}, fmt.Errorf(
+				"model %s estimated cost $%.4f/call exceeds task cost cap $%.4f",
+				entry.ID, estimatedCost, *input.TaskOverride.MaxCostPerCallUSD)
+		}
+	}
+
 	rc.Trace = append(rc.Trace, fmt.Sprintf("resolved: %s/%s [%s]", rc.Provider, rc.Model, rc.AuthMode))
 	return rc, nil
 }

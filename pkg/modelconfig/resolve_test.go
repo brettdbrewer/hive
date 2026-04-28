@@ -250,3 +250,29 @@ func TestResolve_RoleDefault(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "test-haiku", rc.Model)
 }
+
+func TestResolve_MaxCostPerCallUSD(t *testing.T) {
+	r := testResolver(t)
+	maxCost := 0.05 // below opus pricing (10k*15/1M + 2k*75/1M = 0.15+0.15 = 0.30), above haiku (10k*0.8/1M + 2k*4/1M = 0.008+0.008 = 0.016)
+
+	// Resolving to opus should fail because it exceeds the cap.
+	_, err := r.Resolve(ResolutionInput{
+		Role: "cto", // resolves to opus via role defaults
+		Policy: &RoleModelPolicy{
+			MaxCostPerCallUSD: &maxCost,
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds cost cap")
+
+	// Resolving to haiku should succeed (its cost is below 0.05).
+	highCap := 1.0
+	rc, err := r.Resolve(ResolutionInput{
+		Role: "sysmon", // resolves to haiku via role defaults
+		Policy: &RoleModelPolicy{
+			MaxCostPerCallUSD: &highCap,
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "test-haiku", rc.Model)
+}
