@@ -9,6 +9,7 @@ import (
 	"github.com/transpara-ai/eventgraph/go/pkg/event"
 	"github.com/transpara-ai/eventgraph/go/pkg/types"
 	"github.com/transpara-ai/hive/pkg/loop"
+	"github.com/transpara-ai/hive/pkg/modelconfig"
 	"github.com/transpara-ai/hive/pkg/resources"
 	"github.com/transpara-ai/hive/pkg/telemetry"
 )
@@ -242,6 +243,12 @@ func (r *Runtime) spawnDynamicAgent(ctx context.Context, proposal event.RoleProp
 		CanOperate:    false, // trust must be earned; always false for spawned agents
 		MaxIterations: maxIter,
 		MaxDuration:   0,
+		RoleDefinition: &modelconfig.RoleDefinition{
+			Name:        proposal.Name,
+			Description: proposal.Reason,
+			Category:    "spawned",
+			CanOperate:  false,
+		},
 	}
 
 	agent, err := r.spawnAgent(ctx, def)
