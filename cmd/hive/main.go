@@ -114,7 +114,15 @@ func runIngest(specPath, space, apiBase, priority string) error {
 	var repoPath string
 	if os.Getenv("HIVE_INGEST_SKIP_REPO") == "" {
 		var err error
-		repoPath, err = ensureSpecRepo(slug, body)
+		auditEmitter, closeAudit, auditErr := newAuthorityAuditEmitter(ctx, os.Getenv("DATABASE_URL"))
+		if auditErr != nil {
+			log.Printf("[ingest] authority audit unavailable: %v", auditErr)
+		}
+		if closeAudit != nil {
+			defer closeAudit()
+		}
+
+		repoPath, err = ensureSpecRepo(slug, body, auditEmitter)
 		if err != nil {
 			return fmt.Errorf("ensure repo: %w", err)
 		}
@@ -238,7 +246,7 @@ func slugify(title string) string {
 // ensureSpecRepo creates a GitHub repo and local directory for a spec slug
 // if they don't already exist, and registers the repo in repos.json.
 // Returns early if the slug is already registered and the directory exists on disk.
-func ensureSpecRepo(slug, specBody string) (string, error) {
+func ensureSpecRepo(slug, specBody string, auditEmitter authorityRequestEmitter) (string, error) {
 	org := ingestOrg()
 	hiveDir := findHiveDir()
 	reposJSONPath := filepath.Join(hiveDir, "repos.json")
@@ -261,7 +269,7 @@ func ensureSpecRepo(slug, specBody string) (string, error) {
 		}
 	}
 
-	if err := authorizeIngestRepoBootstrap(slug, org, repoDir); err != nil {
+	if err := authorizeIngestRepoBootstrap(slug, org, repoDir, auditEmitter); err != nil {
 		return "", err
 	}
 
@@ -321,32 +329,47 @@ func ensureSpecRepo(slug, specBody string) (string, error) {
 	return repoDir, nil
 }
 
-func authorizeIngestRepoBootstrap(slug, org, repoDir string) error {
+func authorizeIngestRepoBootstrap(slug, org, repoDir string, auditEmitter authorityRequestEmitter) error {
 	var errs []error
 	if err := safety.RequireAuthorized(safety.ActionRepoCreate); err != nil {
+		outcome := safety.DefaultOutcome(safety.ActionRepoCreate)
 		log.Printf("repo.create.blocked action=%s outcome=%s org=%s repo=%s path=%s: %v",
 			safety.ActionRepoCreate,
-			safety.DefaultOutcome(safety.ActionRepoCreate),
+			outcome,
 			org,
 			slug,
 			repoDir,
 			err,
 		)
+		emitAuthorityRequest(auditEmitter, safety.ActionRepoCreate, outcome,
+			fmt.Sprintf("ingest repo bootstrap blocked: create %s/%s at %s", org, slug, repoDir))
 		errs = append(errs, err)
 	}
 	if err := safety.RequireAuthorized(safety.ActionRepoPushDefaultBranch); err != nil {
+		outcome := safety.DefaultOutcome(safety.ActionRepoPushDefaultBranch)
 		log.Printf("repo.push.blocked action=%s outcome=%s org=%s repo=%s branch=main path=%s git_args=%q: %v",
 			safety.ActionRepoPushDefaultBranch,
-			safety.DefaultOutcome(safety.ActionRepoPushDefaultBranch),
+			outcome,
 			org,
 			slug,
 			repoDir,
 			[]string{"push", "-u", org, "main"},
 			err,
 		)
+		emitAuthorityRequest(auditEmitter, safety.ActionRepoPushDefaultBranch, outcome,
+			fmt.Sprintf("ingest repo bootstrap blocked: initial push %s/%s main from %s", org, slug, repoDir))
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+func emitAuthorityRequest(auditEmitter authorityRequestEmitter, action safety.ProtectedAction, outcome safety.AuthorityOutcome, justification string) {
+	if auditEmitter == nil {
+		return
+	}
+	if err := auditEmitter.EmitAuthorityRequest(action, outcome, justification); err != nil {
+		log.Printf("authority.requested emit failed action=%s: %v", action, err)
+	}
 }
 
 // repoInRegistry checks if a slug already exists in repos.json.
@@ -758,7 +781,15 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 
 	// Push ALL repos that have uncommitted changes — not just activeRepo.
 	// The Builder may have modified any repo via Operate().
-	if err := authorizeFinalPipelineSweep(repoMap, activeRepo); err != nil {
+	auditEmitter, closeAudit, auditErr := newAuthorityAuditEmitter(ctx, dsn)
+	if auditErr != nil {
+		log.Printf("[pipeline] authority audit unavailable: %v", auditErr)
+	}
+	if closeAudit != nil {
+		defer closeAudit()
+	}
+
+	if err := authorizeFinalPipelineSweep(repoMap, activeRepo, auditEmitter); err != nil {
 		return err
 	}
 	log.Printf("[pipeline] ── pushing ──")
@@ -798,18 +829,21 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 	return nil
 }
 
-func authorizeFinalPipelineSweep(repoMap map[string]string, activeRepo string) error {
+func authorizeFinalPipelineSweep(repoMap map[string]string, activeRepo string, auditEmitter authorityRequestEmitter) error {
 	if len(repoMap) == 0 {
 		return nil
 	}
 	if err := safety.RequireAuthorized(safety.ActionRepoMutateCrossRepo); err != nil {
+		outcome := safety.DefaultOutcome(safety.ActionRepoMutateCrossRepo)
 		log.Printf("repo.mutate_cross_repo.blocked action=%s outcome=%s repos=%d active_repo=%s: %v",
 			safety.ActionRepoMutateCrossRepo,
-			safety.DefaultOutcome(safety.ActionRepoMutateCrossRepo),
+			outcome,
 			len(repoMap),
 			activeRepo,
 			err,
 		)
+		emitAuthorityRequest(auditEmitter, safety.ActionRepoMutateCrossRepo, outcome,
+			fmt.Sprintf("final pipeline multi-repo sweep blocked: repos=%d active_repo=%s", len(repoMap), activeRepo))
 		return err
 	}
 	return nil

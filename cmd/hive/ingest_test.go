@@ -210,7 +210,7 @@ func TestAuthorizeIngestRepoBootstrapBlocksProtectedActionsByDefault(t *testing.
 	restoreLogs := captureMainLogs(&logs)
 	defer restoreLogs()
 
-	err := authorizeIngestRepoBootstrap("new-service", "transpara-ai", "/tmp/new-service")
+	err := authorizeIngestRepoBootstrap("new-service", "transpara-ai", "/tmp/new-service", nil)
 	if err == nil {
 		t.Fatal("expected repo create authority error")
 	}

@@ -17,7 +17,7 @@ func TestAuthorizeFinalPipelineSweepBlocksRepoMapByDefault(t *testing.T) {
 	err := authorizeFinalPipelineSweep(map[string]string{
 		"hive": "/tmp/hive",
 		"site": "/tmp/site",
-	}, "/tmp/hive")
+	}, "/tmp/hive", nil)
 	if err == nil {
 		t.Fatal("expected cross-repo mutation authority error")
 	}
@@ -47,7 +47,7 @@ func TestAuthorizeFinalPipelineSweepAllowsSingleRepoDirectPushPath(t *testing.T)
 	restoreLogs := captureMainLogs(&logs)
 	defer restoreLogs()
 
-	if err := authorizeFinalPipelineSweep(nil, "/tmp/hive"); err != nil {
+	if err := authorizeFinalPipelineSweep(nil, "/tmp/hive", nil); err != nil {
 		t.Fatalf("authorizeFinalPipelineSweep with no repo map: %v", err)
 	}
 	if strings.Contains(logs.String(), "repo.mutate_cross_repo.blocked") {
