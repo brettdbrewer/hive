@@ -53,6 +53,7 @@ import (
 	"github.com/transpara-ai/hive/pkg/reconciliation"
 	"github.com/transpara-ai/hive/pkg/registry"
 	"github.com/transpara-ai/hive/pkg/runner"
+	"github.com/transpara-ai/hive/pkg/safety"
 	"github.com/transpara-ai/hive/pkg/telemetry"
 	"github.com/transpara-ai/work"
 )
@@ -725,8 +726,11 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 
 	// Push ALL repos that have uncommitted changes — not just activeRepo.
 	// The Builder may have modified any repo via Operate().
+	if err := authorizeFinalPipelineSweep(repoMap, activeRepo); err != nil {
+		return err
+	}
 	log.Printf("[pipeline] ── pushing ──")
-	needsDeploy := false
+	siteChanged := false
 	for name, repoPath := range repoMap {
 		pusher := runner.New(runner.Config{RepoPath: repoPath})
 		if pusher.HasChanges() {
@@ -741,7 +745,7 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 			} else {
 				log.Printf("[pipeline] %s pushed", name)
 				if name == "site" {
-					needsDeploy = true
+					siteChanged = true
 				}
 			}
 		}
@@ -754,21 +758,28 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 		}
 	}
 
-	// Deploy if site was modified. Ship what you build.
-	if needsDeploy || filepath.Base(activeRepo) == "site" {
-		log.Printf("[pipeline] ── deploying site ──")
-		deployCmd := exec.CommandContext(ctx, filepath.Join(os.Getenv("HOME"), ".fly", "bin", "flyctl"), "deploy", "--remote-only")
-		deployCmd.Dir = activeRepo
-		deployCmd.Stdout = os.Stderr
-		deployCmd.Stderr = os.Stderr
-		if err := deployCmd.Run(); err != nil {
-			log.Printf("[pipeline] deploy error: %v", err)
-		} else {
-			log.Printf("[pipeline] deployed to production")
-		}
+	if siteChanged {
+		log.Printf("[pipeline] site changed; external deploy skipped (runtime target: Nucbuntu)")
 	}
 
 	log.Printf("[pipeline] ── cycle complete ──")
+	return nil
+}
+
+func authorizeFinalPipelineSweep(repoMap map[string]string, activeRepo string) error {
+	if len(repoMap) == 0 {
+		return nil
+	}
+	if err := safety.RequireAuthorized(safety.ActionRepoMutateCrossRepo); err != nil {
+		log.Printf("repo.mutate_cross_repo.blocked action=%s outcome=%s repos=%d active_repo=%s: %v",
+			safety.ActionRepoMutateCrossRepo,
+			safety.DefaultOutcome(safety.ActionRepoMutateCrossRepo),
+			len(repoMap),
+			activeRepo,
+			err,
+		)
+		return err
+	}
 	return nil
 }
 
