@@ -160,9 +160,6 @@ func (r *Runner) reviewCommit(ctx context.Context, c commit) {
 
 	switch verdict {
 	case "REVISE":
-		if r.cfg.ProposalMode {
-			r.writePRProposalForCommit(c, "critic requested revision")
-		}
 		// Extract the issues and create a fix task caused by the critique claim.
 		issues := extractIssues(content)
 		title := fixTitle(c.subject)
@@ -188,9 +185,6 @@ func (r *Runner) reviewCommit(ctx context.Context, c commit) {
 
 	case "PASS":
 		log.Printf("[critic] PASS: %s", c.hash[:12])
-		if r.cfg.ProposalMode {
-			r.writePRProposalForCommit(c, "critic passed")
-		}
 		if r.cfg.PRMode {
 			r.maybeCreatePR(c)
 		}
