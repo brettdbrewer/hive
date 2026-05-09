@@ -14,8 +14,8 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", envOrDefault("HIVE_OPS_API_ADDR", ":8083"), "listen address")
-	apiKey := flag.String("api-key", os.Getenv("HIVE_OPS_API_KEY"), "bearer token for Site operator projection reads")
+	addr := flag.String("addr", envOrDefault("HIVE_OPS_API_ADDR", "127.0.0.1:8083"), "listen address")
+	apiKey := flag.String("api-key", envOrDefault("HIVE_OPS_API_KEY", "dev"), "bearer token for Site operator projection reads")
 	limit := flag.Int("limit", 50, "maximum records per projection section")
 	flag.Parse()
 
