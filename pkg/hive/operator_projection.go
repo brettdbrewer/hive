@@ -104,12 +104,14 @@ func BuildOperatorProjection(s store.Store, limit int) OperatorProjection {
 	decisionEvents := readProjectionEvents(&p, s, EventTypeAuthorityDecisionRecorded, limit)
 
 	requests := make(map[string]OperatorApprovalProjection)
+	requestIDs := make(map[string]struct{})
 	for _, pe := range requestEvents {
 		content, ok := pe.event.Content().(AuthorityRequestRecordedContent)
 		if !ok {
 			p.Errors = append(p.Errors, contentTypeError(pe.event, "AuthorityRequestRecordedContent"))
 			continue
 		}
+		requestIDs[content.RequestID.Value()] = struct{}{}
 		requests[content.RequestID.Value()] = OperatorApprovalProjection{
 			EventID:           pe.event.ID().Value(),
 			RequestID:         content.RequestID.Value(),
@@ -154,6 +156,7 @@ func BuildOperatorProjection(s store.Store, limit int) OperatorProjection {
 	sort.Slice(p.AuthorityDecisions, func(i, j int) bool {
 		return p.AuthorityDecisions[i].CreatedAt.After(p.AuthorityDecisions[j].CreatedAt)
 	})
+	decided = readDecisionRequestIDsForCandidates(&p, s, requestIDs, limit)
 
 	for requestID, request := range requests {
 		if _, ok := decided[requestID]; !ok {
@@ -181,6 +184,39 @@ func readProjectionEvents(p *OperatorProjection, s store.Store, eventType types.
 		events = append(events, projectionEvent{event: item})
 	}
 	return events
+}
+
+func readDecisionRequestIDsForCandidates(p *OperatorProjection, s store.Store, requestIDs map[string]struct{}, limit int) map[string]struct{} {
+	decided := make(map[string]struct{})
+	if len(requestIDs) == 0 {
+		return decided
+	}
+	cursor := types.None[types.Cursor]()
+	for {
+		page, err := s.ByType(EventTypeAuthorityDecisionRecorded, limit, cursor)
+		if err != nil {
+			p.Errors = append(p.Errors, fmt.Sprintf("read %s for pending resolution: %v", EventTypeAuthorityDecisionRecorded.Value(), err))
+			return decided
+		}
+		for _, item := range page.Items() {
+			content, ok := item.Content().(AuthorityDecisionRecordedContent)
+			if !ok {
+				p.Errors = append(p.Errors, contentTypeError(item, "AuthorityDecisionRecordedContent"))
+				continue
+			}
+			requestID := content.RequestID.Value()
+			if _, ok := requestIDs[requestID]; ok {
+				decided[requestID] = struct{}{}
+				if len(decided) == len(requestIDs) {
+					return decided
+				}
+			}
+		}
+		if !page.HasMore() {
+			return decided
+		}
+		cursor = page.Cursor()
+	}
 }
 
 func buildLifecycleProjection(p *OperatorProjection, s store.Store, limit int) []OperatorLifecycleProjection {

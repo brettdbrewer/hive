@@ -64,6 +64,64 @@ func TestBuildOperatorProjectionPendingAndDecisions(t *testing.T) {
 	}
 }
 
+func TestBuildOperatorProjectionPendingScansBeyondDecisionDisplayLimit(t *testing.T) {
+	s, actorID, appendEvent := newOperatorProjectionStore(t)
+
+	decidedRequestID := newTestEventID(t)
+	appendEvent(EventTypeAuthorityRequestRecorded, AuthorityRequestRecordedContent{
+		RequestID:        decidedRequestID,
+		RequestingActor:  actorID,
+		ActionName:       "agent.retire",
+		Target:           "actor_decided",
+		Environment:      "production",
+		RequestedOutcome: "retire agent",
+		Justification:    "completed mandate",
+		RiskSummary:      "protected lifecycle action",
+	})
+	appendEvent(EventTypeAuthorityDecisionRecorded, AuthorityDecisionRecordedContent{
+		DecisionID:     "decision-older",
+		RequestID:      decidedRequestID,
+		ApproverActor:  actorID,
+		Outcome:        "approved",
+		ApprovedTarget: "actor_decided",
+		ApprovedAction: "agent.retire",
+		Rationale:      "valid evidence",
+	})
+
+	pendingRequestID := newTestEventID(t)
+	appendEvent(EventTypeAuthorityRequestRecorded, AuthorityRequestRecordedContent{
+		RequestID:        pendingRequestID,
+		RequestingActor:  actorID,
+		ActionName:       "agent.revoke",
+		Target:           "actor_pending",
+		Environment:      "production",
+		RequestedOutcome: "revoke agent",
+		Justification:    "needs operator decision",
+		RiskSummary:      "protected lifecycle action",
+	})
+
+	for i := 0; i < 3; i++ {
+		appendEvent(EventTypeAuthorityDecisionRecorded, AuthorityDecisionRecordedContent{
+			DecisionID:     "decision-unrelated",
+			RequestID:      newTestEventID(t),
+			ApproverActor:  actorID,
+			Outcome:        "approved",
+			ApprovedTarget: "unrelated",
+			ApprovedAction: "agent.spawn.persistent",
+			Rationale:      "unrelated history",
+		})
+	}
+
+	projection := BuildOperatorProjection(s, 2)
+
+	if len(projection.PendingApprovals) != 1 {
+		t.Fatalf("pending approvals = %d, want 1: %+v", len(projection.PendingApprovals), projection.PendingApprovals)
+	}
+	if projection.PendingApprovals[0].RequestID != pendingRequestID.Value() {
+		t.Fatalf("pending request ID = %q, want %q", projection.PendingApprovals[0].RequestID, pendingRequestID.Value())
+	}
+}
+
 func TestBuildOperatorProjectionLifecycleAndKeyAudit(t *testing.T) {
 	s, actorID, appendEvent := newOperatorProjectionStore(t)
 	publicKey := types.MustPublicKey(make([]byte, 32))
