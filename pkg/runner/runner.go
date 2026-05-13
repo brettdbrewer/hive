@@ -19,30 +19,32 @@ import (
 	"github.com/transpara-ai/hive/pkg/api"
 	"github.com/transpara-ai/hive/pkg/modelconfig"
 	"github.com/transpara-ai/hive/pkg/registry"
+	"github.com/transpara-ai/hive/pkg/safety"
 )
-
 
 // Config holds everything a Runner needs.
 type Config struct {
-	Role       string // e.g. "builder"
-	AgentID    string // lovyou.ai user ID for this agent (filters task assignment)
-	SpaceSlug  string // lovyou.ai space slug (e.g. "hive")
-	RepoPath   string // absolute path to the repo to operate on
-	HiveDir    string // path to hive repo (for state.md, role prompts)
-	APIClient  *api.Client
-	APIBase    string // Base URL for agent curl commands (e.g. "http://localhost:8082")
-	Provider   intelligence.Provider
-	RolePrompt string // loaded from agents/{role}.md
-	Interval   time.Duration
-	BudgetUSD     float64 // daily budget, 0 = $10 default
-	OneShot       bool    // if true, work one task then exit (for testing)
-	NoPush        bool              // if true, commit but don't push (pipeline pushes after Critic PASS)
-	PRMode        bool              // if true, create a feature branch before committing
-	CouncilTopic    string            // optional: focus the council on a specific question
-	RepoMap         map[string]string // named repos: name → absolute path (for multi-repo pipeline)
-	BaselineCommit  string            // commit hash before Builder ran — Critic only reviews after this
-	Registry        *registry.Registry // repo metadata for prompts, build/test commands
-	UseWorktrees    bool              // if true, each Builder task gets its own git worktree
+	Role           string // e.g. "builder"
+	AgentID        string // lovyou.ai user ID for this agent (filters task assignment)
+	SpaceSlug      string // lovyou.ai space slug (e.g. "hive")
+	RepoPath       string // absolute path to the repo to operate on
+	HiveDir        string // path to hive repo (for state.md, role prompts)
+	APIClient      *api.Client
+	APIBase        string // Base URL for agent curl commands (e.g. "http://localhost:8082")
+	Provider       intelligence.Provider
+	RolePrompt     string // loaded from agents/{role}.md
+	Interval       time.Duration
+	BudgetUSD      float64            // daily budget, 0 = $10 default
+	OneShot        bool               // if true, work one task then exit (for testing)
+	Direct         bool               // if true, use legacy direct push behavior
+	NoPush         bool               // if true, commit but don't push (pipeline pushes after Critic PASS)
+	PRMode         bool               // if true, create a feature branch before committing
+	ProposalMode   bool               // if true, non-builder phases update local PR proposal artifacts
+	CouncilTopic   string             // optional: focus the council on a specific question
+	RepoMap        map[string]string  // named repos: name → absolute path (for multi-repo pipeline)
+	BaselineCommit string             // commit hash before Builder ran — Critic only reviews after this
+	Registry       *registry.Registry // repo metadata for prompts, build/test commands
+	UseWorktrees   bool               // if true, each Builder task gets its own git worktree
 }
 
 // CostTracker records per-call spending.
@@ -568,6 +570,135 @@ func (r *Runner) gitDiffStat() string {
 	return s
 }
 
+func (r *Runner) gitDiffStatForCommit(hash string) string {
+	if hash == "" {
+		return r.gitDiffStat()
+	}
+	cmd := exec.Command("git", "show", "--stat", hash)
+	cmd.Dir = r.cfg.RepoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	s := strings.TrimSpace(string(out))
+	if len(s) > 1000 {
+		s = s[:1000] + "\n... (truncated)"
+	}
+	return s
+}
+
+// writePRProposal writes a local PR-ready proposal artifact. In default
+// builder mode this replaces branch pushes and remote PR creation.
+func (r *Runner) writePRProposal(t api.Node, buildStatus, reviewStatus string) {
+	hash := r.gitHash()
+	r.writePRProposalContent(t.Title, t.Body, hash, r.currentBranch(), r.gitDiffStatForCommit(hash), buildStatus, reviewStatus, []string{t.ID})
+}
+
+func (r *Runner) writePRProposalForCommit(c commit, reviewStatus string) {
+	title := prTitleFromSubject(c.subject)
+	branch := r.existingProposalBranch()
+	if branch == "" {
+		branch = r.currentBranch()
+	}
+	r.writePRProposalContent(title, r.existingProposalTaskSummary(), c.hash, branch, r.gitDiffStatForCommit(c.hash), "build status carried from builder phase when available", reviewStatus, nil)
+}
+
+func (r *Runner) existingProposalTaskSummary() string {
+	path := filepath.Join(r.cfg.HiveDir, "loop", "pr-proposal.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	content := string(data)
+	marker := "\n## Task Summary\n\n"
+	start := strings.Index(content, marker)
+	if start == -1 {
+		return ""
+	}
+	summary := content[start+len(marker):]
+	if end := strings.Index(summary, "\n## "); end != -1 {
+		summary = summary[:end]
+	}
+	return strings.TrimSpace(summary)
+}
+
+func (r *Runner) existingProposalBranch() string {
+	path := filepath.Join(r.cfg.HiveDir, "loop", "pr-proposal.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "- **Branch:**") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "- **Branch:**"))
+		}
+	}
+	return ""
+}
+
+func (r *Runner) writePRProposalContent(title, body, hash, branch, diffStat, buildStatus, reviewStatus string, causes []string) {
+	if title == "" {
+		title = "Untitled builder proposal"
+	}
+	if branch == "" {
+		branch = "unknown"
+	}
+	if hash == "" {
+		hash = "unknown"
+	}
+	if len(body) > 600 {
+		body = body[:600] + "..."
+	}
+
+	critiquePath := filepath.Join(r.cfg.HiveDir, "loop", "critique.md")
+	critiqueRef := ""
+	if _, err := os.Stat(critiquePath); err == nil {
+		critiqueRef = "loop/critique.md"
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("# PR Proposal: %s\n\n", title))
+	b.WriteString(fmt.Sprintf("- **Branch:** %s\n", branch))
+	b.WriteString(fmt.Sprintf("- **Commit:** %s\n", hash))
+	if buildStatus != "" {
+		b.WriteString(fmt.Sprintf("- **Build/Test Status:** %s\n", buildStatus))
+	}
+	if reviewStatus != "" {
+		b.WriteString(fmt.Sprintf("- **Review Status:** %s\n", reviewStatus))
+	}
+	if critiqueRef != "" {
+		b.WriteString(fmt.Sprintf("- **Critic Reference:** %s\n", critiqueRef))
+	}
+	b.WriteString("- **Authority:** Push, remote PR creation, deployment, or merge requires explicit human approval.\n")
+	if body != "" {
+		b.WriteString(fmt.Sprintf("\n## Task Summary\n\n%s\n", body))
+	}
+	if diffStat != "" {
+		b.WriteString(fmt.Sprintf("\n## Diff Stat\n\n```\n%s\n```\n", diffStat))
+	}
+
+	content := b.String()
+	path := filepath.Join(r.cfg.HiveDir, "loop", "pr-proposal.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		log.Printf("[runner] create loop dir for pr-proposal.md: %v", err)
+		return
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		log.Printf("[runner] write pr-proposal.md: %v", err)
+	}
+
+	if r.cfg.APIClient != nil {
+		cleanCauses := causes[:0]
+		for _, cause := range causes {
+			if cause != "" {
+				cleanCauses = append(cleanCauses, cause)
+			}
+		}
+		_, _ = r.cfg.APIClient.CreateDocument(r.cfg.SpaceSlug, fmt.Sprintf("PR Proposal: %s", title), content, cleanCauses)
+	}
+}
+
 // ─── Build verification ──────────────────────────────────────────────
 
 func (r *Runner) verifyBuild() error {
@@ -609,6 +740,9 @@ func (r *Runner) commitAndPush(t api.Node) error {
 		if err := r.git("checkout", "-B", branch); err != nil {
 			return fmt.Errorf("git checkout -B %s: %w", branch, err)
 		}
+		if r.worktree != nil {
+			r.worktree.Branch = branch
+		}
 		log.Printf("[builder] on feature branch: %s", branch)
 	}
 
@@ -626,6 +760,12 @@ func (r *Runner) commitAndPush(t api.Node) error {
 		return fmt.Errorf("git commit: %w", err)
 	}
 
+	if r.builderProposalMode() {
+		log.Printf("[builder] committed proposal locally: %s", msg)
+		r.writePRProposal(t, "build passed", "")
+		return nil
+	}
+
 	// Push (unless NoPush — pipeline pushes after Critic PASS).
 	if r.cfg.NoPush {
 		log.Printf("[builder] committed (no push — waiting for Critic): %s", msg)
@@ -634,6 +774,10 @@ func (r *Runner) commitAndPush(t api.Node) error {
 
 	// When on a feature branch, push with upstream tracking set.
 	if branch != "" {
+		args := []string{"push", "--set-upstream", "origin", branch}
+		if err := r.authorizeRepoPush("commitAndPush.feature_branch", branch, args, t); err != nil {
+			return err
+		}
 		if err := r.git("push", "--set-upstream", "origin", branch); err != nil {
 			return fmt.Errorf("git push feature branch: %w", err)
 		}
@@ -641,6 +785,9 @@ func (r *Runner) commitAndPush(t api.Node) error {
 		return nil
 	}
 
+	if err := r.authorizeRepoPush("commitAndPush.current_branch", "", []string{"push"}, t); err != nil {
+		return err
+	}
 	if err := r.git("push"); err != nil {
 		return fmt.Errorf("git push: %w", err)
 	}
@@ -651,6 +798,9 @@ func (r *Runner) commitAndPush(t api.Node) error {
 
 // Push pushes the current branch. Called by the pipeline after Critic PASS.
 func (r *Runner) Push() error {
+	if err := r.authorizeRepoPush("Push", "", []string{"push"}, api.Node{}); err != nil {
+		return err
+	}
 	return r.git("push")
 }
 
@@ -665,6 +815,42 @@ func (r *Runner) CommitAll(msg string) error {
 		return fmt.Errorf("git add: %w", err)
 	}
 	return r.git("commit", "-m", msg)
+}
+
+func (r *Runner) authorizeRepoPush(path string, branch string, args []string, t api.Node) error {
+	if err := safety.RequireAuthorized(safety.ActionRepoPushDefaultBranch); err != nil {
+		if branch == "" {
+			branch = r.currentBranch()
+		}
+		log.Printf("repo.push.blocked action=%s outcome=%s role=%s repo=%s branch=%s path=%s task_id=%s task_title=%q git_args=%q: %v",
+			safety.ActionRepoPushDefaultBranch,
+			safety.DefaultOutcome(safety.ActionRepoPushDefaultBranch),
+			r.cfg.Role,
+			r.cfg.RepoPath,
+			branch,
+			path,
+			t.ID,
+			t.Title,
+			args,
+			err,
+		)
+		return err
+	}
+	return nil
+}
+
+func (r *Runner) builderProposalMode() bool {
+	return r.cfg.Role == "builder" && !r.cfg.Direct
+}
+
+func (r *Runner) currentBranch() string {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = r.cfg.RepoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func (r *Runner) git(args ...string) error {
@@ -728,9 +914,10 @@ func stripHivePrefix(s string) string {
 // interleaving. Returns the core title.
 //
 // Examples:
-//   "[hive:builder] Fix: X"                        → "X"
-//   "[hive:builder] Fix: [hive:builder] Fix: X"    → "X"
-//   "[hive:critic] [hive:builder] Fix: Fix: X"     → "X"
+//
+//	"[hive:builder] Fix: X"                        → "X"
+//	"[hive:builder] Fix: [hive:builder] Fix: X"    → "X"
+//	"[hive:critic] [hive:builder] Fix: Fix: X"     → "X"
 func stripRetryPrefixes(s string) string {
 	for {
 		before := s
@@ -819,7 +1006,7 @@ func branchSlug(title string, date time.Time) string {
 // buildBranchName returns the branch to create before committing, or "" when
 // PRMode is disabled (caller should skip the git checkout -b step).
 func buildBranchName(cfg Config, title string) string {
-	if !cfg.PRMode {
+	if !cfg.PRMode && !(cfg.Role == "builder" && !cfg.Direct) {
 		return ""
 	}
 	return branchSlug(title, time.Now())

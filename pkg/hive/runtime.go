@@ -25,11 +25,12 @@ import (
 	"github.com/transpara-ai/eventgraph/go/pkg/types"
 
 	hiveagent "github.com/transpara-ai/agent"
+	"github.com/transpara-ai/hive/pkg/api"
 	"github.com/transpara-ai/hive/pkg/checkpoint"
-	"github.com/transpara-ai/hive/pkg/modelconfig"
 	"github.com/transpara-ai/hive/pkg/knowledge"
 	"github.com/transpara-ai/hive/pkg/loop"
 	"github.com/transpara-ai/hive/pkg/membrane"
+	"github.com/transpara-ai/hive/pkg/modelconfig"
 	"github.com/transpara-ai/hive/pkg/resources"
 	"github.com/transpara-ai/hive/pkg/telemetry"
 	"github.com/transpara-ai/work"
@@ -38,10 +39,10 @@ import (
 // Runtime is the hive runtime. It manages agents, the shared graph,
 // the event bus, and the task store.
 type Runtime struct {
-	store   store.Store
-	actors  actor.IActorStore
-	graph   *graph.Graph
-	humanID types.ActorID
+	store        store.Store
+	actors       actor.IActorStore
+	graph        *graph.Graph
+	humanID      types.ActorID
 	defs         []AgentDef
 	membraneDefs []membrane.MembraneConfig
 
@@ -51,13 +52,17 @@ type Runtime struct {
 	convID  types.ConversationID
 
 	// Task store for agent coordination.
-	tasks *work.TaskStore
+	tasks      *work.TaskStore
+	phaseGates *work.PhaseGateStore
 
 	// Budget registry for cross-agent budget visibility and mutation.
 	budgetRegistry *resources.BudgetRegistry
 
 	// Telemetry writer (optional, nil when no postgres available).
 	telemetryWriter *telemetry.Writer
+
+	// API client for mirroring Hive task state back to Site. Optional.
+	apiClient *api.Client
 
 	// System actor for infrastructure events (knowledge, telemetry, etc.).
 	systemID types.ActorID
@@ -90,9 +95,9 @@ type Runtime struct {
 
 // Config holds the configuration needed to create a Runtime.
 type Config struct {
-	Store       store.Store
-	Actors      actor.IActorStore
-	HumanID     types.ActorID
+	Store           store.Store
+	Actors          actor.IActorStore
+	HumanID         types.ActorID
 	ApproveRequests bool   // --approve-requests: auto-approve authority requests
 	ApproveRoles    bool   // --approve-roles: auto-approve role proposals
 	RepoPath        string // --repo: path to repo for Operate
@@ -101,6 +106,9 @@ type Config struct {
 
 	// TelemetryWriter snapshots agent and hive state to postgres. Optional.
 	TelemetryWriter *telemetry.Writer
+
+	// APIClient mirrors terminal work task state back to Site. Optional.
+	APIClient *api.Client
 }
 
 // New creates a new hive Runtime.
@@ -138,6 +146,7 @@ func New(ctx context.Context, cfg Config) (*Runtime, error) {
 	}
 
 	tasks := work.NewTaskStore(cfg.Store, factory, signer)
+	phaseGates := work.NewPhaseGateStore(cfg.Store, factory, signer)
 
 	return &Runtime{
 		store:           cfg.Store,
@@ -149,12 +158,14 @@ func New(ctx context.Context, cfg Config) (*Runtime, error) {
 		factory:         factory,
 		convID:          convID,
 		tasks:           tasks,
+		phaseGates:      phaseGates,
 		approveRequests: cfg.ApproveRequests,
 		approveRoles:    cfg.ApproveRoles,
 		repoPath:        cfg.RepoPath,
 		loop:            cfg.Loop,
 		catalogPath:     cfg.CatalogPath,
 		telemetryWriter: cfg.TelemetryWriter,
+		apiClient:       cfg.APIClient,
 	}, nil
 }
 
@@ -383,12 +394,14 @@ func (r *Runtime) Run(ctx context.Context, seedIdea string) error {
 			Task:           seedIdea,
 
 			// Task coordination.
-			TaskStore:      r.tasks,
-			ConvID:         r.convID,
-			CanOperate:     def.CanOperate,
-			RepoPath:       r.repoPath,
-			Keepalive:      r.loop,
-			KnowledgeStore: r.knowledgeStore,
+			TaskStore:       r.tasks,
+			PhaseGateStore:  r.phaseGates,
+			ConvID:          r.convID,
+			OnTaskCompleted: r.mirrorTaskCompletion,
+			CanOperate:      def.CanOperate,
+			RepoPath:        r.repoPath,
+			Keepalive:       r.loop,
+			KnowledgeStore:  r.knowledgeStore,
 			CostSummaryFunc: func() string {
 				entries := r.budgetRegistry.Snapshot()
 				agents := make([]modelconfig.AgentModelEntry, 0, len(entries))
@@ -401,7 +414,7 @@ func (r *Runtime) Run(ctx context.Context, seedIdea string) error {
 				summaries := modelconfig.EstimateAgentCostsByModel(r.resolver.Catalog(), agents, 10_000, 2_000)
 				return modelconfig.FormatCostSummary(summaries)
 			},
-			Catalog:        r.resolver.Catalog(),
+			Catalog: r.resolver.Catalog(),
 			ActorResolver: func(id types.ActorID) string {
 				a, err := r.actors.Get(id)
 				if err != nil {
@@ -484,6 +497,11 @@ func buildCheckpointSink(thoughts checkpoint.ThoughtStore, role string) checkpoi
 // spawnAgent creates a hiveagent.Agent from an AgentDef.
 // It returns the agent and the resolved model name so callers can pass it to telemetry.
 func (r *Runtime) spawnAgent(ctx context.Context, def AgentDef) (*hiveagent.Agent, string, error) {
+	identity, err := prepareAgentIdentity(def)
+	if err != nil {
+		return nil, "", err
+	}
+
 	// Resolve model/provider through the precedence chain.
 	input := modelconfig.ResolutionInput{
 		Role:          def.Role,
@@ -510,6 +528,9 @@ func (r *Runtime) spawnAgent(ctx context.Context, def AgentDef) (*hiveagent.Agen
 		Name:           def.Name,
 		Graph:          r.graph,
 		Provider:       tracker,
+		Environment:    identity.AgentEnv,
+		IdentityMode:   identity.AgentMode,
+		SigningKey:     identity.SigningKey,
 		ConversationID: r.convID,
 	})
 	if err != nil {
@@ -524,6 +545,9 @@ func (r *Runtime) spawnAgent(ctx context.Context, def AgentDef) (*hiveagent.Agen
 		Model:   resolved.Model,
 		ActorID: agent.ID().Value(),
 	})
+	if err := r.emitAgentIdentityRegistered(agent.ID(), def, identity); err != nil {
+		return nil, "", fmt.Errorf("record identity provenance: %w", err)
+	}
 
 	// Emit role definition as a first-class event (queryable, versionable).
 	if def.RoleDefinition != nil {
@@ -542,6 +566,39 @@ func (r *Runtime) spawnAgent(ctx context.Context, def AgentDef) (*hiveagent.Agen
 	}
 
 	return agent, resolved.Model, nil
+}
+
+func (r *Runtime) emitAgentIdentityRegistered(agentID types.ActorID, def AgentDef, identity preparedAgentIdentity) error {
+	registered, err := r.actors.Get(agentID)
+	if err != nil {
+		return fmt.Errorf("lookup registered actor: %w", err)
+	}
+
+	var causes []types.EventID
+	head, err := r.store.Head()
+	if err != nil {
+		return fmt.Errorf("store head: %w", err)
+	}
+	if head.IsSome() {
+		causes = []types.EventID{head.Unwrap().ID()}
+	}
+
+	content := AgentIdentityRegisteredContent{
+		ActorID:          agentID,
+		DisplayName:      def.Name,
+		Role:             def.Role,
+		PublicKey:        registered.PublicKey(),
+		KeyProvenance:    string(identity.Provenance),
+		Environment:      string(identity.Environment),
+		IdentityMode:     string(identity.Mode),
+		ExternalKeyRef:   def.ExternalKeyRef,
+		LifecycleStatus:  "active",
+		AuthorityScope:   "hive",
+		RegistrationPath: "hive.runtime.spawnAgent",
+	}
+
+	_, err = r.graph.Record(EventTypeAgentIdentityRegistered, r.humanID, content, causes, r.convID, r.signer)
+	return err
 }
 
 // emit appends a hive event to the graph. Best-effort.

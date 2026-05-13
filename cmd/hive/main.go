@@ -53,6 +53,7 @@ import (
 	"github.com/transpara-ai/hive/pkg/reconciliation"
 	"github.com/transpara-ai/hive/pkg/registry"
 	"github.com/transpara-ai/hive/pkg/runner"
+	"github.com/transpara-ai/hive/pkg/safety"
 	"github.com/transpara-ai/hive/pkg/telemetry"
 	"github.com/transpara-ai/work"
 )
@@ -78,12 +79,12 @@ func run() error {
 // ─── Ingest mode ─────────────────────────────────────────────────────
 
 const (
-	ingestTitlePrefix  = "[SPEC] "
-	ingestOp           = "intend"
-	ingestKind         = "task"
-	ingestTimeout      = 30 * time.Second
-	ingestDefaultOrg   = "transpara-ai"
-	ingestDefaultLang  = "go"
+	ingestTitlePrefix = "[SPEC] "
+	ingestOp          = "intend"
+	ingestKind        = "task"
+	ingestTimeout     = 30 * time.Second
+	ingestDefaultOrg  = "transpara-ai"
+	ingestDefaultLang = "go"
 )
 
 // runIngest reads a markdown spec file, creates a repo for it (if needed),
@@ -113,7 +114,15 @@ func runIngest(specPath, space, apiBase, priority string) error {
 	var repoPath string
 	if os.Getenv("HIVE_INGEST_SKIP_REPO") == "" {
 		var err error
-		repoPath, err = ensureSpecRepo(slug, body)
+		auditEmitter, closeAudit, auditErr := newAuthorityAuditEmitter(ctx, os.Getenv("DATABASE_URL"))
+		if auditErr != nil {
+			log.Printf("[ingest] authority audit unavailable: %v", auditErr)
+		}
+		if closeAudit != nil {
+			defer closeAudit()
+		}
+
+		repoPath, err = ensureSpecRepo(slug, body, auditEmitter)
 		if err != nil {
 			return fmt.Errorf("ensure repo: %w", err)
 		}
@@ -237,7 +246,7 @@ func slugify(title string) string {
 // ensureSpecRepo creates a GitHub repo and local directory for a spec slug
 // if they don't already exist, and registers the repo in repos.json.
 // Returns early if the slug is already registered and the directory exists on disk.
-func ensureSpecRepo(slug, specBody string) (string, error) {
+func ensureSpecRepo(slug, specBody string, auditEmitter authorityRequestEmitter) (string, error) {
 	org := ingestOrg()
 	hiveDir := findHiveDir()
 	reposJSONPath := filepath.Join(hiveDir, "repos.json")
@@ -258,6 +267,10 @@ func ensureSpecRepo(slug, specBody string) (string, error) {
 			log.Printf("[ingest] repo %s already exists at %s", slug, repoDir)
 			return repoDir, nil
 		}
+	}
+
+	if err := authorizeIngestRepoBootstrap(slug, org, repoDir, auditEmitter); err != nil {
+		return "", err
 	}
 
 	repoURL := fmt.Sprintf("https://github.com/%s/%s.git", org, slug)
@@ -314,6 +327,49 @@ func ensureSpecRepo(slug, specBody string) (string, error) {
 	}
 
 	return repoDir, nil
+}
+
+func authorizeIngestRepoBootstrap(slug, org, repoDir string, auditEmitter authorityRequestEmitter) error {
+	var errs []error
+	if err := safety.RequireAuthorized(safety.ActionRepoCreate); err != nil {
+		outcome := safety.DefaultOutcome(safety.ActionRepoCreate)
+		log.Printf("repo.create.blocked action=%s outcome=%s org=%s repo=%s path=%s: %v",
+			safety.ActionRepoCreate,
+			outcome,
+			org,
+			slug,
+			repoDir,
+			err,
+		)
+		emitAuthorityRequest(auditEmitter, safety.ActionRepoCreate, outcome,
+			fmt.Sprintf("ingest repo bootstrap blocked: create %s/%s at %s", org, slug, repoDir))
+		errs = append(errs, err)
+	}
+	if err := safety.RequireAuthorized(safety.ActionRepoPushDefaultBranch); err != nil {
+		outcome := safety.DefaultOutcome(safety.ActionRepoPushDefaultBranch)
+		log.Printf("repo.push.blocked action=%s outcome=%s org=%s repo=%s branch=main path=%s git_args=%q: %v",
+			safety.ActionRepoPushDefaultBranch,
+			outcome,
+			org,
+			slug,
+			repoDir,
+			[]string{"push", "-u", org, "main"},
+			err,
+		)
+		emitAuthorityRequest(auditEmitter, safety.ActionRepoPushDefaultBranch, outcome,
+			fmt.Sprintf("ingest repo bootstrap blocked: initial push %s/%s main from %s", org, slug, repoDir))
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
+}
+
+func emitAuthorityRequest(auditEmitter authorityRequestEmitter, action safety.ProtectedAction, outcome safety.AuthorityOutcome, justification string) {
+	if auditEmitter == nil {
+		return
+	}
+	if err := auditEmitter.EmitAuthorityRequest(action, outcome, justification); err != nil {
+		log.Printf("authority.requested emit failed action=%s: %v", action, err)
+	}
 }
 
 // repoInRegistry checks if a slug already exists in repos.json.
@@ -378,7 +434,7 @@ func addToRegistry(path, slug, absPath, org, lang, buildCmd, testCmd string) err
 
 // ─── Runner mode ─────────────────────────────────────────────────────
 
-func runRunner(role, space, apiBase, repoPath string, budget float64, agentID string, oneShot, prMode bool) error {
+func runRunner(role, space, apiBase, repoPath string, budget float64, agentID string, oneShot, direct, prMode bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -429,12 +485,13 @@ func runRunner(role, space, apiBase, repoPath string, budget float64, agentID st
 		RepoPath:   absRepo,
 		HiveDir:    hiveDir,
 		APIClient:  client,
-		APIBase:   apiBase,
+		APIBase:    apiBase,
 		Provider:   provider,
 		RolePrompt: rolePrompt,
 		BudgetUSD:  budget,
 		OneShot:    oneShot,
-		PRMode:     prMode,
+		Direct:     direct || role != "builder",
+		PRMode:     direct && prMode,
 	})
 
 	log.Printf("hive agent starting: role=%s model=%s space=%s repo=%s agent-id=%s one-shot=%v",
@@ -477,7 +534,7 @@ func runCouncilCmd(space, apiBase, repoPath string, budget float64, topic string
 		RepoPath:     absRepo,
 		HiveDir:      hiveDir,
 		APIClient:    client,
-		APIBase:     apiBase,
+		APIBase:      apiBase,
 		Provider:     provider,
 		BudgetUSD:    budget,
 		CouncilTopic: topic,
@@ -487,7 +544,7 @@ func runCouncilCmd(space, apiBase, repoPath string, budget float64, topic string
 // ─── Pipeline mode ───────────────────────────────────────────────────
 
 // runPipeline runs Scout → Builder → Critic in sequence. One full cycle.
-func runPipeline(space, apiBase, repoPath string, budget float64, agentID string, repoMap map[string]string, prMode, useWorktrees, autoClone bool, storeDSN string) error {
+func runPipeline(space, apiBase, repoPath string, budget float64, agentID string, repoMap map[string]string, direct, prMode, useWorktrees, autoClone bool, storeDSN string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -590,19 +647,21 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 		log.Printf("[%s] provider=%s model=%s", role, providerCfg.Provider, providerCfg.Model)
 
 		return runner.New(runner.Config{
-			Role:       role,
-			AgentID:    agentID,
-			SpaceSlug:  space,
-			RepoPath:   activeRepo,
-			HiveDir:    hiveDir,
-			APIClient:  client,
-		APIBase:   apiBase,
-			Provider:   provider,
-			RolePrompt: runner.LoadRolePrompt(hiveDir, role),
-			BudgetUSD:  budget,
-			OneShot:    true,
-			NoPush:     role == "builder",
-			PRMode:       role == "builder" && prMode,
+			Role:         role,
+			AgentID:      agentID,
+			SpaceSlug:    space,
+			RepoPath:     activeRepo,
+			HiveDir:      hiveDir,
+			APIClient:    client,
+			APIBase:      apiBase,
+			Provider:     provider,
+			RolePrompt:   runner.LoadRolePrompt(hiveDir, role),
+			BudgetUSD:    budget,
+			OneShot:      true,
+			Direct:       direct,
+			ProposalMode: !direct,
+			NoPush:       role == "builder",
+			PRMode:       direct && role == "builder" && prMode,
 			UseWorktrees: role == "builder" && useWorktrees,
 			RepoMap:      repoMap,
 			Registry:     reg,
@@ -616,6 +675,8 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 		return err
 	}
 	sm := runner.NewPipelineStateMachine(smRunner, makeRunner)
+	cycleID := "pipeline-" + time.Now().UTC().Format("20060102T150405Z")
+	sm.SetCycleID(cycleID)
 
 	// Create telemetry writer for pipeline snapshots.
 	var tw *telemetry.Writer
@@ -679,6 +740,30 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 			log.Printf("[pipeline] persisted session for %s: %s", role, sid[:8])
 		}
 	})
+	sm.SetPhaseObserver(func(e runner.PhaseEvent) {
+		if tw == nil {
+			return
+		}
+		tw.WritePipelinePhase(telemetry.PipelinePhaseSnapshot{
+			CycleID:       e.CycleID,
+			Phase:         e.Phase,
+			WorkflowStage: e.WorkflowStage,
+			Outcome:       e.Outcome,
+			Repo:          e.Repo,
+			TaskID:        e.TaskID,
+			TaskTitle:     e.TaskTitle,
+			DurationSecs:  e.DurationSecs,
+			CostUSD:       e.CostUSD,
+			InputTokens:   e.InputTokens,
+			OutputTokens:  e.OutputTokens,
+			BoardOpen:     e.BoardOpen,
+			ReviseCount:   e.ReviseCount,
+			Summary:       e.Summary,
+			Error:         e.Error,
+			InputRef:      e.InputRef,
+			OutputRef:     e.OutputRef,
+		})
+	})
 
 	if err := sm.Run(ctx); err != nil {
 		log.Printf("[pipeline] state machine error: %v", err)
@@ -691,10 +776,27 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 		}
 	}
 
+	if !direct {
+		log.Printf("[pipeline] proposal mode; skipping final direct commit/push/deploy sweep")
+		log.Printf("[pipeline] ── cycle complete ──")
+		return nil
+	}
+
 	// Push ALL repos that have uncommitted changes — not just activeRepo.
 	// The Builder may have modified any repo via Operate().
+	auditEmitter, closeAudit, auditErr := newAuthorityAuditEmitter(ctx, dsn)
+	if auditErr != nil {
+		log.Printf("[pipeline] authority audit unavailable: %v", auditErr)
+	}
+	if closeAudit != nil {
+		defer closeAudit()
+	}
+
+	if err := authorizeFinalPipelineSweep(repoMap, activeRepo, auditEmitter); err != nil {
+		return err
+	}
 	log.Printf("[pipeline] ── pushing ──")
-	needsDeploy := false
+	siteChanged := false
 	for name, repoPath := range repoMap {
 		pusher := runner.New(runner.Config{RepoPath: repoPath})
 		if pusher.HasChanges() {
@@ -709,7 +811,7 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 			} else {
 				log.Printf("[pipeline] %s pushed", name)
 				if name == "site" {
-					needsDeploy = true
+					siteChanged = true
 				}
 			}
 		}
@@ -722,21 +824,31 @@ func runPipeline(space, apiBase, repoPath string, budget float64, agentID string
 		}
 	}
 
-	// Deploy if site was modified. Ship what you build.
-	if needsDeploy || filepath.Base(activeRepo) == "site" {
-		log.Printf("[pipeline] ── deploying site ──")
-		deployCmd := exec.CommandContext(ctx, filepath.Join(os.Getenv("HOME"), ".fly", "bin", "flyctl"), "deploy", "--remote-only")
-		deployCmd.Dir = activeRepo
-		deployCmd.Stdout = os.Stderr
-		deployCmd.Stderr = os.Stderr
-		if err := deployCmd.Run(); err != nil {
-			log.Printf("[pipeline] deploy error: %v", err)
-		} else {
-			log.Printf("[pipeline] deployed to production")
-		}
+	if siteChanged {
+		log.Printf("[pipeline] site changed; external deploy skipped (runtime target: Nucbuntu)")
 	}
 
 	log.Printf("[pipeline] ── cycle complete ──")
+	return nil
+}
+
+func authorizeFinalPipelineSweep(repoMap map[string]string, activeRepo string, auditEmitter authorityRequestEmitter) error {
+	if len(repoMap) == 0 {
+		return nil
+	}
+	if err := safety.RequireAuthorized(safety.ActionRepoMutateCrossRepo); err != nil {
+		outcome := safety.DefaultOutcome(safety.ActionRepoMutateCrossRepo)
+		log.Printf("repo.mutate.cross_repo.blocked action=%s outcome=%s repos=%d active_repo=%s: %v",
+			safety.ActionRepoMutateCrossRepo,
+			outcome,
+			len(repoMap),
+			activeRepo,
+			err,
+		)
+		emitAuthorityRequest(auditEmitter, safety.ActionRepoMutateCrossRepo, outcome,
+			fmt.Sprintf("final pipeline multi-repo sweep blocked: repos=%d active_repo=%s", len(repoMap), activeRepo))
+		return err
+	}
 	return nil
 }
 
@@ -750,7 +862,7 @@ const (
 // runDaemon loops runPipeline at the given interval until SIGINT/SIGTERM.
 // On pipeline failure it retries after a short backoff. After 3 consecutive
 // failures it halts. Writes loop/daemon.status after each cycle.
-func runDaemon(space, apiBase, repoPath string, budget float64, agentID string, repoMap map[string]string, interval time.Duration, prMode, useWorktrees, autoClone bool, storeDSN string) error {
+func runDaemon(space, apiBase, repoPath string, budget float64, agentID string, repoMap map[string]string, interval time.Duration, direct, prMode, useWorktrees, autoClone bool, storeDSN string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -778,11 +890,11 @@ func runDaemon(space, apiBase, repoPath string, budget float64, agentID string, 
 		start := time.Now()
 		log.Printf("[daemon] ── cycle %d start ──", cycle)
 
-		if prMode {
+		if direct && prMode {
 			daemonResetToMain(repoPath)
 		}
 
-		pipelineErr := runPipeline(space, apiBase, repoPath, budget, agentID, repoMap, prMode, useWorktrees, autoClone, storeDSN)
+		pipelineErr := runPipeline(space, apiBase, repoPath, budget, agentID, repoMap, direct, prMode, useWorktrees, autoClone, storeDSN)
 
 		elapsed := time.Since(start)
 		spent = dailyBudget.Spent()
@@ -1119,6 +1231,12 @@ func runLegacy(humanName, idea, dsn string, approveRequests, approveRoles bool, 
 		go pruner.Start(ctx)
 	}
 
+	apiKey := os.Getenv("LOVYOU_API_KEY")
+	var siteClient *api.Client
+	if apiKey != "" {
+		siteClient = api.New(apiBase, apiKey)
+	}
+
 	rt, err := hive.New(ctx, hive.Config{
 		Store:           s,
 		Actors:          actors,
@@ -1129,6 +1247,7 @@ func runLegacy(humanName, idea, dsn string, approveRequests, approveRoles bool, 
 		CatalogPath:     catalogPath,
 		Loop:            loop,
 		TelemetryWriter: tw,
+		APIClient:       siteClient,
 	})
 	if err != nil {
 		return fmt.Errorf("runtime: %w", err)
@@ -1157,7 +1276,6 @@ func runLegacy(humanName, idea, dsn string, approveRequests, approveRoles bool, 
 	// path (site restart, network partition, hive downtime) and replays
 	// them through the same dispatcher. Requires postgres + an API key —
 	// otherwise the ticker can't store a watermark or talk to the site.
-	apiKey := os.Getenv("LOVYOU_API_KEY")
 	if pool != nil && apiKey != "" && space != "" {
 		if err := reconciliation.EnsureTables(ctx, pool); err != nil {
 			fmt.Fprintf(os.Stderr, "WARNING: reconciliation tables: %v (continuing without reconciliation)\n", err)

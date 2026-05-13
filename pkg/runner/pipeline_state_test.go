@@ -64,6 +64,31 @@ func TestPipelineTransitionInvalid(t *testing.T) {
 	}
 }
 
+func TestWorkflowStageMetadata(t *testing.T) {
+	tests := []struct {
+		agent     string
+		stage     string
+		inputRef  string
+		outputRef string
+	}{
+		{"pm", "intake", "work.board:pinned-goal", "work.task:milestone"},
+		{"architect", "design", "loop/scout.md", "work.task:subtasks"},
+		{"builder", "emission", "work.board:active-task", "loop/build.md"},
+		{"critic", "review", "loop/build.md", "loop/critique.md"},
+	}
+	for _, tt := range tests {
+		if got := workflowStageForAgent(tt.agent); got != tt.stage {
+			t.Errorf("workflowStageForAgent(%q) = %q, want %q", tt.agent, got, tt.stage)
+		}
+		if got := phaseInputRef(tt.agent); got != tt.inputRef {
+			t.Errorf("phaseInputRef(%q) = %q, want %q", tt.agent, got, tt.inputRef)
+		}
+		if got := phaseOutputRef(tt.agent, EventTaskDone); got != tt.outputRef {
+			t.Errorf("phaseOutputRef(%q) = %q, want %q", tt.agent, got, tt.outputRef)
+		}
+	}
+}
+
 // newTasksServer creates a test HTTP server that returns tasks in BoardResponse format.
 func newTasksServer(t *testing.T, tasks []api.Node) *httptest.Server {
 	t.Helper()
@@ -264,6 +289,52 @@ func TestInferEventCriticPass(t *testing.T) {
 	got := sm.inferEvent("critic")
 	if got != EventCritiquePass {
 		t.Errorf("inferEvent(critic) with PASS: got %s, want %s", got, EventCritiquePass)
+	}
+}
+
+func TestProposalModeSkipsWorktreeMergeOnCriticPass(t *testing.T) {
+	sm := &PipelineStateMachine{
+		runner:   New(Config{Direct: false}),
+		worktree: &WorktreeContext{Branch: "feat/proposal"},
+	}
+	if sm.shouldMergeWorktree(EventCritiquePass) {
+		t.Fatal("proposal mode must not merge worktree branches after Critic PASS")
+	}
+
+	sm.runner.cfg.Direct = true
+	if !sm.shouldMergeWorktree(EventCritiquePass) {
+		t.Fatal("direct mode should keep legacy worktree merge behavior after Critic PASS")
+	}
+
+	if sm.shouldMergeWorktree(EventCritiqueRevise) {
+		t.Fatal("worktree merge must only happen after Critic PASS")
+	}
+}
+
+func TestWorktreeProposalRoutesTesterAndCriticToWorktree(t *testing.T) {
+	sourceRepo := t.TempDir()
+	worktreeDir := t.TempDir()
+	sm := &PipelineStateMachine{
+		runner:   New(Config{RepoPath: sourceRepo}),
+		worktree: &WorktreeContext{Dir: worktreeDir, Branch: "feat/proposal", SourceDir: sourceRepo},
+	}
+
+	for _, agent := range []string{"tester", "critic"} {
+		sm.runner.cfg.RepoPath = sourceRepo
+		sm.runner.worktree = nil
+		sm.routeWorktreeRepo(agent)
+		if sm.runner.cfg.RepoPath != worktreeDir {
+			t.Fatalf("%s repo path = %q, want worktree %q", agent, sm.runner.cfg.RepoPath, worktreeDir)
+		}
+		if sm.runner.Worktree() != sm.worktree {
+			t.Fatalf("%s runner did not retain worktree context", agent)
+		}
+	}
+
+	sm.runner.cfg.RepoPath = sourceRepo
+	sm.routeWorktreeRepo("reflector")
+	if sm.runner.cfg.RepoPath != sourceRepo {
+		t.Fatalf("reflector repo path = %q, want source repo %q", sm.runner.cfg.RepoPath, sourceRepo)
 	}
 }
 

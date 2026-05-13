@@ -37,13 +37,13 @@ import (
 type StopReason string
 
 const (
-	StopQuiescence  StopReason = "quiescence"
-	StopEscalation  StopReason = "escalation"
-	StopHalt        StopReason = "halt"
-	StopBudget      StopReason = "budget"
-	StopError       StopReason = "error"
-	StopCancelled   StopReason = "cancelled"
-	StopTaskDone    StopReason = "task_done"
+	StopQuiescence StopReason = "quiescence"
+	StopEscalation StopReason = "escalation"
+	StopHalt       StopReason = "halt"
+	StopBudget     StopReason = "budget"
+	StopError      StopReason = "error"
+	StopCancelled  StopReason = "cancelled"
+	StopTaskDone   StopReason = "task_done"
 )
 
 // Result is the outcome of a loop run.
@@ -91,8 +91,15 @@ type Config struct {
 	// create, assign, complete, and comment on tasks through the work graph.
 	TaskStore *work.TaskStore
 
+	// PhaseGateStore enables /phase gate, approve, and reject commands through
+	// the work graph.
+	PhaseGateStore *work.PhaseGateStore
+
 	// ConvID is the conversation ID for task operations.
 	ConvID types.ConversationID
+
+	// OnTaskCompleted is called after TaskStore.Complete succeeds. Optional.
+	OnTaskCompleted func(ctx context.Context, task work.Task, summary string)
 
 	// CanOperate indicates this agent has filesystem access.
 	// When true and the agent has assigned tasks, the loop calls
@@ -355,9 +362,9 @@ func (l *Loop) Run(ctx context.Context) Result {
 			}
 
 			// Auto-complete the task after successful Operate.
-			l.completeTask(task, result.Summary)
+			l.completeTask(ctx, task, result.Summary)
 			if l.sink != nil {
-				l.sink.OnBoundary(checkpoint.TaskCompleted, l.currentSnapshot())
+				l.captureBoundary(checkpoint.TaskCompleted, response)
 				l.lastCheckpointIter = l.iteration
 			}
 		} else {
@@ -384,8 +391,9 @@ func (l *Loop) Run(ctx context.Context) Result {
 			}
 		}
 
-		// 2.5. PROCESS task commands from the response.
+		// 2.5. PROCESS work graph commands from the response.
 		l.processTaskCommands(response)
+		l.processPhaseCommands(response)
 
 		// 2.6. PROCESS /health command from the response.
 		if cmd := parseHealthCommand(response); cmd != nil {
@@ -402,7 +410,7 @@ func (l *Loop) Run(ctx context.Context) Result {
 				fmt.Printf("[%s] /budget failed: %v\n", l.agent.Name(), err)
 			} else {
 				if l.sink != nil {
-					l.sink.OnBoundary(checkpoint.BudgetAdjusted, l.currentSnapshot())
+					l.captureBoundary(checkpoint.BudgetAdjusted, response)
 					l.lastCheckpointIter = l.iteration
 				}
 			}
@@ -415,7 +423,7 @@ func (l *Loop) Run(ctx context.Context) Result {
 					fmt.Printf("warning: /gap rejected: %v\n", err)
 				} else {
 					if l.sink != nil {
-						l.sink.OnBoundary(checkpoint.GapEmitted, l.currentSnapshot())
+						l.captureBoundary(checkpoint.GapEmitted, response)
 						l.lastCheckpointIter = l.iteration
 					}
 				}
@@ -425,7 +433,7 @@ func (l *Loop) Run(ctx context.Context) Result {
 					fmt.Printf("warning: /directive rejected: %v\n", err)
 				} else {
 					if l.sink != nil {
-						l.sink.OnBoundary(checkpoint.DirectiveEmitted, l.currentSnapshot())
+						l.captureBoundary(checkpoint.DirectiveEmitted, response)
 						l.lastCheckpointIter = l.iteration
 					}
 				}
@@ -442,7 +450,7 @@ func (l *Loop) Run(ctx context.Context) Result {
 					fmt.Printf("[%s] /spawn emit failed: %v\n", l.agent.Name(), err)
 				} else {
 					if l.sink != nil {
-						l.sink.OnBoundary(checkpoint.RoleProposed, l.currentSnapshot())
+						l.captureBoundary(checkpoint.RoleProposed, response)
 						l.lastCheckpointIter = l.iteration
 					}
 				}
@@ -467,7 +475,7 @@ func (l *Loop) Run(ctx context.Context) Result {
 						l.reviewerState.recordReview(
 							cmd.TaskID, cmd.Verdict, cmd.Issues, l.iteration)
 						if l.sink != nil {
-							l.sink.OnBoundary(checkpoint.ReviewCompleted, l.currentSnapshot())
+							l.captureBoundary(checkpoint.ReviewCompleted, response)
 							l.lastCheckpointIter = l.iteration
 						}
 					}
@@ -482,7 +490,7 @@ func (l *Loop) Run(ctx context.Context) Result {
 					fmt.Printf("[%s] /approve emit failed: %v\n", l.agent.Name(), err)
 				} else {
 					if l.sink != nil {
-						l.sink.OnBoundary(checkpoint.RoleDecided, l.currentSnapshot())
+						l.captureBoundary(checkpoint.RoleDecided, response)
 						l.lastCheckpointIter = l.iteration
 					}
 				}
@@ -744,7 +752,7 @@ func (l *Loop) checkResponse(ctx context.Context, response string, iteration int
 	switch sig.Signal {
 	case SignalHalt:
 		if l.sink != nil {
-			l.sink.OnBoundary(checkpoint.HaltSignal, l.currentSnapshot())
+			l.captureBoundary(checkpoint.HaltSignal, response)
 			l.lastCheckpointIter = l.iteration
 		}
 		r := l.result(StopHalt, iteration, sig.Reason)
@@ -755,7 +763,7 @@ func (l *Loop) checkResponse(ctx context.Context, response string, iteration int
 			fmt.Printf("warning: escalation event failed: %v\n", err)
 		}
 		if l.sink != nil {
-			l.sink.OnBoundary(checkpoint.TaskBlocked, l.currentSnapshot())
+			l.captureBoundary(checkpoint.TaskBlocked, response)
 			l.lastCheckpointIter = l.iteration
 		}
 		r := l.result(StopEscalation, iteration, sig.Reason)
@@ -780,7 +788,7 @@ func (l *Loop) checkResponse(ctx context.Context, response string, iteration int
 func (l *Loop) checkResponseText(ctx context.Context, response string, iteration int) *Result {
 	if ContainsSignal(response, "HALT") {
 		if l.sink != nil {
-			l.sink.OnBoundary(checkpoint.HaltSignal, l.currentSnapshot())
+			l.captureBoundary(checkpoint.HaltSignal, response)
 			l.lastCheckpointIter = l.iteration
 		}
 		r := l.result(StopHalt, iteration, response)
@@ -788,7 +796,7 @@ func (l *Loop) checkResponseText(ctx context.Context, response string, iteration
 	}
 	if ContainsSignal(response, "ESCALATE") {
 		if l.sink != nil {
-			l.sink.OnBoundary(checkpoint.TaskBlocked, l.currentSnapshot())
+			l.captureBoundary(checkpoint.TaskBlocked, response)
 			l.lastCheckpointIter = l.iteration
 		}
 		if err := l.agent.Escalate(ctx, l.humanID,
@@ -940,6 +948,28 @@ func (l *Loop) processTaskCommands(response string) {
 	}
 }
 
+// processPhaseCommands extracts and executes /phase commands from the response.
+func (l *Loop) processPhaseCommands(response string) {
+	if l.config.PhaseGateStore == nil {
+		return
+	}
+
+	commands := parsePhaseCommands(response)
+	if len(commands) == 0 {
+		return
+	}
+
+	var causes []types.EventID
+	if lastEv := l.agent.LastEvent(); !lastEv.IsZero() {
+		causes = []types.EventID{lastEv}
+	}
+
+	executed := executePhaseCommands(commands, l.config.PhaseGateStore, l.agent.ID(), causes, l.config.ConvID)
+	if executed > 0 {
+		fmt.Printf("[%s] executed %d/%d phase commands\n", l.agent.Name(), executed, len(commands))
+	}
+}
+
 // autoAssignOpenTask finds the first open, unassigned task and assigns it to
 // this agent. This lets the Operate path activate without waiting for the LLM
 // to emit a /task assign command via Reason.
@@ -951,28 +981,42 @@ func (l *Loop) autoAssignOpenTask() {
 	if err != nil || len(open) == 0 {
 		return
 	}
-	// Find first task not assigned to anyone.
-	for _, t := range open {
-		summary, sErr := l.config.TaskStore.ListSummaries(100)
-		if sErr != nil {
+	summaries, sErr := l.config.TaskStore.ListSummaries(100)
+	if sErr != nil {
+		return
+	}
+	assignees := make(map[types.EventID]types.ActorID, len(summaries))
+	for _, s := range summaries {
+		assignees[s.ID] = s.Assignee
+	}
+
+	// ListOpen is store-order dependent. Walk from oldest to newest so the
+	// first canonical leaf task gets executed before newer duplicate chains.
+	for i := len(open) - 1; i >= 0; i-- {
+		t := open[i]
+		if assignees[t.ID] != (types.ActorID{}) {
 			continue
 		}
-		for _, s := range summary {
-			if s.ID == t.ID && s.Assignee == (types.ActorID{}) {
-				var causes []types.EventID
-				if lastEv := l.agent.LastEvent(); !lastEv.IsZero() {
-					causes = []types.EventID{lastEv}
-				}
-				if err := l.config.TaskStore.Assign(l.agent.ID(), t.ID, l.agent.ID(), causes, l.config.ConvID); err == nil {
-					fmt.Printf("  → auto-assigned: %s — %s\n", t.ID.Value(), t.Title)
-					if l.sink != nil {
-						l.sink.OnBoundary(checkpoint.TaskAssigned, l.currentSnapshot())
-						l.lastCheckpointIter = l.iteration
-					}
-				}
-				return
+		hasChildren, childErr := l.config.TaskStore.HasChildren(t.ID)
+		if childErr != nil || hasChildren {
+			continue
+		}
+		readiness, readyErr := l.config.TaskStore.Readiness(t.ID)
+		if readyErr != nil || !readiness.Ready {
+			continue
+		}
+		var causes []types.EventID
+		if lastEv := l.agent.LastEvent(); !lastEv.IsZero() {
+			causes = []types.EventID{lastEv}
+		}
+		if err := l.config.TaskStore.Assign(l.agent.ID(), t.ID, l.agent.ID(), causes, l.config.ConvID); err == nil {
+			fmt.Printf("  → auto-assigned canonical leaf: %s — %s\n", t.ID.Value(), t.Title)
+			if l.sink != nil {
+				l.sink.OnBoundary(checkpoint.TaskAssigned, l.currentSnapshot())
+				l.lastCheckpointIter = l.iteration
 			}
 		}
+		return
 	}
 }
 
@@ -1070,7 +1114,7 @@ func buildOperateArtifactBody(repoPath string) string {
 }
 
 // completeTask marks a task as completed in the task store. Best-effort.
-func (l *Loop) completeTask(task work.Task, summary string) {
+func (l *Loop) completeTask(ctx context.Context, task work.Task, summary string) {
 	if l.config.TaskStore == nil {
 		return
 	}
@@ -1082,6 +1126,9 @@ func (l *Loop) completeTask(task work.Task, summary string) {
 		fmt.Printf("warning: task complete failed: %v\n", err)
 	} else {
 		fmt.Printf("  → task completed: %s — %s\n", task.ID.Value(), task.Title)
+		if l.config.OnTaskCompleted != nil {
+			l.config.OnTaskCompleted(ctx, task, summary)
+		}
 	}
 }
 
@@ -1149,4 +1196,3 @@ func RunConcurrent(ctx context.Context, configs []Config) []AgentResult {
 	wg.Wait()
 	return results
 }
-
