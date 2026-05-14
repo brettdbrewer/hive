@@ -519,7 +519,11 @@ func runCouncilCmd(space, apiBase, repoPath string, budget float64, topic, catal
 	if err != nil {
 		return fmt.Errorf("resolver: %w", err)
 	}
-	pool := modelconfig.NewProviderPool(resolver)
+	// Thread --budget into every pool-built provider. Without this wrapper,
+	// modelconfig.ToIntelligenceConfig produces configs with MaxBudgetUSD=0
+	// and claude-cli falls back to its $1/call default, far below the $10
+	// daily budget operators expect.
+	pool := modelconfig.NewProviderPoolWithBuilder(resolver, councilProviderBuilder(intelligence.New, budget))
 
 	// Precompute role → CanOperate map once, then pass as a closure on Config.
 	// Bridges the runner package (which can't import hive) to the live
@@ -541,6 +545,25 @@ func runCouncilCmd(space, apiBase, repoPath string, budget float64, topic, catal
 		CouncilTopic:     topic,
 		CanOperateLookup: canOperateLookup,
 	})
+}
+
+// councilProviderBuilder returns a provider builder closure that injects the
+// operator's --budget into every intelligence.Config before delegating to the
+// real constructor. Threading budget through here is essential because the
+// modelconfig.Resolver (used by ProviderPool) does not carry a per-call cost
+// cap; without this wrapper, claude-cli providers default to a $1 per-call
+// cap (far below the daily --budget operators set).
+//
+// The `inner` parameter is the underlying constructor (intelligence.New in
+// production, a capturing fake in tests).
+func councilProviderBuilder(
+	inner func(intelligence.Config) (intelligence.Provider, error),
+	budget float64,
+) func(intelligence.Config) (intelligence.Provider, error) {
+	return func(cfg intelligence.Config) (intelligence.Provider, error) {
+		cfg.MaxBudgetUSD = budget
+		return inner(cfg)
+	}
 }
 
 // buildCouncilResolver returns a Resolver for the council. Precedence:

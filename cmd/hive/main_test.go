@@ -2,12 +2,34 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+
+	"github.com/transpara-ai/eventgraph/go/pkg/decision"
+	"github.com/transpara-ai/eventgraph/go/pkg/event"
+	"github.com/transpara-ai/eventgraph/go/pkg/intelligence"
+	"github.com/transpara-ai/eventgraph/go/pkg/modelconfig"
 )
+
+// fakeBudgetProvider satisfies intelligence.Provider for tests so no
+// subprocess or network call is made. It records the MaxBudgetUSD it was
+// constructed with.
+type fakeBudgetProvider struct {
+	provider     string
+	model        string
+	maxBudgetUSD float64
+}
+
+func (f *fakeBudgetProvider) Name() string  { return f.provider }
+func (f *fakeBudgetProvider) Model() string { return f.model }
+func (f *fakeBudgetProvider) Reason(_ context.Context, _ string, _ []event.Event) (decision.Response, error) {
+	return decision.Response{}, nil
+}
 
 type logCaptureMain struct {
 	original io.Writer
@@ -83,6 +105,62 @@ func TestBuildCouncilResolver_CatalogPrecedence(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("council provider builder threads budget", func(t *testing.T) {
+		// Verify the council pool, when built with councilProviderBuilder, threads
+		// --budget into every constructed provider. This guards against the
+		// regression where modelconfig.ToIntelligenceConfig produces configs with
+		// MaxBudgetUSD=0 and claude-cli falls back to its $1/call default.
+		os.Unsetenv("COUNCIL_MODEL")
+		resolver, err := buildCouncilResolver("")
+		if err != nil {
+			t.Fatalf("buildCouncilResolver: %v", err)
+		}
+
+		const wantBudget = 10.0
+		var (
+			mu          sync.Mutex
+			seenConfigs []intelligence.Config
+		)
+		recordingBuilder := func(cfg intelligence.Config) (intelligence.Provider, error) {
+			mu.Lock()
+			seenConfigs = append(seenConfigs, cfg)
+			mu.Unlock()
+			return &fakeBudgetProvider{
+				provider:     cfg.Provider,
+				model:        cfg.Model,
+				maxBudgetUSD: cfg.MaxBudgetUSD,
+			}, nil
+		}
+
+		pool := modelconfig.NewProviderPoolWithBuilder(
+			resolver,
+			councilProviderBuilder(recordingBuilder, wantBudget),
+		)
+
+		provider, err := pool.For("planner")
+		if err != nil {
+			t.Fatalf("pool.For(planner): %v", err)
+		}
+		fp, ok := provider.(*fakeBudgetProvider)
+		if !ok {
+			t.Fatalf("provider type: got %T, want *fakeBudgetProvider", provider)
+		}
+		if fp.maxBudgetUSD != wantBudget {
+			t.Errorf("provider MaxBudgetUSD: got %v, want %v", fp.maxBudgetUSD, wantBudget)
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if len(seenConfigs) == 0 {
+			t.Fatal("recordingBuilder was never called")
+		}
+		for i, cfg := range seenConfigs {
+			if cfg.MaxBudgetUSD != wantBudget {
+				t.Errorf("seenConfigs[%d].MaxBudgetUSD: got %v, want %v", i, cfg.MaxBudgetUSD, wantBudget)
+			}
+		}
+	})
 
 	// Separate subtest for catalog + env coexistence; uses a real temp catalog file.
 	t.Run("catalog and env: env ignored, note logged", func(t *testing.T) {
