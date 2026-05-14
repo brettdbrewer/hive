@@ -138,6 +138,115 @@ func TestRunCouncil_UsesPoolWhenSet(t *testing.T) {
 	}
 }
 
+func TestRunCouncil_RoutesYAMLCatalogPerRole(t *testing.T) {
+	tmp := t.TempDir()
+	mustWrite(t, filepath.Join(tmp, "agents/planner.md"), "# Planner\nYou are the Planner.")
+	mustWrite(t, filepath.Join(tmp, "agents/implementer.md"), "# Implementer\nYou are the Implementer.")
+
+	catalogPath := filepath.Join(tmp, "catalog.yaml")
+	if err := os.WriteFile(catalogPath, []byte(testYAMLCatalog), 0o644); err != nil {
+		t.Fatalf("write catalog: %v", err)
+	}
+
+	r, err := modelconfig.ResolverFromCatalogFile(catalogPath)
+	if err != nil {
+		t.Fatalf("ResolverFromCatalogFile: %v", err)
+	}
+
+	type seenCfg struct {
+		Provider string
+		Model    string
+		BaseURL  string
+	}
+	var (
+		mu   sync.Mutex
+		seen []seenCfg
+	)
+	builder := func(cfg intelligence.Config) (intelligence.Provider, error) {
+		mu.Lock()
+		seen = append(seen, seenCfg{Provider: cfg.Provider, Model: cfg.Model, BaseURL: cfg.BaseURL})
+		mu.Unlock()
+		return &recordingFakeProvider{name: cfg.Provider, model: cfg.Model, calls: &callLog{}}, nil
+	}
+	pool := modelconfig.NewProviderPoolWithBuilder(r, builder)
+
+	err = RunCouncil(context.Background(), Config{
+		HiveDir:      tmp,
+		Pool:         pool,
+		BudgetUSD:    10.0,
+		CouncilTopic: "test",
+	})
+	if err != nil {
+		t.Fatalf("RunCouncil: %v", err)
+	}
+
+	// Two roles → two distinct resolved configs → two builder invocations.
+	mu.Lock()
+	defer mu.Unlock()
+	if len(seen) != 2 {
+		t.Fatalf("expected 2 builder invocations (one per unique config); got %d: %v", len(seen), seen)
+	}
+
+	wantPlanner := seenCfg{Provider: "openai-compatible", Model: "test-planner-model", BaseURL: "https://example.test/api/v1"}
+	wantImpl := seenCfg{Provider: "openai-compatible", Model: "test-implementer-model", BaseURL: "https://example.test/api/v2"}
+
+	foundPlanner, foundImpl := false, false
+	for _, s := range seen {
+		switch s {
+		case wantPlanner:
+			foundPlanner = true
+		case wantImpl:
+			foundImpl = true
+		default:
+			t.Errorf("unexpected config seen by builder: %+v", s)
+		}
+	}
+	if !foundPlanner {
+		t.Errorf("planner config not seen; got: %v", seen)
+	}
+	if !foundImpl {
+		t.Errorf("implementer config not seen; got: %v", seen)
+	}
+}
+
+const testYAMLCatalog = `
+models:
+  - id: test-planner-model
+    aliases: [planner-alias]
+    provider: openai-compatible
+    base_url: https://example.test/api/v1
+    auth_mode: api-key
+    tier: judgment
+    capabilities: [tools, reasoning]
+    context_window: 100000
+    max_output_tokens: 4096
+    pricing:
+      input_per_million: 0.50
+      output_per_million: 1.00
+
+  - id: test-implementer-model
+    aliases: [implementer-alias]
+    provider: openai-compatible
+    base_url: https://example.test/api/v2
+    auth_mode: api-key
+    tier: judgment
+    capabilities: [tools, reasoning, operate]
+    context_window: 200000
+    max_output_tokens: 8192
+    pricing:
+      input_per_million: 1.00
+      output_per_million: 2.00
+
+tier_defaults:
+  judgment: planner-alias
+  execution: planner-alias
+  volume: planner-alias
+
+role_defaults:
+  planner: planner-alias
+  implementer: implementer-alias
+`
+
 func TestRunCouncil_WarnsOnCanOperateMismatch(t *testing.T) {
 	tmp := t.TempDir()
 	mustWrite(t, filepath.Join(tmp, "agents/implementer.md"), "# Implementer\nYou are the Implementer.")
