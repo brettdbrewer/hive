@@ -8,7 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/stretchr/testify v1.11.1
 	github.com/transpara-ai/agent v0.0.0
-	github.com/transpara-ai/eventgraph/go v0.0.0-20260309152918-5602caa542f2
+	github.com/transpara-ai/eventgraph/go v0.0.0-20260514214920-cf255c0d24cd
 	github.com/transpara-ai/work v0.0.0
 )
 
