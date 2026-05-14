@@ -17,7 +17,7 @@ import (
 	"github.com/transpara-ai/eventgraph/go/pkg/decision"
 	"github.com/transpara-ai/eventgraph/go/pkg/intelligence"
 	"github.com/transpara-ai/hive/pkg/api"
-	"github.com/transpara-ai/hive/pkg/modelconfig"
+	"github.com/transpara-ai/eventgraph/go/pkg/modelconfig"
 	"github.com/transpara-ai/hive/pkg/registry"
 	"github.com/transpara-ai/hive/pkg/safety"
 )
